@@ -16,13 +16,8 @@ host = os.environ.get("TRAEFIK_HOST", "")
 if not host or not agent.certificate_event_matches(event, host):
     sys.exit(0)  # not our certificate
 
-get_proc = agent.run_helper(
-    "get-certificate",
-    "--cert-file=certs/remoted.pem",
-    "--key-file=certs/remoted-key.pem",
-    host,
-)
-if get_proc.returncode == 0:
+# The exit status 0 means the certificate was replaced, 3 that the current one stays
+if agent.run_helper("install-listener-cert").returncode == 0:
     agent.run_helper("fix-perms").check_returncode()
     # The manager has no documented reload for the agent listener certificate
     agent.run_helper("systemctl", "--user", "-T", "try-restart", "wazuh-manager.service").check_returncode()
