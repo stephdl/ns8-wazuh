@@ -21,6 +21,7 @@ config = {}
 config["host"] = os.getenv("TRAEFIK_HOST","")
 config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
 config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
+config["ldap_readonly_group"] = os.getenv("LDAP_READONLY_GROUP", "")
 config["export_url"] = os.getenv("EXPORT_URL", "")
 config["export_token_set"] = os.path.exists("secrets/export.env")
 config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"

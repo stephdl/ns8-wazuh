@@ -9,6 +9,7 @@
             "lets_encrypt": true,
             "ldap_domain": "domain.org",
             "ldap_admin_group": "wazuh-admins",
+            "ldap_readonly_group": "wazuh-readers",
             "index_unclassified_events": false,
             "export_url": "https://logs.example.org/wazuh"
         }
@@ -38,6 +39,11 @@
             "type": "string",
             "title": "Administrators group",
             "description": "Group of the user domain that receives the administrator role."
+        },
+        "ldap_readonly_group": {
+            "type": "string",
+            "title": "Read-only group",
+            "description": "Group of the user domain that can read alerts and agents without changing anything."
         },
         "index_unclassified_events": {
             "type": "boolean",
