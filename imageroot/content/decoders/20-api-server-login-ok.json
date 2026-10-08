@@ -2,6 +2,9 @@
   "resource": {
     "name": "decoder/ns8-api-server-login-ok/0",
     "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
     "metadata": {
       "title": "NS8 cluster admin login",
       "description": "Successful logins to the NS8 cluster API",
