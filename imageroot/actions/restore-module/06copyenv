@@ -19,6 +19,7 @@ for evar in [
         "LDAP_DOMAIN",
         "LDAP_ADMIN_GROUP",
         "INDEX_UNCLASSIFIED_EVENTS",
+        "EXPORT_URL",
     ]:
     agent.set_env(evar, original_environment[evar])
 
