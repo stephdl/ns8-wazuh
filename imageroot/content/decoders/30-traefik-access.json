@@ -20,13 +20,13 @@
     },
     "check": [
       {
-        "_tmp_json.event.original": "contains(\" - - [\")"
+        "event.original": "contains(\" - - [\")"
       }
     ],
     "normalize": [
       {
-        "parse|_tmp_json.event.original": [
-          "<source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
+        "parse|event.original": [
+          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
         ]
       },
       {
