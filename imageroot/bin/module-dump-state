@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Runs before the backup, in the state directory: take a snapshot of the user data.
+# Copying the live data volume of the indexer would give an inconsistent backup.
+
+import os
+import subprocess
+import sys
+
+from wazuh_api import api, USER_INDICES
+
+SNAPSHOT_DIR = os.environ.get("SNAPSHOT_DIR", "snapshots")
+
+answer = api("PUT", "_snapshot/ns8", {"type": "fs", "settings": {"location": "/snapshots"}})
+if not answer.get("acknowledged"):
+    sys.exit(f"cannot register the snapshot repository: {answer}")
+
+# Only the last snapshot is kept: the backup tool already keeps the history
+api("DELETE", "_snapshot/ns8/backup")
+answer = api("PUT", "_snapshot/ns8/backup?wait_for_completion=true", {
+    "indices": USER_INDICES,
+    "ignore_unavailable": True,
+    "include_global_state": False,
+})
+state = answer.get("snapshot", {}).get("state")
+if state != "SUCCESS":
+    sys.exit(f"the snapshot failed: {answer}")
+
+# The files belong to uid 101 of the pod, hand them to the module so the backup tool can read them
+subprocess.run(["podman", "unshare", "chown", "-R", "0:0", SNAPSHOT_DIR], check=True)
+print("snapshot done", file=sys.stderr)
