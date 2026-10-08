@@ -141,17 +141,20 @@
             :loading="loading.getHealth"
             class="min-height-card"
           >
+            <!-- NsInfoCard checks the slot once, so the wrapper must exist from the first render -->
             <template slot="content">
-              <div
-                v-if="
-                  health.indexer && health.indexer.disk_used_percent !== null
-                "
-              >
-                {{
-                  $t("status.disk_used", {
-                    percent: health.indexer.disk_used_percent,
-                  })
-                }}
+              <div>
+                <span
+                  v-if="
+                    health.indexer && health.indexer.disk_used_percent !== null
+                  "
+                >
+                  {{
+                    $t("status.disk_used", {
+                      percent: health.indexer.disk_used_percent,
+                    })
+                  }}
+                </span>
               </div>
             </template>
           </NsInfoCard>
