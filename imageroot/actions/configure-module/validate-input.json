@@ -6,7 +6,9 @@
     "examples": [
         {
             "host": "wazuh.domain.org",
-            "lets_encrypt": true
+            "lets_encrypt": true,
+            "ldap_domain": "domain.org",
+            "ldap_admin_group": "wazuh-admins"
         }
     ],
     "type": "object",
@@ -24,6 +26,16 @@
             "type": "boolean",
             "title": "Let's Encrypt certificate",
             "description": "Request a valid Let's Encrypt certificate."
+        },
+        "ldap_domain": {
+            "type": "string",
+            "title": "User domain",
+            "description": "NS8 user domain used to log in to the dashboard. Empty to disable."
+        },
+        "ldap_admin_group": {
+            "type": "string",
+            "title": "Administrators group",
+            "description": "Group of the user domain that receives the administrator role."
         }
     }
 }
