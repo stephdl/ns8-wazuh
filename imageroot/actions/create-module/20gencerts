@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+set -e
+exec 1>&2
+
+# Internal CA, used only between the containers of the pod
+mkdir -p ca
+chmod 0700 ca
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out ca/root-ca-key.pem
+openssl req -x509 -new -key ca/root-ca-key.pem -days 3650 \
+    -subj "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=ns8-wazuh internal CA" -out ca/root-ca.pem
+
+# The subject of the indexer certificate must match NODES_DN in wazuh-indexer.service
+"${AGENT_INSTALL_DIR}/bin/mkcert" indexer "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.indexer" \
+    "DNS:wazuh.indexer,DNS:localhost,IP:127.0.0.1"
+"${AGENT_INSTALL_DIR}/bin/mkcert" admin "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=admin" "DNS:admin"
+"${AGENT_INSTALL_DIR}/bin/mkcert" connector "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.manager" \
+    "DNS:wazuh.manager,DNS:localhost,IP:127.0.0.1"
