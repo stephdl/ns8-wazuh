@@ -9,7 +9,9 @@
             "lets_encrypt": true,
             "ldap_domain": "domain.org",
             "ldap_admin_group": "wazuh-admins",
-            "index_unclassified_events": false
+            "index_unclassified_events": false,
+            "export_url": "https://logs.example.org/wazuh",
+            "export_token_set": true
         }
     ],
     "type": "object",
@@ -18,7 +20,9 @@
         "lets_encrypt",
         "ldap_domain",
         "ldap_admin_group",
-        "index_unclassified_events"
+        "index_unclassified_events",
+        "export_url",
+        "export_token_set"
     ],
     "properties": {
         "host": {
@@ -45,6 +49,16 @@
             "type": "boolean",
             "title": "Keep unclassified logs",
             "description": "Index the logs that no decoder recognizes. They take more disk space."
+        },
+        "export_url": {
+            "type": "string",
+            "title": "Export URL",
+            "description": "HTTPS endpoint that receives the new findings. Empty when disabled."
+        },
+        "export_token_set": {
+            "type": "boolean",
+            "title": "Export token set",
+            "description": "True when a bearer token is stored. The token itself is never returned."
         }
     }
 }
