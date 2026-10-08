@@ -1,0 +1,45 @@
+{
+  "resource": {
+    "name": "decoder/ns8-traefik-access/0",
+    "enabled": true,
+    "metadata": {
+      "title": "Traefik access log",
+      "description": "HTTP requests received by the NS8 reverse proxy",
+      "author": "NethServer",
+      "module": "traefik",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_tmp_json.event.original": "contains(\" - - [\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_tmp_json.event.original": [
+          "<source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "web"
+            ]
+          },
+          {
+            "event.type": [
+              "access"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
