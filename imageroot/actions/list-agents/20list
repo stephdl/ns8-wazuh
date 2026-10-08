@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+
+import agent
+from wazuh_api import manager_api
+
+FIELDS = "id,name,ip,registerIP,status,version,os.name,os.version,lastKeepAlive,dateAdd,group"
+
+response = manager_api("GET", f"agents?select={FIELDS}&limit=500&sort=%2Bname")
+if response.get("error", 1) != 0:
+    print(agent.SD_ERR + f"cannot list the agents: {response.get('detail')}", file=sys.stderr)
+    sys.exit(2)
+
+agents = []
+for item in response["data"]["affected_items"]:
+    os_info = item.get("os") or {}
+    agents.append({
+        "id": item["id"],
+        "name": item.get("name", ""),
+        # The manager keeps the address seen at the enrollment when the agent did not give one
+        "ip": item.get("ip") or item.get("registerIP") or "",
+        "status": item.get("status", ""),
+        "version": item.get("version", ""),
+        "os": " ".join(part for part in (os_info.get("name"), os_info.get("version")) if part),
+        "last_keep_alive": item.get("lastKeepAlive", ""),
+        "date_add": item.get("dateAdd", ""),
+        "groups": item.get("group") or [],
+    })
+
+# The manager itself is listed with the id 000: it is not an agent
+agents = [a for a in agents if a["id"] != "000"]
+json.dump({"agents": agents}, fp=sys.stdout)
