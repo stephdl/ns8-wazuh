@@ -2,6 +2,9 @@
   "resource": {
     "name": "decoder/ns8-dovecot-login-ok/0",
     "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
     "metadata": {
       "title": "Dovecot successful login",
       "description": "IMAP, POP3 and submission logins accepted by Dovecot",
