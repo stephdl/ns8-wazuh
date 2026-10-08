@@ -80,25 +80,72 @@
                 />
               </cv-column>
             </cv-row>
-            <cv-toggle
-              value="httpToHttps"
-              :label="$t('settings.http_to_https')"
-              v-model="isHttpToHttpsEnabled"
-              :disabled="loading.getConfiguration || loading.configureModule"
-              class="mg-bottom"
+            <NsComboBox
+              v-model="ldapDomain"
+              :options="domains"
+              auto-highlight
+              :title="$t('settings.ldap_domain')"
+              :label="$t('settings.choose_ldap_domain')"
+              :invalid-message="$t(error.ldap_domain)"
+              :disabled="stillLoading || loading.listUserDomains"
+              tooltipAlignment="start"
+              tooltipDirection="top"
+              class="mg-bottom maxwidth"
+              ref="ldap_domain"
             >
-              <template slot="text-left">{{
-                $t("settings.disabled")
-              }}</template>
-              <template slot="text-right">{{
-                $t("settings.enabled")
-              }}</template>
-            </cv-toggle>
+              <template slot="tooltip">{{ $t("settings.ldap_domain_tooltip") }}</template>
+            </NsComboBox>
+            <cv-text-input
+              v-if="ldapDomain && ldapDomain !== '-'"
+              :label="$t('settings.ldap_admin_group')"
+              placeholder="wazuh-admins"
+              v-model.trim="ldapAdminGroup"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.ldap_admin_group)"
+              :disabled="stillLoading"
+              ref="ldap_admin_group"
+            >
+            </cv-text-input>
             <!-- advanced options -->
             <cv-accordion ref="accordion" class="maxwidth mg-bottom">
               <cv-accordion-item :open="toggleAccordion[0]">
                 <template slot="title">{{ $t("settings.advanced") }}</template>
-                <template slot="content"> </template>
+                <template slot="content">
+                  <NsToggle
+                    value="indexUnclassified"
+                    :label="$t('settings.index_unclassified_events')"
+                    v-model="indexUnclassifiedEvents"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template #tooltip>{{ $t("settings.index_unclassified_events_tooltip") }}</template>
+                    <template slot="text-left">{{ $t("settings.disabled") }}</template>
+                    <template slot="text-right">{{ $t("settings.enabled") }}</template>
+                  </NsToggle>
+                  <cv-text-input
+                    :label="$t('settings.export_url')"
+                    placeholder="https://logs.example.org/wazuh"
+                    v-model.trim="exportUrl"
+                    class="mg-bottom"
+                    :helper-text="$t('settings.export_url_helper')"
+                    :invalid-message="$t(error.export_url)"
+                    :disabled="stillLoading"
+                    ref="export_url"
+                  >
+                  </cv-text-input>
+                  <NsTextInput
+                    v-if="exportUrl"
+                    type="password"
+                    v-model="exportToken"
+                    :label="$t('settings.export_token')"
+                    :placeholder="exportTokenSet ? $t('settings.export_token_set') : ''"
+                    :helper-text="$t('settings.export_token_helper')"
+                    :passwordShowLabel="$t('settings.show')"
+                    :passwordHideLabel="$t('settings.hide')"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  />
+                </template>
               </cv-accordion-item>
             </cv-accordion>
             <cv-row v-if="error.configureModule">
@@ -191,18 +238,28 @@ export default {
       host: "",
       isLetsEncryptEnabled: false,
       isLetsEncryptCurrentlyEnabled: false,
-      isHttpToHttpsEnabled: true,
+      ldapDomain: "-",
+      ldapAdminGroup: "",
+      domains: [],
+      indexUnclassifiedEvents: false,
+      exportUrl: "",
+      exportToken: "",
+      exportTokenSet: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
         getStatus: false,
+        listUserDomains: false,
       },
       error: {
+        ldap_domain: "",
+        ldap_admin_group: "",
+        export_url: "",
+        listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
         host: "",
         lets_encrypt: "",
-        http2https: "",
         getStatus: "",
       },
     };
@@ -218,6 +275,7 @@ export default {
     },
   },
   created() {
+    this.listUserDomains();
     this.getConfiguration();
     this.getStatus();
   },
@@ -232,6 +290,49 @@ export default {
     next();
   },
   methods: {
+    async listUserDomains() {
+      this.loading.listUserDomains = true;
+      this.error.listUserDomains = "";
+      const taskAction = "list-user-domains";
+      this.core.$root.$off(taskAction + "-aborted");
+      this.core.$root.$once(taskAction + "-aborted", this.listUserDomainsAborted);
+      this.core.$root.$off(taskAction + "-completed");
+      this.core.$root.$once(taskAction + "-completed", this.listUserDomainsCompleted);
+      const res = await to(
+        this.createClusterTaskForApp({
+          action: taskAction,
+          extra: {
+            title: this.$t("action." + taskAction),
+            isNotificationHidden: true,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.listUserDomains = this.getErrorMessage(err);
+        this.loading.listUserDomains = false;
+      }
+    },
+    listUserDomainsAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.listUserDomains = this.$t("error.generic_error");
+      this.loading.listUserDomains = false;
+    },
+    listUserDomainsCompleted(taskContext, taskResult) {
+      const options = taskResult.output.domains.map((domain) => ({
+        name: domain.name,
+        label: domain.name,
+        value: domain.name,
+      }));
+      options.unshift({
+        name: "no_user_domain",
+        label: this.$t("settings.no_user_domain"),
+        value: "-",
+      });
+      this.domains = options;
+      this.loading.listUserDomains = false;
+    },
     goToCertificates() {
       this.core.$router.push("/settings/tls-certificates");
     },
@@ -324,7 +425,12 @@ export default {
       this.host = config.host;
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isLetsEncryptCurrentlyEnabled = config.lets_encrypt;
-      this.isHttpToHttpsEnabled = config.http2https;
+      this.ldapDomain = config.ldap_domain === "" ? "-" : config.ldap_domain;
+      this.ldapAdminGroup = config.ldap_admin_group;
+      this.indexUnclassifiedEvents = config.index_unclassified_events;
+      this.exportUrl = config.export_url;
+      this.exportTokenSet = config.export_token_set;
+      this.exportToken = "";
 
       this.loading.getConfiguration = false;
       this.focusElement("host");
@@ -338,6 +444,20 @@ export default {
 
         if (isValidationOk) {
           this.focusElement("host");
+        }
+        isValidationOk = false;
+      }
+      if (this.ldapDomain && this.ldapDomain !== "-" && !this.ldapAdminGroup) {
+        this.error.ldap_admin_group = "common.required";
+        if (isValidationOk) {
+          this.focusElement("ldap_admin_group");
+        }
+        isValidationOk = false;
+      }
+      if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
+        this.error.export_url = "settings.export_url_https";
+        if (isValidationOk) {
+          this.focusElement("export_url");
         }
         isValidationOk = false;
       }
@@ -392,14 +512,24 @@ export default {
         `${taskAction}-completed-${eventId}`,
         this.configureModuleCompleted
       );
+      const data = {
+        host: this.host,
+        lets_encrypt: this.isLetsEncryptEnabled,
+        ldap_domain: this.ldapDomain === "-" ? "" : this.ldapDomain,
+        ldap_admin_group: this.ldapDomain === "-" ? "" : this.ldapAdminGroup,
+        index_unclassified_events: this.indexUnclassifiedEvents,
+        export_url: this.exportUrl,
+      };
+      // Only send the token when typed, an empty one would remove the stored token
+      if (this.exportToken) {
+        data.export_token = this.exportToken;
+      } else if (!this.exportUrl) {
+        data.export_token = "";
+      }
       const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
           action: taskAction,
-          data: {
-            host: this.host,
-            lets_encrypt: this.isLetsEncryptEnabled,
-            http2https: this.isHttpToHttpsEnabled,
-          },
+          data,
           extra: {
             title: this.$t("settings.instance_configuration", {
               instance: this.instanceName,
