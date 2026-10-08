@@ -161,6 +161,17 @@ if [ -s "${INSTALL_DIR}/etc/client.keys" ] && [ "${FORCE}" -ne 1 ]; then
     exit 0
 fi
 
+if [ "${FORCE}" -eq 1 ]; then
+    # Forget the previous server: its key and its certificate authority would be refused by the new one
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl stop wazuh-agent 2>/dev/null || true
+    else
+        "${INSTALL_DIR}/bin/wazuh-control" stop >/dev/null 2>&1 || true
+    fi
+    : > "${INSTALL_DIR}/etc/client.keys"
+    rm -f "${INSTALL_DIR}/etc/certs/root-ca.pem" "${INSTALL_DIR}/etc/certs/.anchor-committed" "${INSTALL_DIR}/etc/reenroll.secret"
+fi
+
 # Keep the file of the package once, to compare with the changes
 [ -f "${CONFIG}.orig" ] || cp -p "${CONFIG}" "${CONFIG}.orig"
 sed -i "/<manager>/,/<\/manager>/ s#<endpoint>.*</endpoint>#<endpoint>${address}</endpoint>#" "${CONFIG}"
@@ -187,6 +198,10 @@ if [ "${START}" -ne 1 ]; then
     exit 0
 fi
 
+log_file="${INSTALL_DIR}/logs/ossec.log"
+start_line=0
+[ -f "${log_file}" ] && start_line="$(wc -l < "${log_file}")"
+
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable wazuh-agent >/dev/null 2>&1 || true
     systemctl restart wazuh-agent
@@ -194,15 +209,16 @@ else
     "${INSTALL_DIR}/bin/wazuh-control" restart
 fi
 
-# The token is deleted once the enrollment worked
+# The agent writes this line once the server accepted the token
 for _ in $(seq 1 30); do
-    if [ -s "${INSTALL_DIR}/etc/client.keys" ] && [ ! -e "${token_file}" ]; then
+    if tail -n "+$((start_line + 1))" "${log_file}" 2>/dev/null | grep -q "enrollment succeeded"; then
         say "Enrolled. The agent is running and sends its logs to ${address}."
         exit 0
     fi
     sleep 2
 done
 
-say "The agent is started but the enrollment is not confirmed after 60 seconds."
-say "Look at ${INSTALL_DIR}/logs/ossec.log"
+say "The agent is started but the enrollment is not confirmed after 60 seconds. Last messages:"
+tail -n "+$((start_line + 1))" "${log_file}" 2>/dev/null | grep -E "ERROR|WARNING" | tail -n 4 >&2 || true
+say "Full log: ${log_file}"
 exit 1
