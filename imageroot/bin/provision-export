@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Send the new findings to an HTTPS endpoint of the customer.
+# It creates a webhook channel and an Alerting monitor that posts the findings of the last minute.
+# With no EXPORT_URL both are removed. The optional token is read from secrets/export.env.
+
+import os
+import sys
+
+from wazuh_api import api
+
+NAME = "ns8-export"
+URL = os.environ.get("EXPORT_URL", "")
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def read_token():
+    try:
+        with open(os.environ.get("EXPORT_SECRETS", "secrets/export.env")) as f:
+            for line in f:
+                if line.startswith("EXPORT_TOKEN="):
+                    return line.rstrip("\n").split("=", 1)[1]
+    except FileNotFoundError:
+        pass
+    return ""
+
+
+def find_channel():
+    answer = api("GET", f"_plugins/_notifications/configs?config_type=webhook&max_items=100")
+    for config in answer.get("config_list", []):
+        if config["config"]["name"] == NAME:
+            return config["config_id"]
+    return None
+
+
+def find_monitors():
+    # The search by name does not match on this version, so list them all and filter here
+    answer = api("POST", "_plugins/_alerting/monitors/_search", {"size": 500, "query": {"match_all": {}}})
+    return [hit["_id"] for hit in answer.get("hits", {}).get("hits", []) if hit["_source"].get("name") == NAME]
+
+
+channel_id = find_channel()
+monitor_ids = find_monitors()
+monitor_id = monitor_ids[0] if monitor_ids else None
+
+if not URL:
+    for old_id in monitor_ids:
+        api("DELETE", f"_plugins/_alerting/monitors/{old_id}")
+        log("monitor removed")
+    if channel_id:
+        api("DELETE", f"_plugins/_notifications/configs/{channel_id}")
+        log("channel removed")
+    sys.exit(0)
+
+headers = {"Content-Type": "application/json"}
+token = read_token()
+if token:
+    headers["Authorization"] = f"Bearer {token}"
+channel = {"config": {
+    "name": NAME,
+    "description": "Findings sent to the customer endpoint",
+    "config_type": "webhook",
+    "is_enabled": True,
+    "webhook": {"url": URL, "header_params": headers, "method": "POST"},
+}}
+if channel_id:
+    answer = api("PUT", f"_plugins/_notifications/configs/{channel_id}", channel)
+else:
+    answer = api("POST", "_plugins/_notifications/configs", channel)
+    channel_id = answer.get("config_id")
+if not channel_id:
+    raise SystemExit(f"channel: {answer}")
+log("channel ok")
+
+monitor = {
+    "type": "monitor",
+    "name": NAME,
+    "monitor_type": "query_level_monitor",
+    "enabled": True,
+    "schedule": {"period": {"interval": 1, "unit": "MINUTES"}},
+    "inputs": [{"search": {
+        "indices": ["wazuh-findings-v5-*"],
+        "query": {"size": 100, "sort": [{"@timestamp": "asc"}], "query": {"bool": {"filter": [
+            {"range": {"@timestamp": {"gt": "{{period_end}}||-1m", "lte": "{{period_end}}", "format": "epoch_millis"}}}]}}},
+    }}],
+    "triggers": [{"query_level_trigger": {
+        "name": "new findings",
+        "severity": "1",
+        "condition": {"script": {"source": "ctx.results[0].hits.total.value > 0", "lang": "painless"}},
+        "actions": [{
+            "name": NAME,
+            "destination_id": channel_id,
+            "message_template": {"source": '{"monitor":"{{ctx.monitor.name}}","period_end":"{{ctx.periodEnd}}","findings":{{#toJson}}ctx.results.0.hits.hits{{/toJson}}}', "lang": "mustache"},
+            "throttle_enabled": False,
+            "subject_template": {"source": "NS8 findings", "lang": "mustache"},
+        }],
+    }}],
+}
+if monitor_id:
+    answer = api("PUT", f"_plugins/_alerting/monitors/{monitor_id}", monitor)
+else:
+    answer = api("POST", "_plugins/_alerting/monitors", monitor)
+if "_id" not in answer:
+    raise SystemExit(f"monitor: {answer}")
+log("monitor ok")
