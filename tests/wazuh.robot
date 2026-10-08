@@ -49,7 +49,7 @@ Check if wazuh reports its health
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
     ${health} =    Evaluate    json.loads('''${output}''')    modules=json
-    Should Be Equal    ${health}[output][indexer][status]    green
+    Should Be Equal    ${health}[indexer][status]    green
 
 Check if an enrollment token is created
     ${output}  ${rc} =    Execute Command
@@ -57,8 +57,8 @@ Check if an enrollment token is created
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
     ${token} =    Evaluate    json.loads('''${output}''')    modules=json
-    Should Be Equal    ${token}[output][address]    ${TEST_HOST}
-    Should Not Be Empty    ${token}[output][token]
+    Should Be Equal    ${token}[address]    ${TEST_HOST}
+    Should Not Be Empty    ${token}[token]
 
 Check if wazuh is removed correctly
     ${rc} =    Execute Command    remove-module --no-preserve ${module_id}
