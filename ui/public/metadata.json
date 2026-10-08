@@ -1,19 +1,21 @@
 {
   "name": "wazuh",
   "description": {
-    "en": "My wazuh module"
+    "en": "Central Wazuh server: collects the logs of your servers, raises alerts and keeps them searchable"
   },
-  "categories": [],
+  "categories": [
+    "security"
+  ],
   "authors": [
     {
-      "name": "Name Surname",
-      "email": "author@yourmail.org"
+      "name": "Stephane de Labrusse",
+      "email": "stephdl@de-labrusse.fr"
     }
   ],
   "docs": {
-    "documentation_url": "https://docs.wazuh.com/",
-    "bug_url": "https://github.com/NethServer/dev",
-    "code_url": "https://github.com/author/ns8-wazuh"
+    "documentation_url": "https://documentation.wazuh.com/",
+    "bug_url": "https://github.com/stephdl/ns8-wazuh/issues",
+    "code_url": "https://github.com/stephdl/ns8-wazuh"
   },
-  "source": "ghcr.io/nethserver/wazuh"
+  "source": "ghcr.io/stephdl/wazuh"
 }
