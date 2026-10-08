@@ -28,10 +28,26 @@ def podman_exec(args, stdin=None):
                           input=stdin, capture_output=True, text=True)
 
 
-def read_default(name):
-    proc = podman_exec(["cat", f"{CONFIG_DIR}/{name}"])
-    agent.assert_exp(proc.returncode == 0, f"cannot read {name}: {proc.stderr}")
-    return yaml.safe_load(proc.stdout)
+def wait_indexer():
+    # The restart of the services returns before the indexer accepts requests
+    for _ in range(60):
+        if subprocess.run(["podman", "healthcheck", "run", "wazuh-indexer"],
+                          capture_output=True).returncode == 0:
+            return
+        time.sleep(5)
+    agent.assert_exp(False, "the indexer is not healthy")
+
+
+def read_default(name, key):
+    # A file read while the indexer is still rewriting its configuration can come back empty
+    for _ in range(12):
+        proc = podman_exec(["cat", f"{CONFIG_DIR}/{name}"])
+        if proc.returncode == 0:
+            document = yaml.safe_load(proc.stdout)
+            if isinstance(document, dict) and key in document:
+                return document
+        time.sleep(5)
+    agent.assert_exp(False, f"cannot read {name} from the indexer")
 
 
 def apply_document(document, doc_type):
@@ -53,6 +69,8 @@ def apply_document(document, doc_type):
         podman_exec(["rm", "-f", tmp])
 
 
+wait_indexer()
+
 ldap_domain = os.environ.get("LDAP_DOMAIN", "")
 admin_group = os.environ.get("LDAP_ADMIN_GROUP", "")
 
@@ -65,5 +83,5 @@ if ldap_domain:
     agent.bind_user_domains([ldap_domain])
     users_filter = proxy.get_ldap_users_search_filter_clause(ldap_domain)
 
-apply_document(wazuh_security.build_security_config(read_default("config.yml"), domain, users_filter), "config")
-apply_document(wazuh_security.build_roles_mapping(read_default("roles_mapping.yml"), admin_group if domain else None), "rolesmapping")
+apply_document(wazuh_security.build_security_config(read_default("config.yml", "config"), domain, users_filter), "config")
+apply_document(wazuh_security.build_roles_mapping(read_default("roles_mapping.yml", "all_access"), admin_group if domain else None), "rolesmapping")
