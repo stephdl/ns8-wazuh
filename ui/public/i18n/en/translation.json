@@ -7,7 +7,6 @@
   "status": {
     "title": "Status",
     "app_instance": "App instance",
-    "services": "Service | Services",
     "app_images": "App image | App images",
     "app_volumes": "App volume | App volumes",
     "installation_node": "Installation node",
@@ -31,9 +30,11 @@
     "disk_used": "Disk used: {percent}%",
     "agents": "Agents",
     "agents_count": "{active} active of {total}",
-    "add_agent": "Add an agent",
+    "add_agent": "Go to agents",
     "certificate": "Agent listener certificate",
-    "days_left": "Expires today | Expires in {count} day | Expires in {count} days"
+    "days_left": "Expires today | Expires in {count} day | Expires in {count} days",
+    "failed_services": "Failed services",
+    "all_services_running": "All services are running"
   },
   "settings": {
     "title": "Settings",
