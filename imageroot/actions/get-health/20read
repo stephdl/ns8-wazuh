@@ -37,8 +37,7 @@ try:
 except (RuntimeError, KeyError, TypeError) as exc:
     print(f"agents: {exc}", file=sys.stderr)
 
-# The file belongs to uid 101 of the pod, so read it from the user namespace
-proc = subprocess.run(["podman", "unshare", "openssl", "x509", "-noout", "-enddate", "-in", "certs/remoted.pem"],
+proc = subprocess.run(["openssl", "x509", "-noout", "-enddate", "-in", "certs/remoted.pem"],
                       capture_output=True, text=True)
 if proc.returncode == 0 and "=" in proc.stdout:
     expires = datetime.strptime(proc.stdout.split("=", 1)[1].strip(), "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
