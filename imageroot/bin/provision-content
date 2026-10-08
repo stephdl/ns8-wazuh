@@ -12,6 +12,7 @@
 import glob
 import json
 import os
+import re
 import sys
 import time
 
@@ -101,20 +102,34 @@ def policy_document(space):
 index_unclassified = os.environ.get("INDEX_UNCLASSIFIED_EVENTS", "False") == "True"
 standard = policy_document("standard")
 
-# The standard policy only accepts a few flags: here the unclassified events and its enrichments
-check(api("PUT", f"{CM}/policy/standard", {"resource": {
-    "enrichments": standard.get("enrichments", []),
-    "filters": standard.get("filters", []),
-    "enabled": True,
-    "index_unclassified_events": index_unclassified,
-    "index_discarded_events": standard.get("index_discarded_events", False),
-}}), "standard policy")
-log("standard policy updated")
+
+def put_policy(space, resource, what):
+    answer = api("PUT", f"{CM}/policy/{space}", {"resource": resource})
+    if answer.get("status") == 400 and "Invalid enrichment type" in str(answer.get("message")):
+        # The engine tells which enrichments it supports, and it differs from one start to the other
+        found = re.search(r"Allowed values are: \[(.*?)\]", answer["message"])
+        allowed = [value.strip() for value in found.group(1).split(",")] if found else []
+        resource["enrichments"] = [e for e in resource.get("enrichments", []) if e in allowed]
+        log(f"{what}: enrichments reduced to {resource['enrichments']}")
+        answer = api("PUT", f"{CM}/policy/{space}", {"resource": resource})
+    check(answer, what)
+
+
+# The standard policy is touched only when the setting changes, its enrichments are not ours
+if standard.get("index_unclassified_events", False) != index_unclassified:
+    put_policy("standard", {
+        "enrichments": standard.get("enrichments", []),
+        "filters": standard.get("filters", []),
+        "enabled": True,
+        "index_unclassified_events": index_unclassified,
+        "index_discarded_events": standard.get("index_discarded_events", False),
+    }, "standard policy")
+    log("standard policy updated")
 
 # The draft policy needs our own root decoder, a standard one is not visible from this space.
 # It takes the enrichments of the standard policy, like the geo one used to locate IP addresses.
 policy = policy_document("draft")
-check(api("PUT", f"{CM}/policy/draft", {"resource": {
+put_policy("draft", {
     "metadata": {
         "title": policy["metadata"].get("title", "Draft policy"),
         "author": policy["metadata"].get("author") or "NethServer",
@@ -129,7 +144,7 @@ check(api("PUT", f"{CM}/policy/draft", {"resource": {
     "enabled": True,
     "index_unclassified_events": index_unclassified,
     "index_discarded_events": policy.get("index_discarded_events", False),
-}}), "draft policy")
+}, "draft policy")
 log("draft policy updated")
 
 for space in ("draft", "test"):
