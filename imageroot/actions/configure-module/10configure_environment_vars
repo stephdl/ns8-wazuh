@@ -12,3 +12,5 @@ import agent
 data = json.load(sys.stdin)
 agent.set_env("TRAEFIK_HOST", data["host"])
 agent.set_env("TRAEFIK_LETS_ENCRYPT", data.get("lets_encrypt", False))
+agent.set_env("LDAP_DOMAIN", data.get("ldap_domain", ""))
+agent.set_env("LDAP_ADMIN_GROUP", data.get("ldap_admin_group", ""))
