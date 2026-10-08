@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+import agent
+
+event = json.load(sys.stdin)
+
+if not os.environ.get("LDAP_DOMAIN") or event.get("domain") != os.environ["LDAP_DOMAIN"]:
+    sys.exit(0)  # not our user domain
+
+agent.run_helper("setup-ldap").check_returncode()
