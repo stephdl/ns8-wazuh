@@ -307,6 +307,11 @@ export default {
       },
     };
   },
+  watch: {
+    adminPassword() {
+      this.error.admin_password = "";
+    },
+  },
   computed: {
     ...mapState(["instanceName", "core", "appName"]),
     stillLoading() {
