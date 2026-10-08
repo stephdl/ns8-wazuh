@@ -8,13 +8,9 @@
 # Runs before the backup, in the state directory: take a snapshot of the user data.
 # Copying the live data volume of the indexer would give an inconsistent backup.
 
-import os
-import subprocess
 import sys
 
 from wazuh_api import api, USER_INDICES
-
-SNAPSHOT_DIR = os.environ.get("SNAPSHOT_DIR", "snapshots")
 
 answer = api("PUT", "_snapshot/ns8", {"type": "fs", "settings": {"location": "/snapshots"}})
 if not answer.get("acknowledged"):
@@ -31,6 +27,4 @@ state = answer.get("snapshot", {}).get("state")
 if state != "SUCCESS":
     sys.exit(f"the snapshot failed: {answer}")
 
-# The files belong to uid 101 of the pod, hand them to the module so the backup tool can read them
-subprocess.run(["podman", "unshare", "chown", "-R", "0:0", SNAPSHOT_DIR], check=True)
 print("snapshot done", file=sys.stderr)
