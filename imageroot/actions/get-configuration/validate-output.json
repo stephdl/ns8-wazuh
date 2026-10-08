@@ -8,7 +8,8 @@
             "host": "wazuh.domain.org",
             "lets_encrypt": true,
             "ldap_domain": "domain.org",
-            "ldap_admin_group": "wazuh-admins"
+            "ldap_admin_group": "wazuh-admins",
+            "index_unclassified_events": false
         }
     ],
     "type": "object",
@@ -16,7 +17,8 @@
         "host",
         "lets_encrypt",
         "ldap_domain",
-        "ldap_admin_group"
+        "ldap_admin_group",
+        "index_unclassified_events"
     ],
     "properties": {
         "host": {
@@ -38,6 +40,11 @@
             "type": "string",
             "title": "Administrators group",
             "description": "Group of the user domain that receives the administrator role."
+        },
+        "index_unclassified_events": {
+            "type": "boolean",
+            "title": "Keep unclassified logs",
+            "description": "Index the logs that no decoder recognizes. They take more disk space."
         }
     }
 }
