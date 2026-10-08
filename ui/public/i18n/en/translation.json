@@ -70,7 +70,7 @@
     "unchanged_password_placeholder": "Unchanged",
     "admin_password_rules": "12 to 64 characters with an uppercase letter, a lowercase letter, a digit and a symbol among . , _ + : @ % ^ = ~ -",
     "to_save": "To save, complete",
-    "password_length_error": "The password must have 12 to 64 characters",
+    "password_length": "The password must have 12 to 64 characters",
     "password_characters": "Only A-Z a-z 0-9 and . , _ + : @ % ^ = ~ - are accepted",
     "password_classes": "The password needs an uppercase letter, a lowercase letter, a digit and a symbol among . , _ + : @ % ^ = ~ -"
   },
