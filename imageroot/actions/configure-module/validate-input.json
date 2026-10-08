@@ -1,11 +1,11 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Configure kickstart",
-    "$id": "http://nethserver.org/json-schema/task/input/kickstart/configure-module",
-    "description": "Configure kickstart",
+    "title": "Configure wazuh",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/configure-module",
+    "description": "Configure wazuh",
     "examples": [
         {
-            "host": "kickstart.domain.org",
+            "host": "wazuh.domain.org",
             "http2https": true,
             "lets_encrypt": true
         }
@@ -17,7 +17,7 @@
     "properties": {
         "host": {
             "type": "string",
-            "description": "Host name for the application, like 'kickstart.domain.org'",
+            "description": "Host name for the application, like 'wazuh.domain.org'",
             "format": "hostname",
             "pattern": "\\."
         },
