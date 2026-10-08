@@ -2,6 +2,9 @@
   "resource": {
     "name": "decoder/ns8-crowdsec-alert/0",
     "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
     "metadata": {
       "title": "CrowdSec alert",
       "description": "Scenarios triggered by an IP address in CrowdSec",
