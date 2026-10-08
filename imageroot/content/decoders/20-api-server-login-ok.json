@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "_tmp_json.event.original": "contains(\"[AUTH] login-ok\")"
+        "event.original": "contains(\"[AUTH] login-ok\")"
       }
     ],
     "normalize": [
       {
-        "parse|_tmp_json.event.original": [
+        "parse|event.original": [
           "<~> login-ok user=<user.name> source=<source.ip> <~>"
         ]
       },
