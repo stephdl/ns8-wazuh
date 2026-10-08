@@ -19,6 +19,8 @@ config = {}
 
 # Read current configuration from the environment file
 config["host"] = os.getenv("TRAEFIK_HOST","")
+config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
+config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
 config["lets_encrypt"] = agent.get_route(os.environ['MODULE_ID']).get('lets_encrypt', False)
 
 # Dump the configuration to stdout
