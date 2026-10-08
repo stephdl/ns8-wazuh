@@ -13,5 +13,7 @@ set -e
 exec 1>&2
 
 cd "${AGENT_STATE_DIR}"
+mkdir -p snapshots
+podman unshare chown -R 101:101 snapshots
 podman unshare find certs -type f -name '*.pem' -exec chown 101:101 {} +
 podman unshare find certs -type f -name '*.pem' -exec chmod 0640 {} +
