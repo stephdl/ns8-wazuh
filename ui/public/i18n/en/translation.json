@@ -48,10 +48,10 @@
     "domain_already_used_in_traefik": "Domain already used in traefik",
     "host_pattern": "Must be a valid fully qualified domain name",
     "host_format": "Must be a valid fully qualified domain name",
-    "ldap_domain": "User domain",
+    "ldap_domain": "User domain (optional)",
     "choose_ldap_domain": "Choose a user domain",
-    "ldap_domain_tooltip": "Users of this domain can log in to the dashboard with their account.",
-    "no_user_domain": "No user domain",
+    "ldap_domain_tooltip": "Users of this domain can log in to the dashboard with their account. Without a domain, only the local administrator can log in.",
+    "no_user_domain": "No user domain (local administrator only)",
     "ldap_admin_group": "Administrators group",
     "user_domain_not_found": "User domain not found",
     "required_with_user_domain": "Required when a user domain is chosen",
@@ -64,7 +64,21 @@
     "export_token_helper": "Optional. Sent as a bearer token. Leave empty to keep the current one.",
     "export_token_set": "A token is stored",
     "show": "Show",
-    "hide": "Hide"
+    "hide": "Hide",
+    "admin_password": "Administrator password",
+    "admin_password_change": "New administrator password",
+    "admin_password_confirm": "Confirm the password",
+    "admin_password_keep": "Leave empty to keep the current password. The change applies at once, nothing restarts.",
+    "to_save": "To save, complete",
+    "password_length": "12 to 64 characters",
+    "password_lowercase": "A lowercase letter",
+    "password_uppercase": "An uppercase letter",
+    "password_number": "A digit",
+    "password_symbol": "A symbol among . , _ + : @ % ^ = ~ -",
+    "password_equal": "Both passwords are equal",
+    "password_length_error": "The password must have 12 to 64 characters",
+    "password_characters": "Only A-Z a-z 0-9 and . , _ + : @ % ^ = ~ - are accepted",
+    "password_classes": "The password needs an uppercase letter, a lowercase letter, a digit and a symbol among . , _ + : @ % ^ = ~ -"
   },
   "about": {
     "title": "About"
@@ -83,7 +97,9 @@
     "list-installed-modules": "List installed modules",
     "get-enrollment-token": "Create enrollment token",
     "get-health": "Get health",
-    "list-user-domains": "List user domains"
+    "list-user-domains": "List user domains",
+    "list-agents": "List agents",
+    "remove-agent": "Revoke agent"
   },
   "error": {
     "error": "Error",
@@ -101,7 +117,7 @@
   "agents": {
     "title": "Agents",
     "how_it_works_title": "How to add an agent",
-    "how_it_works": "Create an enrollment token, then give it to the Wazuh agent with the server address. The agent reads the journal of its host and sends it here. A token is valid for a limited time and a limited number of agents.",
+    "how_it_works": "Create a token, then run the command on the server to watch. A token is valid for a limited time and a limited number of agents.",
     "ttl": "Validity",
     "ttl_helper": "For example 30m, 1h or 7d",
     "ttl_invalid": "Use a number followed by s, m, h or d",
@@ -118,6 +134,30 @@
     "copy": "Copy",
     "copied": "Copied",
     "show_more": "Show more",
-    "show_less": "Show less"
+    "show_less": "Show less",
+    "search_agents": "Search agents",
+    "no_agents": "No agent is enrolled yet",
+    "refresh": "Refresh",
+    "revoke": "Revoke",
+    "revoke_title": "Revoke the agent",
+    "revoke_warning": "This cannot be undone",
+    "revoke_description": "The server forgets the agent and its key stops working. The agent has to enroll again with a new token to send its logs.",
+    "revoke_type_to_confirm": "Type '{name}' to confirm",
+    "revoke_task": "Revoke the agent {name}",
+    "add_title": "Add an agent",
+    "col_name": "Name",
+    "col_ip": "Address",
+    "col_status": "Status",
+    "col_version": "Version",
+    "col_os": "System",
+    "col_last_keep_alive": "Last seen",
+    "status_active": "Active",
+    "status_disconnected": "Disconnected",
+    "status_pending": "Pending",
+    "status_never_connected": "Never connected",
+    "linux_command": "On a Debian or Red Hat family Linux, run as root:",
+    "linux_hint": "The script installs the agent package, checks its signature, enrolls the agent and starts it.",
+    "other_systems_title": "Windows and macOS",
+    "other_systems": "The script does not cover them. Install the agent from the Wazuh documentation, then enroll it with this token."
   }
 }
