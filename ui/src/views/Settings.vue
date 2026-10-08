@@ -93,7 +93,9 @@
               class="mg-bottom maxwidth"
               ref="ldap_domain"
             >
-              <template slot="tooltip">{{ $t("settings.ldap_domain_tooltip") }}</template>
+              <template slot="tooltip">{{
+                $t("settings.ldap_domain_tooltip")
+              }}</template>
             </NsComboBox>
             <cv-text-input
               v-if="ldapDomain && ldapDomain !== '-'"
@@ -118,9 +120,15 @@
                     :disabled="stillLoading"
                     class="mg-bottom"
                   >
-                    <template #tooltip>{{ $t("settings.index_unclassified_events_tooltip") }}</template>
-                    <template slot="text-left">{{ $t("settings.disabled") }}</template>
-                    <template slot="text-right">{{ $t("settings.enabled") }}</template>
+                    <template #tooltip>{{
+                      $t("settings.index_unclassified_events_tooltip")
+                    }}</template>
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
                   </NsToggle>
                   <cv-text-input
                     :label="$t('settings.export_url')"
@@ -138,7 +146,9 @@
                     type="password"
                     v-model="exportToken"
                     :label="$t('settings.export_token')"
-                    :placeholder="exportTokenSet ? $t('settings.export_token_set') : ''"
+                    :placeholder="
+                      exportTokenSet ? $t('settings.export_token_set') : ''
+                    "
                     :helper-text="$t('settings.export_token_helper')"
                     :passwordShowLabel="$t('settings.show')"
                     :passwordHideLabel="$t('settings.hide')"
@@ -295,9 +305,15 @@ export default {
       this.error.listUserDomains = "";
       const taskAction = "list-user-domains";
       this.core.$root.$off(taskAction + "-aborted");
-      this.core.$root.$once(taskAction + "-aborted", this.listUserDomainsAborted);
+      this.core.$root.$once(
+        taskAction + "-aborted",
+        this.listUserDomainsAborted
+      );
       this.core.$root.$off(taskAction + "-completed");
-      this.core.$root.$once(taskAction + "-completed", this.listUserDomainsCompleted);
+      this.core.$root.$once(
+        taskAction + "-completed",
+        this.listUserDomainsCompleted
+      );
       const res = await to(
         this.createClusterTaskForApp({
           action: taskAction,
