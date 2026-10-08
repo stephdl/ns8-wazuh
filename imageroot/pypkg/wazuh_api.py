@@ -11,6 +11,13 @@ import subprocess
 
 _password = None
 
+# What a backup keeps: user data and dashboards. The detection content comes back by itself
+# from the CTI sync and from provision-content, and the system indices are rebuilt at start.
+USER_INDICES = ("wazuh-events-v5-*,wazuh-findings-v5-*,wazuh-states-*,wazuh-active-responses*,"
+                "wazuh-metrics-*,wazuh-agent-*,.kibana_*")
+USER_DATA_STREAMS = ["wazuh-events-v5-*", "wazuh-findings-v5-*", "wazuh-active-responses*", "wazuh-metrics-*"]
+CERTS = "/usr/share/wazuh-indexer/config/certs"
+
 
 def container():
     return os.environ.get("INDEXER_CONTAINER", "wazuh-indexer")
@@ -33,9 +40,14 @@ def curl_quote(value):
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
-def api(method, path, body=None):
-    # The curl options go through stdin, so the password never appears in a process list
-    config = f'user = "admin:{curl_quote(admin_password())}"\nrequest = "{method}"\nurl = "https://localhost:9200/{path}"\n'
+def api(method, path, body=None, admin_cert=False):
+    # The curl options go through stdin, so the password never appears in a process list.
+    # Restoring protected indices needs the admin certificate: the password is not enough.
+    if admin_cert:
+        config = f'cert = "{CERTS}/admin.pem"\nkey = "{CERTS}/admin-key.pem"\n'
+    else:
+        config = f'user = "admin:{curl_quote(admin_password())}"\n'
+    config += f'request = "{method}"\nurl = "https://localhost:9200/{path}"\n'
     config += 'header = "Content-Type: application/json"\n'
     if body is not None:
         config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
