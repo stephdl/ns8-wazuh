@@ -1,0 +1,45 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Enrolled agents",
+    "$id": "http://nethserver.org/json-schema/task/output/wazuh/list-agents",
+    "description": "The agents known to the manager",
+    "examples": [
+        {
+            "agents": [
+                {
+                    "id": "001",
+                    "name": "web1",
+                    "ip": "192.0.2.10",
+                    "status": "active",
+                    "version": "v5.0.0",
+                    "os": "Rocky Linux 9.8 (Blue Onyx)",
+                    "last_keep_alive": "2026-10-08T16:40:00+00:00",
+                    "date_add": "2026-10-08T15:10:00+00:00",
+                    "groups": ["default"]
+                }
+            ]
+        }
+    ],
+    "type": "object",
+    "required": ["agents"],
+    "properties": {
+        "agents": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "name", "status"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "ip": {"type": "string"},
+                    "status": {"type": "string", "description": "active, disconnected, pending or never_connected"},
+                    "version": {"type": "string"},
+                    "os": {"type": "string"},
+                    "last_keep_alive": {"type": "string"},
+                    "date_add": {"type": "string"},
+                    "groups": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        }
+    }
+}
