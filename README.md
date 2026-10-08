@@ -1,171 +1,76 @@
 # ns8-wazuh
 
-This is a template module for [NethServer 8](https://github.com/NethServer/ns8-core).
-To start a new module from it:
+A central [Wazuh](https://wazuh.com) 5 server for [NethServer 8](https://github.com/NethServer/ns8-core).
 
-1. Click on [Use this template](https://github.com/NethServer/ns8-wazuh/generate).
-   Name your repo with `ns8-` prefix (e.g. `ns8-mymodule`). 
-   Do not end your module name with a number, like ~~`ns8-baaad2`~~!
+It is meant to run on its own node, outside the clusters it watches. Wazuh agents installed on servers (NS8 nodes, other Linux hosts, Windows) send their logs to it. The server decodes them, raises alerts, keeps everything searchable in the Wazuh dashboard, and can post the new findings to an HTTPS endpoint.
 
-1. Clone the repository, enter the cloned directory and
-   [configure your GIT identity](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup#_your_identity)
+The module is not ready for production: it targets Wazuh `5.0.0-rc1`. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
-1. Rename some references inside the repo:
-   ```
-   modulename=$(basename $(pwd) | sed 's/^ns8-//') &&
-   git mv imageroot/systemd/user/wazuh.service imageroot/systemd/user/${modulename}.service &&
-   git mv imageroot/systemd/user/wazuh-app.service imageroot/systemd/user/${modulename}-app.service && 
-   git mv tests/wazuh.robot tests/${modulename}.robot &&
-   sed -i "s/wazuh/${modulename}/g" $(find .github/ * -type f) &&
-   git commit -a -m "Repository initialization"
-   ```
+## What runs
 
-1. Edit this `README.md` file, by replacing this section with your module
-   description
+One rootless pod with three containers: the Wazuh manager (agents, API), the indexer (data) and the dashboard (web interface). Traefik publishes the dashboard over HTTPS, always. The agents connect to the ports 1514, 1515 and 1517 of the node, which the module opens in the firewall. For this reason only one instance can run on a node.
 
-1. Adjust `.github/workflows` to your needs. `clean-registry.yml` might
-   need the proper list of image names to work correctly. Unused workflows
-   can be disabled from the GitHub Actions interface.
-
-1. Commit and push your local changes
+The node needs `vm.max_map_count=262144`, 4 to 6 GB of RAM and 50 GB of disk.
 
 ## Install
 
-Instantiate the module with:
+    add-module ghcr.io/stephdl/wazuh:latest 1
 
-    add-module ghcr.io/nethserver/wazuh:latest 1
-
-The output of the command will return the instance name.
-Output example:
-
-    {"module_id": "wazuh1", "image_name": "wazuh", "image_url": "ghcr.io/nethserver/wazuh:latest"}
+The output of the command returns the instance name, for example `wazuh1`.
 
 ## Configure
 
-Let's assume that the mattermost instance is named `wazuh1`.
+Launch `configure-module` with:
 
-Launch `configure-module`, by setting the following parameters:
-- `host`: a fully qualified domain name for the application
-- `http2https`: enable or disable HTTP to HTTPS redirection (true/false)
-- `lets_encrypt`: enable or disable Let's Encrypt certificate (true/false)
-
+- `host`: the public host name. It is the name of the dashboard and the address the agents connect to.
+- `lets_encrypt`: request a Let's Encrypt certificate for the host (true/false).
+- `ldap_domain`: the user domain whose users can log in to the dashboard. Empty to disable.
+- `ldap_admin_group`: the group of that domain that gets the administrator role.
+- `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
+- `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
+- `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
 
 Example:
 
 ```
-api-cli run configure-module --agent module/wazuh1 --data - <<EOF
+api-cli run module/wazuh1/configure-module --data - <<EOF
 {
   "host": "wazuh.domain.com",
-  "http2https": true,
-  "lets_encrypt": false
+  "lets_encrypt": true,
+  "ldap_domain": "domain.com",
+  "ldap_admin_group": "wazuh-admins",
+  "index_unclassified_events": false,
+  "export_url": ""
 }
 EOF
 ```
 
-The above command will:
-- start and configure the wazuh instance
-- configure a virtual host for trafik to access the instance
+Read the settings back with `api-cli run module/wazuh1/get-configuration`.
 
-## Get the configuration
-You can retrieve the configuration with
+## Add an agent
+
+Create an enrollment token, valid for a limited time and a limited number of agents:
 
 ```
-api-cli run get-configuration --agent module/wazuh1
+api-cli run module/wazuh1/get-enrollment-token --data '{"ttl":"1h","max_uses":1,"description":"web server"}'
 ```
+
+The same is available on the Agents page of the module. The token holds the server address and the certificate authority, so the agent needs no other setting.
+
+## Health
+
+`get-health` returns the state of the indexer, the number of agents and the expiry date of the agent listener certificate. The Status page shows the same.
+
+## Backup
+
+The module is backed up by the NS8 backup. Before each backup the indexer writes a snapshot of the user data (events, findings, dashboards). The detection content comes back by itself from the Wazuh CTI at start and from this module. Restoring a module also restores the snapshot.
 
 ## Uninstall
 
-To uninstall the instance:
-
     remove-module --no-preserve wazuh1
 
-## Smarthost setting discovery
+## Test
 
-Some configuration settings, like the smarthost setup, are not part of the
-`configure-module` action input: they are discovered by looking at some
-Redis keys.  To ensure the module is always up-to-date with the
-centralized [smarthost
-setup](https://nethserver.github.io/ns8-core/core/smarthost/) every time
-wazuh starts, the command `bin/discover-smarthost` runs and refreshes
-the `state/smarthost.env` file with fresh values from Redis.
+The Robot tests are in `tests/`. They need a node and the image URL:
 
-Furthermore if smarthost setup is changed when wazuh is already
-running, the event handler `events/smarthost-changed/10reload_services`
-restarts the main module service.
-
-See also the `systemd/user/wazuh.service` file.
-
-This setting discovery is just an example to understand how the module is
-expected to work: it can be rewritten or discarded completely.
-
-## Debug
-
-some CLI are needed to debug
-
-- The module runs under an agent that initiate a lot of environment variables (in /home/wazuh1/.config/state), it could be nice to verify them
-on the root terminal
-
-    `runagent -m wazuh1 env`
-
-- you can become runagent for testing scripts and initiate all environment variables
-  
-    `runagent -m wazuh1`
-
- the path become : 
-```
-    echo $PATH
-    /home/wazuh1/.config/bin:/usr/local/agent/pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/
-```
-
-- if you want to debug a container or see environment inside
- `runagent -m wazuh1`
- ```
-podman ps
-CONTAINER ID  IMAGE                                      COMMAND               CREATED        STATUS        PORTS                    NAMES
-d292c6ff28e9  localhost/podman-pause:4.6.1-1702418000                          9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  80b8de25945f-infra
-d8df02bf6f4a  docker.io/library/mariadb:10.11.5          --character-set-s...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  mariadb-app
-9e58e5bd676f  docker.io/library/nginx:stable-alpine3.17  nginx -g daemon o...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  wazuh-app
-```
-
-you can see what environment variable is inside the container
-```
-podman exec  wazuh-app env
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-TERM=xterm
-PKG_RELEASE=1
-MARIADB_DB_HOST=127.0.0.1
-MARIADB_DB_NAME=wazuh
-MARIADB_IMAGE=docker.io/mariadb:10.11.5
-MARIADB_DB_TYPE=mysql
-container=podman
-NGINX_VERSION=1.24.0
-NJS_VERSION=0.7.12
-MARIADB_DB_USER=wazuh
-MARIADB_DB_PASSWORD=wazuh
-MARIADB_DB_PORT=3306
-HOME=/root
-```
-
-you can run a shell inside the container
-
-```
-podman exec -ti   wazuh-app sh
-/ # 
-```
-## Testing
-
-Test the module using the `test-module.sh` script:
-
-
-    ./test-module.sh <NODE_ADDR> ghcr.io/nethserver/wazuh:latest
-
-The tests are made using [Robot Framework](https://robotframework.org/)
-
-## UI translation
-
-Translated with [Weblate](https://hosted.weblate.org/projects/ns8/).
-
-To setup the translation process:
-
-- add [GitHub Weblate app](https://docs.weblate.org/en/latest/admin/continuous.html#github-setup) to your repository
-- add your repository to [hosted.weblate.org]((https://hosted.weblate.org) or ask a NethServer developer to add it to ns8 Weblate project
+    ./test-module.sh <node address> ghcr.io/stephdl/wazuh:latest
