@@ -126,6 +126,18 @@
               ref="ldap_admin_group"
             >
             </cv-text-input>
+            <cv-text-input
+              v-if="ldapDomain && ldapDomain !== '-'"
+              :label="$t('settings.ldap_readonly_group')"
+              :helper-text="$t('settings.ldap_readonly_group_helper')"
+              placeholder="wazuh-readers"
+              v-model.trim="ldapReadonlyGroup"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.ldap_readonly_group)"
+              :disabled="stillLoading"
+              ref="ldap_readonly_group"
+            >
+            </cv-text-input>
             <!-- advanced options -->
             <cv-accordion ref="accordion" class="maxwidth mg-bottom">
               <cv-accordion-item :open="isAdvancedOpen">
@@ -282,6 +294,7 @@ export default {
       ldapDomain: "",
       configuredLdapDomain: null,
       ldapAdminGroup: "",
+      ldapReadonlyGroup: "",
       domains: [],
       indexUnclassifiedEvents: false,
       exportUrl: "",
@@ -297,6 +310,7 @@ export default {
         admin_password: "",
         ldap_domain: "",
         ldap_admin_group: "",
+        ldap_readonly_group: "",
         export_url: "",
         listUserDomains: "",
         getConfiguration: "",
@@ -535,6 +549,7 @@ export default {
         config.ldap_domain === "" ? "-" : config.ldap_domain;
       this.applyLdapDomain();
       this.ldapAdminGroup = config.ldap_admin_group;
+      this.ldapReadonlyGroup = config.ldap_readonly_group || "";
       this.indexUnclassifiedEvents = config.index_unclassified_events;
       this.exportUrl = config.export_url;
       this.exportTokenSet = config.export_token_set;
@@ -635,6 +650,8 @@ export default {
         lets_encrypt: this.isLetsEncryptEnabled,
         ldap_domain: this.ldapDomain === "-" ? "" : this.ldapDomain,
         ldap_admin_group: this.ldapDomain === "-" ? "" : this.ldapAdminGroup,
+        ldap_readonly_group:
+          this.ldapDomain === "-" ? "" : this.ldapReadonlyGroup,
         index_unclassified_events: this.indexUnclassifiedEvents,
         export_url: this.exportUrl,
       };
