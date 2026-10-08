@@ -1,0 +1,39 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Wazuh health",
+    "$id": "http://nethserver.org/json-schema/task/output/wazuh/get-health",
+    "description": "State of the indexer, of the agents and of the agent listener certificate",
+    "examples": [
+        {
+            "indexer": {"status": "green", "disk_used_percent": 12},
+            "agents": {"total": 3, "active": 2, "disconnected": 1},
+            "certificate": {"expires": "2027-01-05T10:00:00+00:00", "days_left": 89}
+        }
+    ],
+    "type": "object",
+    "required": ["indexer", "agents", "certificate"],
+    "properties": {
+        "indexer": {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "description": "green, yellow, red or unreachable"},
+                "disk_used_percent": {"type": ["integer", "null"], "description": "Disk used by the indexer data"}
+            }
+        },
+        "agents": {
+            "type": "object",
+            "properties": {
+                "total": {"type": ["integer", "null"]},
+                "active": {"type": ["integer", "null"]},
+                "disconnected": {"type": ["integer", "null"]}
+            }
+        },
+        "certificate": {
+            "type": "object",
+            "properties": {
+                "expires": {"type": ["string", "null"], "description": "Expiration date of the agent listener certificate, ISO 8601"},
+                "days_left": {"type": ["integer", "null"]}
+            }
+        }
+    }
+}
