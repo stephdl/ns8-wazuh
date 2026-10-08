@@ -10,7 +10,7 @@ The module is not ready for production: it targets Wazuh `5.0.0-rc1`. The plan a
 
 One rootless pod with three containers: the Wazuh manager (agents, API), the indexer (data) and the dashboard (web interface). Traefik publishes the dashboard over HTTPS, always. The agents connect to the ports 1514, 1515 and 1517 of the node, which the module opens in the firewall. For this reason only one instance can run on a node.
 
-The node needs `vm.max_map_count=262144`, 4 to 6 GB of RAM and 50 GB of disk.
+The node needs `vm.max_map_count=262144`, at least 6 GB of RAM (the indexer alone takes a 2 GB heap, about 3 GB in total) and 50 GB of disk.
 
 ## Install
 
