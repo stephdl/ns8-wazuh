@@ -8,5 +8,6 @@
 set -e
 exec 1>&2
 
-# Load the NS8 decoders and rules once the indexer is healthy
+# Load the NS8 decoders and rules once the indexer is healthy, then run the rules on the events
 runagent provision-content
+runagent provision-detector
