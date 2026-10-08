@@ -2,6 +2,9 @@
   "resource": {
     "name": "decoder/ns8-dovecot-login-failed/0",
     "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
     "metadata": {
       "title": "Dovecot failed login",
       "description": "Authentication failures reported by Dovecot",
