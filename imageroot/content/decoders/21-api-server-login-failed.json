@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "_tmp_json.event.original": "contains(\"[AUTH] login-failed\")"
+        "event.original": "contains(\"[AUTH] login-failed\")"
       }
     ],
     "normalize": [
       {
-        "parse|_tmp_json.event.original": [
+        "parse|event.original": [
           "<~> login-failed user=<user.name> source=<source.ip><~>"
         ]
       },
