@@ -12,49 +12,17 @@
 import glob
 import json
 import os
-import subprocess
 import sys
 import time
 
-CONTAINER = os.environ.get("INDEXER_CONTAINER", "wazuh-indexer")
-SECRETS_FILE = os.environ.get("INDEXER_SECRETS", "secrets/indexer.env")
+from wazuh_api import api
+
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 CM = "_plugins/_content_manager"
 
 
 def log(message):
     print(message, file=sys.stderr)
-
-
-def admin_password():
-    with open(SECRETS_FILE) as f:
-        for line in f:
-            if line.startswith("WAZUH_INDEXER_ADMIN_PASSWORD="):
-                return line.rstrip("\n").split("=", 1)[1]
-    raise SystemExit("admin password not found")
-
-
-PASSWORD = admin_password()
-
-
-def curl_quote(value):
-    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-
-def api(method, path, body=None):
-    # The curl options go through stdin, so the password never appears in a process list
-    config = f'user = "admin:{curl_quote(PASSWORD)}"\nrequest = "{method}"\nurl = "https://localhost:9200/{path}"\n'
-    config += 'header = "Content-Type: application/json"\n'
-    if body is not None:
-        config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
-    proc = subprocess.run(["podman", "exec", "-i", CONTAINER, "curl", "-sk", "-K", "-"],
-                          input=config, capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"curl failed: {proc.stderr}")
-    try:
-        return json.loads(proc.stdout)
-    except ValueError:
-        raise RuntimeError(f"not a JSON answer: {proc.stdout[:200]}")
 
 
 def wait_ready():
