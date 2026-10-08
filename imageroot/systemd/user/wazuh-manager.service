@@ -1,0 +1,51 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Podman wazuh-manager.service
+BindsTo=wazuh.service
+After=wazuh.service wazuh-indexer.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
+Restart=always
+TimeoutStartSec=300
+TimeoutStopSec=90
+Type=forking
+ExecStartPre=/bin/rm -f %t/wazuh-manager.pid %t/wazuh-manager.ctr-id
+ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-manager.pid \
+    --cidfile %t/wazuh-manager.ctr-id --cgroups=no-conmon \
+    --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-manager \
+    --ulimit nofile=65536:65536 \
+    --env WAZUH_INDEXER_HOSTS=wazuh.indexer:9200 \
+    --env WAZUH_NODE_NAME=manager \
+    --env WAZUH_CLUSTER_NODES=wazuh.manager \
+    --env WAZUH_CLUSTER_BIND_ADDR=wazuh.manager \
+    --volume wazuh-api-configuration:/var/wazuh-manager/api/configuration:Z \
+    --volume wazuh-etc:/var/wazuh-manager/etc:Z \
+    --volume wazuh-logs:/var/wazuh-manager/logs:Z \
+    --volume wazuh-queue:/var/wazuh-manager/queue:Z \
+    --volume wazuh-multigroups:/var/wazuh-manager/var/multigroups:Z \
+    --volume wazuh-data:/var/wazuh-manager/data:Z \
+    --volume ./secrets/manager.env:/run/secrets/wazuh-credentials:ro,Z \
+    --volume ./ca/root-ca.pem:/var/wazuh-manager/etc/certs/root-ca.pem:ro,z \
+    --volume ./certs/connector.pem:/var/wazuh-manager/etc/certs/indexer-connector.pem:ro,Z \
+    --volume ./certs/connector-key.pem:/var/wazuh-manager/etc/certs/indexer-connector-key.pem:ro,Z \
+    --volume ./certs/remoted.pem:/var/wazuh-manager/etc/certs/remoted.pem:ro,Z \
+    --volume ./certs/remoted-key.pem:/var/wazuh-manager/etc/certs/remoted-key.pem:ro,Z \
+    --health-cmd='["/var/wazuh-manager/bin/wazuh-manager-control","status"]' \
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-start-period=60s \
+    ${WAZUH_MANAGER_IMAGE}
+ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-manager.ctr-id -t 60
+ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-manager.ctr-id
+PIDFile=%t/wazuh-manager.pid
+SyslogIdentifier=%u
+
+[Install]
+WantedBy=default.target
