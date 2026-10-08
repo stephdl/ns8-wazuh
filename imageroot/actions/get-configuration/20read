@@ -21,6 +21,7 @@ config = {}
 config["host"] = os.getenv("TRAEFIK_HOST","")
 config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
 config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
+config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"
 config["lets_encrypt"] = agent.get_route(os.environ['MODULE_ID']).get('lets_encrypt', False)
 
 # Dump the configuration to stdout
