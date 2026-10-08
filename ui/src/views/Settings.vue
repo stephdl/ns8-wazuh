@@ -320,16 +320,24 @@ export default {
     isConfigured() {
       return this.configuredHost !== "";
     },
-    isPasswordAccepted() {
+    passwordError() {
       // Same rules as the backend: Wazuh refuses other characters than these ones
       const value = this.adminPassword;
-      return (
-        /^[A-Za-z0-9.,_+:@%^=~-]{12,64}$/.test(value) &&
-        /[A-Z]/.test(value) &&
-        /[a-z]/.test(value) &&
-        /[0-9]/.test(value) &&
-        /[.,_+:@%^=~-]/.test(value)
-      );
+      if (value.length < 12 || value.length > 64) {
+        return "settings.password_length";
+      }
+      if (!/^[A-Za-z0-9.,_+:@%^=~-]+$/.test(value)) {
+        return "settings.password_characters";
+      }
+      if (
+        !/[A-Z]/.test(value) ||
+        !/[a-z]/.test(value) ||
+        !/[0-9]/.test(value) ||
+        !/[.,_+:@%^=~-]/.test(value)
+      ) {
+        return "settings.password_classes";
+      }
+      return "";
     },
     isDomainChosen() {
       return this.ldapDomain !== "" && this.ldapDomain !== "-";
@@ -339,10 +347,8 @@ export default {
       if (!this.host || !this.host.includes(".")) {
         missing.push(this.$t("settings.wazuh_fqdn"));
       }
-      if (this.adminPassword || !this.isConfigured) {
-        if (!this.isPasswordAccepted) {
-          missing.push(this.$t("settings.admin_password"));
-        }
+      if (!this.adminPassword && !this.isConfigured) {
+        missing.push(this.$t("settings.admin_password"));
       }
       if (this.isDomainChosen && !this.ldapAdminGroup) {
         missing.push(this.$t("settings.ldap_admin_group"));
@@ -544,6 +550,13 @@ export default {
 
         if (isValidationOk) {
           this.focusElement("host");
+        }
+        isValidationOk = false;
+      }
+      if (this.adminPassword && this.passwordError) {
+        this.error.admin_password = this.passwordError;
+        if (isValidationOk) {
+          this.focusElement("admin_password");
         }
         isValidationOk = false;
       }
