@@ -1,0 +1,13 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+set -e
+exec 1>&2
+
+# The services run since 50traefik called configure-module: load the snapshot, then reload the dashboard
+runagent restore-snapshot
+systemctl --user try-restart wazuh-dashboard.service
