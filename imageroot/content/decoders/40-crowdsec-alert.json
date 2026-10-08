@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "_tmp_json.event.original": "contains(\"performed '\")"
+        "event.original": "contains(\"performed '\")"
       }
     ],
     "normalize": [
       {
-        "parse|_tmp_json.event.original": [
+        "parse|event.original": [
           "<~>msg=\"Ip <source.ip> performed '<event.reason>' \\(<~>"
         ]
       },
