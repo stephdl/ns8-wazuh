@@ -21,10 +21,12 @@ TimeoutStopSec=70
 ExecStartPre=/bin/rm -f %t/wazuh.pid %t/wazuh.pod-id
 ExecStartPre=runagent fix-perms
 # Wazuh components reach each other by name, so the pod resolves them to localhost.
+# allow_host_loopback lets the pod reach the LDAP proxy of the node at 10.0.2.2.
 # Ports 1514, 1515 and 1517 are for the agents, the dashboard stays on localhost for Traefik.
 ExecStartPre=/usr/bin/podman pod create --infra-conmon-pidfile %t/wazuh.pid \
     --pod-id-file %t/wazuh.pod-id \
     --name wazuh \
+    --network=slirp4netns:allow_host_loopback=true \
     --add-host wazuh.indexer:127.0.0.1 \
     --add-host wazuh.manager:127.0.0.1 \
     --publish 127.0.0.1:${TCP_PORT}:5601 \
