@@ -115,8 +115,14 @@
           class="min-height-card"
         >
           <template slot="content">
-            <div v-if="health.indexer && health.indexer.disk_used_percent !== null">
-              {{ $t("status.disk_used", { percent: health.indexer.disk_used_percent }) }}
+            <div
+              v-if="health.indexer && health.indexer.disk_used_percent !== null"
+            >
+              {{
+                $t("status.disk_used", {
+                  percent: health.indexer.disk_used_percent,
+                })
+              }}
             </div>
           </template>
         </NsInfoCard>
@@ -404,14 +410,19 @@ export default {
   computed: {
     ...mapState(["instanceName", "instanceLabel", "core", "appName"]),
     indexerTitle() {
-      return this.health.indexer ? this.$t("status.indexer_" + this.health.indexer.status) : "-";
+      return this.health.indexer
+        ? this.$t("status.indexer_" + this.health.indexer.status)
+        : "-";
     },
     agentsTitle() {
       const a = this.health.agents;
       if (!a || a.total === null) {
         return "-";
       }
-      return this.$t("status.agents_count", { active: a.active, total: a.total });
+      return this.$t("status.agents_count", {
+        active: a.active,
+        total: a.total,
+      });
     },
     certificateTitle() {
       const c = this.health.certificate;
