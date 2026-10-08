@@ -1,0 +1,27 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 CrowdSec scenario triggered",
+      "description": "CrowdSec detected a behavior from an IP address",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0002",
+    "enabled": true,
+    "status": "experimental",
+    "level": "medium",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.action": [
+          "crowdsec-alert"
+        ]
+      }
+    }
+  }
+}
