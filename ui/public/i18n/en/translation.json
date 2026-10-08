@@ -109,8 +109,6 @@
   },
   "agents": {
     "title": "Agents",
-    "how_it_works_title": "How to add an agent",
-    "how_it_works": "Create a token, then run the command on the server to watch. A token is valid for a limited time and a limited number of agents.",
     "ttl": "Validity",
     "ttl_helper": "For example 30m, 1h or 7d",
     "ttl_invalid": "Use a number followed by s, m, h or d",
@@ -137,7 +135,6 @@
     "revoke_description": "The server forgets the agent and its key stops working. The agent has to enroll again with a new token to send its logs.",
     "revoke_type_to_confirm": "Type '{name}' to confirm",
     "revoke_task": "Revoke the agent {name}",
-    "add_title": "Add an agent",
     "col_name": "Name",
     "col_ip": "Address",
     "col_status": "Status",
@@ -151,6 +148,18 @@
     "linux_command": "On a Debian or Red Hat family Linux, run as root:",
     "linux_hint": "The script installs the agent package, checks its signature, enrolls the agent and starts it.",
     "other_systems_title": "Windows and macOS",
-    "other_systems": "The script does not cover them. Install the agent from the Wazuh documentation, then enroll it with this token."
+    "other_systems": "The script does not cover them. Install the agent from the Wazuh documentation, then enroll it with this token.",
+    "tabs": "Agent pages",
+    "tab_list": "Agents",
+    "tab_enrollment": "Enrollment",
+    "steps_title": "How to add an agent",
+    "step_token": "Create a token below. It is valid for a limited time and a limited number of agents.",
+    "step_command": "Copy the command and run it as root on the server to watch.",
+    "step_check": "Open the Agents tab: the new agent appears as Active after a few seconds.",
+    "requirements_title": "Before you start",
+    "requirement_dns": "The server to watch must resolve the public host name of this Wazuh server.",
+    "requirement_ports": "It must reach this server on TCP ports 1514, 1515 and 1517. The installer already opened them here.",
+    "requirement_os": "The script supports Debian, Ubuntu, Rocky Linux, AlmaLinux and RHEL, on x86_64 and aarch64.",
+    "requirement_logs": "The agent reads the system journal (journald) by default."
   }
 }
