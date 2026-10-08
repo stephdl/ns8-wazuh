@@ -2,6 +2,9 @@
   "resource": {
     "name": "decoder/ns8-api-server-login-failed/0",
     "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
     "metadata": {
       "title": "NS8 cluster admin failed login",
       "description": "Failed logins to the NS8 cluster API",
