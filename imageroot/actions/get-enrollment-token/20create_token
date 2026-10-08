@@ -7,38 +7,14 @@
 
 import json
 import os
-import subprocess
 import sys
 
 import agent
-
-API = "https://localhost:55000"
+from wazuh_api import manager_api
 
 data = json.load(sys.stdin)
 host = os.environ.get("TRAEFIK_HOST", "")
 agent.assert_exp(host != "", "the module is not configured yet")
-
-
-def manager_api_password():
-    with open("secrets/manager.env") as f:
-        for line in f:
-            if line.startswith("WAZUH_MANAGER_API_PASSWORD="):
-                return line.rstrip("\n").split("=", 1)[1]
-    agent.assert_exp(False, "API password not found")
-
-
-def curl(args, stdin=None):
-    # The API listens inside the pod only, so run curl from the manager container
-    proc = subprocess.run(["podman", "exec", "-i", "wazuh-manager", "curl", "-sk"] + args,
-                          input=stdin, capture_output=True, text=True)
-    agent.assert_exp(proc.returncode == 0, f"curl failed: {proc.stderr}")
-    return proc.stdout
-
-
-# The credentials go through stdin, so they never appear in a process list
-jwt = curl(["-K", "-", "-X", "POST", f"{API}/security/user/authenticate?raw=true"],
-           f'user = "wazuh:{manager_api_password()}"\n').strip()
-agent.assert_exp(jwt.count(".") == 2, "the Wazuh API refused the login")
 
 body = {
     "address": host,
@@ -49,10 +25,7 @@ body = {
 if data.get("description"):
     body["description"] = data["description"]
 
-response = json.loads(curl(["-X", "POST", f"{API}/agents/enrollment-tokens",
-                            "-H", f"Authorization: Bearer {jwt}",
-                            "-H", "Content-Type: application/json",
-                            "-d", "@-"], json.dumps(body)))
+response = manager_api("POST", "agents/enrollment-tokens", body)
 if response.get("error", 1) != 0:
     print(agent.SD_ERR + f"enrollment token refused: {response.get('detail')}", file=sys.stderr)
     sys.exit(2)
