@@ -110,16 +110,30 @@ Modules to watch first: mail, samba, openldap, nextcloud, traefik, crowdsec and 
 ## 7. Phases
 
 - [ ] **Phase 0, checks** on a test node (done: indexer rc1 starts rootless on Debian 13 with `bootstrap.memory_lock=false`, certificates readable by uid 101 with `podman unshare chown`, CTI content syncs by itself, list of standard integrations; left: manager and agent): upstream rc1 stack on rootless Podman (uid 101 permissions, `memlock`), Let's Encrypt certificate accepted by `remoted` and by an agent without an embedded CA, list of standard decoders, targeted `securityadmin.sh` with LDAP, `path.repo` for snapshots, GeoIP, dashboard over HTTP behind Traefik, OpenLDAP and core log lines.
-- [ ] **Phase 1, pod**: three containers, systemd, passwords, internal certificates, clean start.
-- [ ] **Phase 2, web access and certificate**: port, Traefik route, `set_certificate`, `get-certificate.service`, `certificate-changed` event, firewall 1514, 1515 and 1517.
-- [ ] **Phase 3, LDAP**: OpenLDAP and Samba AD, admin group, change events.
-- [ ] **Phase 4, agents**: `get-enrollment-token`, first enrolled agent, journald received.
-- [ ] **Phase 5, detection**: NS8 decoders and rules through the Content Manager API, minimal rule set, Samba retest.
-- [ ] **Phase 6, export and health**: webhook, module health alerts.
-- [ ] **Phase 7, backup**: dump, restore, clone, agents reconnecting.
-- [ ] **Phase 8, UI**: Status, Settings, Agents.
-- [ ] **Phase 9, tests and finish**: Robot tests, `renovate.json`, README, `org.nethserver.images`.
+- [x] **Phase 1, pod** (written, not installed): three containers, systemd, passwords, internal certificates, clean start.
+- [x] **Phase 2, web access and certificate** (written, not installed): port, Traefik route, `set_certificate`, `get-certificate.service`, `certificate-changed` event, firewall 1514, 1515 and 1517.
+- [x] **Phase 3, LDAP** (written, tested with a fake domain): OpenLDAP and Samba AD, admin group, change events.
+- [x] **Phase 4, agents** (token tested, no agent enrolled): `get-enrollment-token`, first enrolled agent, journald received.
+- [x] **Phase 5, detection** (first rules and decoders, tested with sample lines): NS8 decoders and rules through the Content Manager API, minimal rule set, Samba retest.
+- [x] **Phase 6, export and health** (webhook and health tested): webhook, module health alerts.
+- [x] **Phase 7, backup** (snapshot dump and restore tested): dump, restore, clone, agents reconnecting.
+- [x] **Phase 8, UI** (builds and lints, never opened in a browser): Status, Settings, Agents.
+- [x] **Phase 9, tests and finish** (Robot tests written, never run): Robot tests, `renovate.json`, README, `org.nethserver.images`.
 - [ ] **Second deliverable**: deploy the agent on an NS8 node (script or small module).
+
+## Status of the phases
+
+The code of the phases 1 to 9 is written. It was checked piece by piece on a test node (certificate and password scripts, security documents applied with `securityadmin.sh`, enrollment token, health, decoders and rules with `logtest`, webhook export, snapshot dump and restore) and the UI builds and passes the linter. **It was never installed as a module on NS8.** The first real install is the next step, and the open points below are the things most likely to fail there.
+
+Known gaps:
+- The unit files, the `configure-module` sequence and the image variables (`WAZUH_*_IMAGE`, `TCP_PORT`) were never run by the NS8 agent.
+- The Python scripts in `imageroot/bin` import `wazuh_security` and `wazuh_api` from `imageroot/pypkg`. That this folder is on their import path under `runagent` is assumed, not verified.
+- The listener certificate comes from the internal CA. Replacing it with the Traefik certificate (`get-certificate.service`, `certificate-changed` event) is written but not tested, and Let's Encrypt was not tried.
+- The LDAP login was tested with a fake domain, not with a real OpenLDAP or Samba AD.
+- No agent was enrolled, so journald collection and the detection rules were never seen on real data.
+- The Dovecot, api-server, Traefik and CrowdSec decoders were checked with sample lines copied from a running node, not with live events.
+- The geo enrichment is listed in the policy, but a login from a country outside the allowed list has no rule yet. Login outside working hours, mass file access and OpenLDAP and Samba logs are not covered.
+- The journald `localfile` configuration pushed to the agents is not written.
 
 ## 8. Open points
 
