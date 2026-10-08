@@ -169,8 +169,10 @@ if ! grep -q "<endpoint>${address}</endpoint>" "${CONFIG}"; then
 fi
 
 if [ -n "${AGENT_NAME}" ]; then
-    sed -i '/<agent_name>.*<\/agent_name>/d' "${CONFIG}"
-    sed -i "0,/<agent>/ s#<agent>#<agent>\n    <agent_name>${AGENT_NAME}</agent_name>#" "${CONFIG}"
+    # The name is read from the enrollment block, an agent_name next to the manager is refused
+    sed -i '/<enrollment>/,/<\/enrollment>/d' "${CONFIG}"
+    sed -i "0,/<manager>/ s#<manager>#<enrollment>\n      <agent_name>${AGENT_NAME}</agent_name>\n    </enrollment>\n    <manager>#" "${CONFIG}"
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the configuration, see ${CONFIG}"
 fi
 
 # Only root reads the token: the agent takes it at its first start and deletes it
