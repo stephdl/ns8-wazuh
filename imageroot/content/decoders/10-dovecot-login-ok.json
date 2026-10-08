@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "_tmp_json.event.original": "contains(\"-login: Login: user=\")"
+        "event.original": "contains(\"-login: Login: user=\")"
       }
     ],
     "normalize": [
       {
-        "parse|_tmp_json.event.original": [
+        "parse|event.original": [
           "<~>Login: user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>"
         ]
       },
