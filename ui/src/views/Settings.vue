@@ -33,31 +33,23 @@
               ref="host"
             >
             </cv-text-input>
-            <NsPasswordInput
+            <NsTextInput
+              type="password"
               v-model="adminPassword"
-              :newPasswordLabel="
+              autocomplete="new-password"
+              :label="$t('settings.admin_password')"
+              :placeholder="
                 isConfigured
-                  ? $t('settings.admin_password_change')
-                  : $t('settings.admin_password')
+                  ? $t('settings.unchanged_password_placeholder')
+                  : ''
               "
-              :confirmPasswordLabel="$t('settings.admin_password_confirm')"
-              :newPasswordHelperText="
-                isConfigured ? $t('settings.admin_password_keep') : ''
-              "
-              :newPasswordInvalidMessage="$t(error.admin_password)"
-              :passwordHideLabel="$t('settings.hide')"
+              :helper-text="$t('settings.admin_password_rules')"
+              :invalid-message="$t(error.admin_password)"
               :passwordShowLabel="$t('settings.show')"
-              :minLength="12"
-              :lengthLabel="$t('settings.password_length')"
-              :lowercaseLabel="$t('settings.password_lowercase')"
-              :uppercaseLabel="$t('settings.password_uppercase')"
-              :numberLabel="$t('settings.password_number')"
-              :symbolLabel="$t('settings.password_symbol')"
-              :equalLabel="$t('settings.password_equal')"
-              :clearConfirmPasswordCommand="passwordClearCommand"
+              :passwordHideLabel="$t('settings.hide')"
               :disabled="stillLoading"
               class="mg-bottom maxwidth"
-              @passwordValidation="passwordValidation = $event"
+              ref="admin_password"
             />
             <NsToggle
               value="letsEncrypt"
@@ -282,8 +274,6 @@ export default {
       host: "",
       configuredHost: "",
       adminPassword: "",
-      passwordValidation: { isValid: false },
-      passwordClearCommand: 0,
       isAdvancedOpen: false,
       isLetsEncryptEnabled: false,
       isLetsEncryptCurrentlyEnabled: false,
@@ -332,9 +322,13 @@ export default {
     },
     isPasswordAccepted() {
       // Same rules as the backend: Wazuh refuses other characters than these ones
+      const value = this.adminPassword;
       return (
-        this.passwordValidation.isValid &&
-        /^[A-Za-z0-9.,_+:@%^=~-]{12,64}$/.test(this.adminPassword)
+        /^[A-Za-z0-9.,_+:@%^=~-]{12,64}$/.test(value) &&
+        /[A-Z]/.test(value) &&
+        /[a-z]/.test(value) &&
+        /[0-9]/.test(value) &&
+        /[.,_+:@%^=~-]/.test(value)
       );
     },
     isDomainChosen() {
@@ -667,7 +661,6 @@ export default {
       this.loading.configureModule = false;
       // Do not keep the password in the page once it is applied
       this.adminPassword = "";
-      this.passwordClearCommand++;
 
       // reload configuration
       this.getConfiguration();
