@@ -54,6 +54,13 @@
             "type": "string",
             "title": "Export token",
             "description": "Optional bearer token sent to the export URL. Omit to keep the current one, send an empty string to remove it."
+        },
+        "admin_password": {
+            "type": "string",
+            "title": "Administrator password",
+            "description": "New password of the dashboard administrator, 12 to 64 characters from A-Z a-z 0-9 . , _ + : @ % ^ = ~ - with at least one uppercase letter, one lowercase letter, one digit and one symbol. Omit it to keep the current one.",
+            "minLength": 12,
+            "maxLength": 64
         }
     }
 }
