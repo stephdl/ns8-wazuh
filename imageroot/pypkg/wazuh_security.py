@@ -13,6 +13,13 @@ LDAP_HOST_FROM_POD = "10.0.2.2"
 # Service accounts must keep using the internal database only
 INTERNAL_USERS = ["admin", "kibanaserver", "wazuh-manager", "wazuh-wui"]
 
+# kibana_read_only hides the dashboard buttons that would save objects
+READONLY_INDEXER_ROLES = ["readall", "kibana_user", "kibana_read_only"]
+
+# Names of the Wazuh API rules owned by the module, so they can be found and replaced
+API_RULE_ADMIN = "ns8_ldap_admin"
+API_RULE_READONLY = "ns8_ldap_readonly"
+
 
 def _ldap_backend_config(domain, users_filter_clause=""):
     config = {
@@ -83,10 +90,33 @@ def build_security_config(default_config, domain=None, users_filter_clause=""):
     return document
 
 
-def build_roles_mapping(default_mapping, admin_group=None):
-    """Return the roles mapping document, with the admin group mapped to all_access."""
+def _map_group(document, role, group):
+    entry = document.setdefault(role, {"reserved": False})
+    backend_roles = entry.setdefault("backend_roles", [])
+    if group not in backend_roles:
+        backend_roles.append(group)
+
+
+def build_roles_mapping(default_mapping, admin_group=None, readonly_group=None):
+    """Return the roles mapping document, with the admin group mapped to all_access
+    and the read-only group mapped to the roles that open the dashboard without writing."""
     document = copy.deepcopy(default_mapping)
-    backend_roles = document["all_access"].setdefault("backend_roles", [])
-    if admin_group and admin_group not in backend_roles:
-        backend_roles.append(admin_group)
+    if admin_group:
+        _map_group(document, "all_access", admin_group)
+    if readonly_group:
+        for role in READONLY_INDEXER_ROLES:
+            _map_group(document, role, readonly_group)
     return document
+
+
+def build_api_rules(admin_group=None, readonly_group=None):
+    """Return the Wazuh API rules that give the same groups the matching API role.
+
+    The dashboard calls the API on behalf of the user, and the API only knows
+    the groups as backend_roles, so each group needs its own rule."""
+    rules = {}
+    if admin_group:
+        rules[API_RULE_ADMIN] = ("administrator", {"MATCH": {"backend_roles": [admin_group]}})
+    if readonly_group:
+        rules[API_RULE_READONLY] = ("readonly", {"MATCH": {"backend_roles": [readonly_group]}})
+    return rules
