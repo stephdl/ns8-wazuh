@@ -36,7 +36,7 @@ buildah add "${container}" imageroot /imageroot
 buildah add "${container}" ui/dist /ui
 
 buildah config --entrypoint=/ \
-    --label="org.nethserver.authorizations=node:fwadm traefik@node:routeadm" \
+    --label="org.nethserver.authorizations=node:fwadm traefik@node:fulladm cluster:accountconsumer" \
     --label="org.nethserver.max-per-node=1" \
     --label="org.nethserver.tcp-ports-demand=1" \
     --label="org.nethserver.volumes=wazuh-indexer-data" \
