@@ -20,6 +20,18 @@
       </cv-column>
     </cv-row>
     <cv-row>
+      <cv-column class="toolbar">
+        <NsButton
+          kind="ghost"
+          :icon="Restart20"
+          :loading="loading.listAgents"
+          :disabled="loading.listAgents"
+          @click="listAgents"
+          >{{ $t("agents.refresh") }}</NsButton
+        >
+      </cv-column>
+    </cv-row>
+    <cv-row>
       <cv-column>
         <cv-tile light>
           <NsDataTable
@@ -85,14 +97,6 @@
               </cv-data-table-row>
             </template>
           </NsDataTable>
-          <NsButton
-            kind="ghost"
-            :icon="Restart20"
-            :loading="loading.listAgents"
-            :disabled="loading.listAgents"
-            @click="listAgents"
-            >{{ $t("agents.refresh") }}</NsButton
-          >
         </cv-tile>
       </cv-column>
     </cv-row>
@@ -490,6 +494,11 @@ export default {
   margin-bottom: $spacing-06;
 }
 .mg-bottom-sm {
+  margin-bottom: $spacing-03;
+}
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
   margin-bottom: $spacing-03;
 }
 </style>
