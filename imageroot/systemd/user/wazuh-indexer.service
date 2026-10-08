@@ -35,7 +35,7 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-indexer.pid \
     --env path.repo=/snapshots \
     --env NODES_DN=CN=wazuh.indexer,OU=Wazuh,O=Wazuh,L=California,C=US \
     --volume wazuh-indexer-data:/var/lib/wazuh-indexer:Z \
-    --volume ./snapshots:/snapshots:Z \
+    --volume wazuh-snapshots:/snapshots:Z \
     --volume ./secrets/indexer.env:/run/secrets/wazuh-credentials:ro,Z \
     --volume ./ca/root-ca.pem:/usr/share/wazuh-indexer/config/certs/root-ca.pem:ro,z \
     --volume ./certs/indexer.pem:/usr/share/wazuh-indexer/config/certs/indexer.pem:ro,Z \
