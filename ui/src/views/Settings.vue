@@ -33,6 +33,32 @@
               ref="host"
             >
             </cv-text-input>
+            <NsPasswordInput
+              v-model="adminPassword"
+              :newPasswordLabel="
+                isConfigured
+                  ? $t('settings.admin_password_change')
+                  : $t('settings.admin_password')
+              "
+              :confirmPasswordLabel="$t('settings.admin_password_confirm')"
+              :newPasswordHelperText="
+                isConfigured ? $t('settings.admin_password_keep') : ''
+              "
+              :newPasswordInvalidMessage="$t(error.admin_password)"
+              :passwordHideLabel="$t('settings.hide')"
+              :passwordShowLabel="$t('settings.show')"
+              :minLength="12"
+              :lengthLabel="$t('settings.password_length')"
+              :lowercaseLabel="$t('settings.password_lowercase')"
+              :uppercaseLabel="$t('settings.password_uppercase')"
+              :numberLabel="$t('settings.password_number')"
+              :symbolLabel="$t('settings.password_symbol')"
+              :equalLabel="$t('settings.password_equal')"
+              :clearConfirmPasswordCommand="passwordClearCommand"
+              :disabled="stillLoading"
+              class="mg-bottom maxwidth"
+              @passwordValidation="passwordValidation = $event"
+            />
             <NsToggle
               value="letsEncrypt"
               :label="core.$t('apps_lets_encrypt.request_https_certificate')"
@@ -110,7 +136,7 @@
             </cv-text-input>
             <!-- advanced options -->
             <cv-accordion ref="accordion" class="maxwidth mg-bottom">
-              <cv-accordion-item :open="toggleAccordion[0]">
+              <cv-accordion-item :open="isAdvancedOpen">
                 <template slot="title">{{ $t("settings.advanced") }}</template>
                 <template slot="content">
                   <NsToggle
@@ -200,11 +226,19 @@
                 </NsInlineNotification>
               </cv-column>
             </cv-row>
+            <NsInlineNotification
+              v-if="missingFields.length && !stillLoading"
+              kind="info"
+              :title="$t('settings.to_save')"
+              :description="missingFields.join(', ')"
+              :showCloseButton="false"
+              class="mg-bottom maxwidth"
+            />
             <NsButton
               kind="primary"
               :icon="Save20"
               :loading="loading.configureModule"
-              :disabled="loading.getConfiguration || loading.configureModule"
+              :disabled="stillLoading || !isFormValid"
               >{{ $t("settings.save") }}</NsButton
             >
           </cv-form>
@@ -246,9 +280,17 @@ export default {
       validationErrorDetails: [],
       urlCheckInterval: null,
       host: "",
+      configuredHost: "",
+      adminPassword: "",
+      passwordValidation: { isValid: false },
+      passwordClearCommand: 0,
+      isAdvancedOpen: false,
       isLetsEncryptEnabled: false,
       isLetsEncryptCurrentlyEnabled: false,
-      ldapDomain: "-",
+      // Empty until the list of domains and the configuration are both loaded: NsComboBox
+      // writes its label only when the value changes while the option already exists
+      ldapDomain: "",
+      configuredLdapDomain: null,
       ldapAdminGroup: "",
       domains: [],
       indexUnclassifiedEvents: false,
@@ -262,6 +304,7 @@ export default {
         listUserDomains: false,
       },
       error: {
+        admin_password: "",
         ldap_domain: "",
         ldap_admin_group: "",
         export_url: "",
@@ -282,6 +325,41 @@ export default {
         this.loading.configureModule ||
         this.loading.getStatus
       );
+    },
+    // The first configuration must choose the password, a later one may keep it
+    isConfigured() {
+      return this.configuredHost !== "";
+    },
+    isPasswordAccepted() {
+      // Same rules as the backend: Wazuh refuses other characters than these ones
+      return (
+        this.passwordValidation.isValid &&
+        /^[A-Za-z0-9.,_+:@%^=~-]{12,64}$/.test(this.adminPassword)
+      );
+    },
+    isDomainChosen() {
+      return this.ldapDomain !== "" && this.ldapDomain !== "-";
+    },
+    missingFields() {
+      const missing = [];
+      if (!this.host || !this.host.includes(".")) {
+        missing.push(this.$t("settings.wazuh_fqdn"));
+      }
+      if (this.adminPassword || !this.isConfigured) {
+        if (!this.isPasswordAccepted) {
+          missing.push(this.$t("settings.admin_password"));
+        }
+      }
+      if (this.isDomainChosen && !this.ldapAdminGroup) {
+        missing.push(this.$t("settings.ldap_admin_group"));
+      }
+      if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
+        missing.push(this.$t("settings.export_url"));
+      }
+      return missing;
+    },
+    isFormValid() {
+      return this.missingFields.length === 0;
     },
   },
   created() {
@@ -348,6 +426,12 @@ export default {
       });
       this.domains = options;
       this.loading.listUserDomains = false;
+      this.applyLdapDomain();
+    },
+    applyLdapDomain() {
+      if (this.configuredLdapDomain !== null && this.domains.length) {
+        this.ldapDomain = this.configuredLdapDomain;
+      }
     },
     goToCertificates() {
       this.core.$router.push("/settings/tls-certificates");
@@ -439,15 +523,21 @@ export default {
     getConfigurationCompleted(taskContext, taskResult) {
       const config = taskResult.output;
       this.host = config.host;
+      this.configuredHost = config.host;
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isLetsEncryptCurrentlyEnabled = config.lets_encrypt;
-      this.ldapDomain = config.ldap_domain === "" ? "-" : config.ldap_domain;
+      this.configuredLdapDomain =
+        config.ldap_domain === "" ? "-" : config.ldap_domain;
+      this.applyLdapDomain();
       this.ldapAdminGroup = config.ldap_admin_group;
       this.indexUnclassifiedEvents = config.index_unclassified_events;
       this.exportUrl = config.export_url;
       this.exportTokenSet = config.export_token_set;
       this.exportToken = "";
 
+      // Show the advanced options when one of them is in use
+      this.isAdvancedOpen =
+        config.index_unclassified_events || config.export_url !== "";
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -536,6 +626,10 @@ export default {
         index_unclassified_events: this.indexUnclassifiedEvents,
         export_url: this.exportUrl,
       };
+      // The password is sent only when typed: nothing means keep the current one
+      if (this.adminPassword) {
+        data.admin_password = this.adminPassword;
+      }
       // Only send the token when typed, an empty one would remove the stored token
       if (this.exportToken) {
         data.export_token = this.exportToken;
@@ -571,6 +665,9 @@ export default {
     },
     configureModuleCompleted() {
       this.loading.configureModule = false;
+      // Do not keep the password in the page once it is applied
+      this.adminPassword = "";
+      this.passwordClearCommand++;
 
       // reload configuration
       this.getConfiguration();
