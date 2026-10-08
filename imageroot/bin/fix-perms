@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# The Wazuh images run as uid 101. In a rootless pod that uid is a subuid,
+# so the certificates must be chowned inside the user namespace.
+# The certs directory stays owned by the module, to let it replace the files.
+
+set -e
+exec 1>&2
+
+cd "${AGENT_STATE_DIR}"
+podman unshare find certs -type f -name '*.pem' -exec chown 101:101 {} +
+podman unshare find certs -type f -name '*.pem' -exec chmod 0640 {} +
