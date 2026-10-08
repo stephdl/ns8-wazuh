@@ -1,0 +1,29 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Issue a leaf certificate signed by the internal CA.
+# Usage: mkcert <name> <subject> <subjectAltName>
+# Runs in the state directory: reads ca/, writes certs/<name>.pem and certs/<name>-key.pem
+
+set -e
+exec 1>&2
+
+name=$1
+subject=$2
+san=$3
+
+mkdir -p certs
+# Files may be owned by another uid after fix-perms, so remove them before writing
+rm -f "certs/${name}.pem" "certs/${name}-key.pem"
+
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "certs/${name}-key.pem"
+openssl req -new -key "certs/${name}-key.pem" -subj "${subject}" -out "certs/${name}.csr"
+printf 'subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth\n' "${san}" > "certs/${name}.ext"
+# 10 years: these certificates never leave the pod and no renewal job exists
+openssl x509 -req -in "certs/${name}.csr" -CA ca/root-ca.pem -CAkey ca/root-ca-key.pem \
+    -CAcreateserial -days 3650 -extfile "certs/${name}.ext" -out "certs/${name}.pem"
+rm -f "certs/${name}.csr" "certs/${name}.ext"
