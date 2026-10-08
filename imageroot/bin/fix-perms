@@ -5,15 +5,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-# The Wazuh images run as uid 101. In a rootless pod that uid is a subuid,
-# so the certificates must be chowned inside the user namespace.
-# The certs directory stays owned by the module, to let it replace the files.
+# The Wazuh images drop to uid 101 inside the pod. The core runs "chown -R" on the module
+# directory at each update and it fails on a file owned by a subuid, so nothing under state/
+# may belong to uid 101. The certificates stay owned by the module and are readable by all:
+# they are reached only through a bind mount, and the module home is private to the module.
 
 set -e
 exec 1>&2
 
 cd "${AGENT_STATE_DIR}"
-mkdir -p snapshots
-podman unshare chown -R 101:101 snapshots
-podman unshare find certs -type f -name '*.pem' -exec chown 101:101 {} +
-podman unshare find certs -type f -name '*.pem' -exec chmod 0640 {} +
+chmod 0644 certs/*.pem
+
+# A volume lives outside the module directory, so it can belong to uid 101, which writes the snapshots
+podman volume exists wazuh-snapshots || podman volume create wazuh-snapshots
+podman unshare chown 101:101 "$(podman volume inspect wazuh-snapshots --format '{{.Mountpoint}}')"
