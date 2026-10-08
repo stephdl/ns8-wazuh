@@ -18,12 +18,13 @@ TimeoutStartSec=600
 TimeoutStopSec=120
 Type=forking
 ExecStartPre=/bin/rm -f %t/wazuh-indexer.pid %t/wazuh-indexer.ctr-id
-# bootstrap.memory_lock is off: a rootless user is limited to 8 MB of locked memory
+# bootstrap.memory_lock is off: a rootless user is limited to 8 MB of locked memory.
+# A heap of 1 GB is too small: the memory circuit breaker trips during the content sync and the searches fail.
 ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-indexer.pid \
     --cidfile %t/wazuh-indexer.ctr-id --cgroups=no-conmon \
     --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-indexer \
     --ulimit nofile=65536:65536 \
-    --env OPENSEARCH_JAVA_OPTS="-Xms1g -Xmx1g" \
+    --env OPENSEARCH_JAVA_OPTS="-Xms2g -Xmx2g" \
     --env bootstrap.memory_lock=false \
     --env network.host=0.0.0.0 \
     --env node.name=wazuh.indexer \
