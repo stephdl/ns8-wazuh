@@ -19,7 +19,7 @@
       {
         "map": [
           {
-            "_tmp_json": "parse_json($event.original)"
+            "_ns8": "true"
           }
         ]
       }
