@@ -18,6 +18,7 @@ for evar in [
         "TRAEFIK_LETS_ENCRYPT",
         "LDAP_DOMAIN",
         "LDAP_ADMIN_GROUP",
+        "INDEX_UNCLASSIFIED_EVENTS",
     ]:
     agent.set_env(evar, original_environment[evar])
 
