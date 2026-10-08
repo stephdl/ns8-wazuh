@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Load the NS8 integration (decoders and rules) into the Wazuh Content Manager.
+# The content is created in the draft space, then promoted to test and custom.
+# The script is idempotent: existing resources are updated in place.
+
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+CONTAINER = os.environ.get("INDEXER_CONTAINER", "wazuh-indexer")
+SECRETS_FILE = os.environ.get("INDEXER_SECRETS", "secrets/indexer.env")
+CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
+CM = "_plugins/_content_manager"
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def admin_password():
+    with open(SECRETS_FILE) as f:
+        for line in f:
+            if line.startswith("WAZUH_INDEXER_ADMIN_PASSWORD="):
+                return line.rstrip("\n").split("=", 1)[1]
+    raise SystemExit("admin password not found")
+
+
+PASSWORD = admin_password()
+
+
+def curl_quote(value):
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def api(method, path, body=None):
+    # The curl options go through stdin, so the password never appears in a process list
+    config = f'user = "admin:{curl_quote(PASSWORD)}"\nrequest = "{method}"\nurl = "https://localhost:9200/{path}"\n'
+    config += 'header = "Content-Type: application/json"\n'
+    if body is not None:
+        config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
+    proc = subprocess.run(["podman", "exec", "-i", CONTAINER, "curl", "-sk", "-K", "-"],
+                          input=config, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed: {proc.stderr}")
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        raise RuntimeError(f"not a JSON answer: {proc.stdout[:200]}")
+
+
+def wait_ready():
+    for _ in range(60):
+        try:
+            if "changes" in api("GET", f"{CM}/promote?space=draft"):
+                return
+        except RuntimeError:
+            pass
+        time.sleep(10)
+    raise SystemExit("the Content Manager is not ready")
+
+
+def find_draft(index, field, value):
+    """Return the id of the draft document whose field equals value, or None."""
+    answer = api("POST", f"{index}/_search", {"size": 50, "query": {"bool": {"filter": [
+        {"match_phrase": {"space.name": "draft"}}, {"match_phrase": {field: value}}]}}})
+    for hit in answer.get("hits", {}).get("hits", []):
+        document = hit["_source"]["document"]
+        actual = document["name"] if field == "document.name" else document["metadata"]["title"]
+        if actual == value:
+            return hit["_id"]
+    return None
+
+
+def check(answer, what):
+    if answer.get("status") not in (200, 201):
+        raise SystemExit(f"{what}: {answer.get('message', answer)}")
+    return answer["message"]
+
+
+def load(path):
+    with open(path) as f:
+        return json.load(f)
+
+
+wait_ready()
+
+integration = load(os.path.join(CONTENT_DIR, "integration.json"))
+integration_id = find_draft("wazuh-threatintel-integrations", "document.metadata.title", integration["resource"]["metadata"]["title"])
+if integration_id is None:
+    integration_id = check(api("POST", f"{CM}/integrations", integration), "integration")
+    log(f"integration created: {integration_id}")
+
+root_decoder_id = None
+for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "decoders", "*.json"))):
+    resource = load(path)["resource"]
+    existing = find_draft("wazuh-threatintel-decoders", "document.name", resource["name"])
+    if existing:
+        new_id = check(api("PUT", f"{CM}/decoders/{existing}", {"resource": resource}), resource["name"])
+        existing_id = existing
+    else:
+        new_id = check(api("POST", f"{CM}/decoders", {"integration": integration_id, "resource": resource}), resource["name"])
+        existing_id = new_id[2:] if new_id.startswith("d_") else new_id
+    log(f"decoder {resource['name']}: ok")
+    if resource["name"] == "decoder/ns8-root/0":
+        root_decoder_id = existing_id
+
+for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "rules", "*.json"))):
+    resource = load(path)["resource"]
+    existing = find_draft("wazuh-threatintel-rules", "document.metadata.title", resource["metadata"]["title"])
+    if existing:
+        check(api("PUT", f"{CM}/rules/{existing}", {"resource": resource}), resource["metadata"]["title"])
+    else:
+        check(api("POST", f"{CM}/rules", {"integration": integration_id, "resource": resource}), resource["metadata"]["title"])
+    log(f"rule {resource['metadata']['title']}: ok")
+
+def policy_document(space):
+    answer = api("POST", "wazuh-threatintel-policies/_search", {"size": 5, "query": {"match_phrase": {"space.name": space}}})
+    for hit in answer["hits"]["hits"]:
+        if "document" in hit["_source"]:
+            return hit["_source"]["document"]
+    raise SystemExit(f"policy of the {space} space not found")
+
+
+index_unclassified = os.environ.get("INDEX_UNCLASSIFIED_EVENTS", "False") == "True"
+standard = policy_document("standard")
+
+# The standard policy only accepts a few flags: here the unclassified events and its enrichments
+check(api("PUT", f"{CM}/policy/standard", {"resource": {
+    "enrichments": standard.get("enrichments", []),
+    "filters": standard.get("filters", []),
+    "enabled": True,
+    "index_unclassified_events": index_unclassified,
+    "index_discarded_events": standard.get("index_discarded_events", False),
+}}), "standard policy")
+log("standard policy updated")
+
+# The draft policy needs our own root decoder, a standard one is not visible from this space.
+# It takes the enrichments of the standard policy, like the geo one used to locate IP addresses.
+policy = policy_document("draft")
+check(api("PUT", f"{CM}/policy/draft", {"resource": {
+    "metadata": {
+        "title": policy["metadata"].get("title", "Draft policy"),
+        "author": policy["metadata"].get("author") or "NethServer",
+        "description": policy["metadata"].get("description") or "NS8 detection content",
+        "documentation": policy["metadata"].get("documentation") or "",
+        "references": policy["metadata"].get("references") or ["https://github.com/stephdl/ns8-wazuh"],
+    },
+    "root_decoder": root_decoder_id,
+    "integrations": policy.get("integrations", []),
+    "filters": policy.get("filters", []),
+    "enrichments": standard.get("enrichments", []),
+    "enabled": True,
+    "index_unclassified_events": index_unclassified,
+    "index_discarded_events": policy.get("index_discarded_events", False),
+}}), "draft policy")
+log("draft policy updated")
+
+for space in ("draft", "test"):
+    preview = api("GET", f"{CM}/promote?space={space}")
+    changes = preview.get("changes", {})
+    if not any(changes.get(kind) for kind in changes):
+        log(f"nothing to promote from {space}")
+        continue
+    check(api("POST", f"{CM}/promote", {"space": space, "changes": changes}), f"promotion from {space}")
+    log(f"promoted from {space}")
