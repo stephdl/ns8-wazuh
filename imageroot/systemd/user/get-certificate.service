@@ -1,0 +1,17 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Get the TLS certificate of the agent listener from Traefik
+
+[Service]
+Type=oneshot
+# Exit status 3 means Traefik has no certificate for the host yet: the internal one stays in place
+SuccessExitStatus=0,3
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
+SyslogIdentifier=%N
+ExecStart=-mkdir -vp certs
+ExecStart=-runagent get-certificate --cert-file=certs/remoted.pem --key-file=certs/remoted-key.pem ${TRAEFIK_HOST}
