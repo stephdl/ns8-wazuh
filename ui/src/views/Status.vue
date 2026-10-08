@@ -19,6 +19,16 @@
         />
       </cv-column>
     </cv-row>
+    <cv-row v-if="error.getHealth">
+      <cv-column>
+        <NsInlineNotification
+          kind="error"
+          :title="$t('action.get-health')"
+          :description="error.getHealth"
+          :showCloseButton="false"
+        />
+      </cv-column>
+    </cv-row>
     <cv-row v-if="error.listBackupRepositories">
       <cv-column>
         <NsInlineNotification
@@ -92,6 +102,52 @@
           :description="$t('status.installation_node')"
           :icon="Chip32"
           :loading="loading.getStatus || loading.getConfiguration"
+          class="min-height-card"
+        />
+      </cv-column>
+      <cv-column :md="4" :max="4">
+        <NsInfoCard
+          light
+          :title="indexerTitle"
+          :description="$t('status.indexer')"
+          :icon="DataBase32"
+          :loading="loading.getHealth"
+          class="min-height-card"
+        >
+          <template slot="content">
+            <div v-if="health.indexer && health.indexer.disk_used_percent !== null">
+              {{ $t("status.disk_used", { percent: health.indexer.disk_used_percent }) }}
+            </div>
+          </template>
+        </NsInfoCard>
+      </cv-column>
+      <cv-column :md="4" :max="4">
+        <NsInfoCard
+          light
+          :title="agentsTitle"
+          :description="$t('status.agents')"
+          :icon="Connect32"
+          :loading="loading.getHealth"
+          class="min-height-card"
+        >
+          <template slot="content">
+            <NsButton
+              kind="ghost"
+              :icon="ArrowRight20"
+              @click="goToAppPage(instanceName, 'agents')"
+            >
+              {{ $t("status.add_agent") }}
+            </NsButton>
+          </template>
+        </NsInfoCard>
+      </cv-column>
+      <cv-column :md="4" :max="4">
+        <NsInfoCard
+          light
+          :title="certificateTitle"
+          :description="$t('status.certificate')"
+          :icon="Certificate32"
+          :loading="loading.getHealth"
           class="min-height-card"
         />
       </cv-column>
@@ -323,6 +379,11 @@ export default {
         images: [],
         volumes: [],
       },
+      health: {
+        indexer: null,
+        agents: null,
+        certificate: null,
+      },
       backupRepositories: [],
       backups: [],
       loading: {
@@ -330,8 +391,10 @@ export default {
         listBackupRepositories: false,
         listBackups: false,
         getConfiguration: false,
+        getHealth: false,
       },
       error: {
+        getHealth: "",
         getStatus: "",
         listBackupRepositories: "",
         listBackups: "",
@@ -340,6 +403,23 @@ export default {
   },
   computed: {
     ...mapState(["instanceName", "instanceLabel", "core", "appName"]),
+    indexerTitle() {
+      return this.health.indexer ? this.$t("status.indexer_" + this.health.indexer.status) : "-";
+    },
+    agentsTitle() {
+      const a = this.health.agents;
+      if (!a || a.total === null) {
+        return "-";
+      }
+      return this.$t("status.agents_count", { active: a.active, total: a.total });
+    },
+    certificateTitle() {
+      const c = this.health.certificate;
+      if (!c || c.days_left === null) {
+        return "-";
+      }
+      return this.$tc("status.days_left", c.days_left, { count: c.days_left });
+    },
     installationNodeTitle() {
       if (this.status && this.status.node) {
         if (this.status.node_ui_name) {
@@ -381,9 +461,49 @@ export default {
   created() {
     this.getConfiguration();
     this.getStatus();
+    this.getHealth();
     this.listBackupRepositories();
   },
   methods: {
+    async getHealth() {
+      this.loading.getHealth = true;
+      this.error.getHealth = "";
+      const taskAction = "get-health";
+      const eventId = this.getUuid();
+      this.core.$root.$once(
+        `${taskAction}-aborted-${eventId}`,
+        this.getHealthAborted
+      );
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.getHealthCompleted
+      );
+      const res = await to(
+        this.createModuleTaskForApp(this.instanceName, {
+          action: taskAction,
+          extra: {
+            title: this.$t("action." + taskAction),
+            isNotificationHidden: true,
+            eventId,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.getHealth = this.getErrorMessage(err);
+        this.loading.getHealth = false;
+      }
+    },
+    getHealthAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.getHealth = this.$t("error.generic_error");
+      this.loading.getHealth = false;
+    },
+    getHealthCompleted(taskContext, taskResult) {
+      this.health = taskResult.output;
+      this.loading.getHealth = false;
+    },
     goToWebapp() {
       window.open(`https://${this.host}`, "_blank");
     },
