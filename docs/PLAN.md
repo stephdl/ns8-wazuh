@@ -107,31 +107,44 @@ Modules to watch first: mail, samba, openldap, nextcloud, traefik, crowdsec and 
 
 ## 7. Phases
 
-- [ ] **Phase 0, checks** on a test node (done: indexer rc1 starts rootless on Debian 13 with `bootstrap.memory_lock=false`, certificates readable by uid 101 with `podman unshare chown`, CTI content syncs by itself, list of standard integrations; left: manager and agent): upstream rc1 stack on rootless Podman (uid 101 permissions, `memlock`), Let's Encrypt certificate accepted by `remoted` and by an agent without an embedded CA, list of standard decoders, targeted `securityadmin.sh` with LDAP, `path.repo` for snapshots, GeoIP, dashboard over HTTP behind Traefik, OpenLDAP and core log lines.
-- [x] **Phase 1, pod** (written, not installed): three containers, systemd, passwords, internal certificates, clean start.
-- [x] **Phase 2, web access and certificate**: port, Traefik route, internal certificate for the agent ports, firewall 1514, 1515 and 1517.
-- [x] **Phase 3, LDAP** (written, tested with a fake domain): OpenLDAP and Samba AD, admin group, change events.
-- [x] **Phase 4, agents** (one agent enrolled): `get-enrollment-token`, first enrolled agent, journald received.
-- [x] **Phase 5, detection** (first rules and decoders, tested with sample lines): NS8 decoders and rules through the Content Manager API, minimal rule set, Samba retest.
+- [x] **Phase 0, checks**: the rc1 stack runs rootless on Debian 13 and Rocky 9, CTI content syncs by itself, the dashboard works over HTTP behind Traefik, `securityadmin.sh` applies targeted LDAP documents, snapshots work with `path.repo`. Left: OpenLDAP and core log lines (see open points).
+- [x] **Phase 1, pod**: three containers, systemd, passwords, internal certificates, clean start.
+- [x] **Phase 2, web access and certificate**: port, Traefik route, internal certificate for the agent ports, firewall 1514, 1515 and 1517, host name locked once agents are enrolled.
+- [x] **Phase 3, LDAP**: OpenLDAP and Samba AD, admin group and optional read-only group, mapped on the indexer and on the Wazuh API, change events.
+- [x] **Phase 4, agents**: one-day token, install script, revocation, `--update`, outdated tag.
+- [ ] **Phase 5, detection**: NS8 decoders and two rules work, the custom rules asked by the customer are not written yet.
 - [x] **Phase 6, export and health**: webhook, email summary through the cluster smarthost, module health.
-- [x] **Phase 7, backup** (snapshot dump and restore tested): dump, restore, clone, agents reconnecting.
-- [x] **Phase 8, UI** (checked in a browser): Status, Settings, Agents.
-- [x] **Phase 9, tests and finish** (Robot tests not run yet): Robot tests, `renovate.json`, README, `org.nethserver.images`.
-- [ ] **Second deliverable**: deploy the agent on an NS8 node (script or small module).
+- [x] **Phase 7, backup**: NS8 backup, restore and clone on another node, agents reconnecting after a DNS change.
+- [x] **Phase 8, UI**: Status, Settings, Agents.
+- [ ] **Phase 9, tests and finish**: README and Renovate done, Robot tests not run yet.
+- [x] **Second deliverable**: the same install script runs on NS8 nodes. No agent module for now, see open points.
 
 ## Status of the phases
 
-The module installs and updates on a Debian 13 node with Podman 5.4. Checked there: the pod starts, the health is green, `update-module` works, one Rocky 9 agent enrolled with `scripts/install-agent.sh`, a real Dovecot failure from another node produced the finding "NS8 authentication failure", agent revocation and re-enrollment, on-the-fly admin password change, LDAP login with an OpenLDAP domain (admin group mapped on the indexer, Wazuh API rule created but not yet checked in the dashboard), snapshot dump and restore. The UI pages were checked in a browser.
+The module runs on a Debian 13 node with Podman 5.4, and on Rocky 9 with the default `vm.max_map_count`. Two Rocky 9 agents are enrolled. Checked on the test cluster:
+
+- Install, configure, `update-module`, health. Saving the settings no longer restarts the pod, and the LDAP documents are applied only when they change.
+- Agents: enrollment with a one-day token, revocation, `--update` on an enrolled agent, outdated tag and update command in the UI. The agent checks the host name in the server certificate, so the host name is locked once agents are enrolled.
+- Certificates: one internal CA for the pod and the agent ports, 10 years, never renewed. `renew-certificates` issues the signed certificates again, the agents keep working.
+- LDAP: login with Samba AD as administrator, Wazuh API rights through the `ns8_ldap_admin` rule, read-only group mapped on `readall`, `kibana_user` and the API `readonly` role.
+- Detection: a real Dovecot failure produced the finding "NS8 authentication failure".
+- Emails: summary every 5 minutes through the smarthost, grouped by agent and rule, minimum level, on and off switch, NS8 session noise left out, monitor saved only when it changes.
+- Backup: NS8 backup of about 10 MB (the vulnerability feed is left out), restore and clone on another node with the same CA, agents, history and settings. Pointing the DNS record to the new node brought the agent back without a new token.
 
 Known gaps:
-- Let's Encrypt for the dashboard was not tried.
-- Moving the server with a restore on another node, and the agent reading the DNS again when it reconnects, were not tested.
-- The LDAP login was not tested with Samba AD, and the read-only group was not tested with a real user.
-- The Dovecot, api-server, Traefik and CrowdSec decoders were checked with sample lines copied from a running node, not with live events.
-- The geo enrichment is listed in the policy, but a login from a country outside the allowed list has no rule yet. Login outside working hours, mass file access and OpenLDAP and Samba logs are not covered.
-- The journald `localfile` configuration pushed to the agents is not written.
+- Let's Encrypt for the dashboard was not tried, it needs a real host name.
+- The api-server, Traefik and CrowdSec decoders were checked with sample lines, not with live events.
+- No rule yet for a login outside working hours, from an unexpected country, or for mass file activity.
+- The collection settings pushed to the agents by group are not written.
+- The Robot tests were never run.
 
 ## 8. Open points
+
+**Remote agent update.** The Wazuh API can upgrade an agent through its own connection with a signed WPK package (`PUT /agents/upgrade`), without SSH. No WPK is published for 5.0.0-rc1. To look at once 5.0.0 is out, as a button next to the update command.
+
+**Agent as an NS8 module.** It would need a privileged rootfull container with the host mounted to read the journal, the packages and the files, and Wazuh does not support that layout. The install script stays the way to deploy agents unless a customer asks for a module.
+
+**Other notification channels.** The Notifications plugin also has Slack, Microsoft Teams and Chime channels. Mattermost accepts the Slack format. Not done.
 
 **Samba file audit (on hold).** Tested on a node: ns8-samba 3.5.0 logs each audited operation (`create_file`, `unlinkat`, `renameat`, `mkdirat`, `fsetxattr`) with user, source IP, share, result and path, but syslog-ng sends them only to TimescaleDB (`samba-dc/etc/syslog-ng/syslog-ng.conf`, destination `d_sql`), never to journald. So a Wazuh agent cannot see them. A second syslog-ng destination writing to the container output brought them to journald in a manual test, for example:
 
