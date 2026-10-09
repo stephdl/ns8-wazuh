@@ -59,14 +59,12 @@ Checked against the 5.0.0 documentation and wazuh-docker `v5.0.0-rc1`.
 - API 55000 and indexer 9200 stay inside the pod and are never published.
 - To test: the real source address of agents seen by the manager. With `slirp4netns` it may be masked, while ns8-mail uses `--network=host`.
 
-**Certificates.** Same pattern as ns8-ejabberd and ns8-mail.
-1. `configure-module` asks Traefik for the certificate with `agent.set_certificate`.
-2. `get-certificate.service` (oneshot) runs `runagent get-certificate --cert-file --key-file $FQDN`. The manager unit uses `Wants=` and `After=` on it.
-3. `events/certificate-changed/50get_certificate` checks `agent.certificate_event_matches`, fetches the new certificate and reloads the service. If the manager cannot reload `remoted.pem`, use `try-restart`.
-4. Authorization: `traefik@node:fulladm` (route and certificate).
-5. Wazuh wants two files (`remoted.pem` and `remoted-key.pem`), so no concatenation like ejabberd does.
-
-With a Let's Encrypt certificate, agents already trust it through the system store, so the Wazuh CA does not need to be distributed. With an uploaded or self-signed certificate the CA must be given to the agents (`embed_ca` in the enrollment token). The `remoted` certificate must have `CA:FALSE`, `serverAuth` and the FQDN in the SAN, the full chain, and mode 0640 readable by the `wazuh-manager` group (uid 101, so `podman unshare chown` in rootless).
+**Certificates.** Agents enroll with a token that embeds the internal CA, then pin it (`.anchor-committed`). They also check that the server certificate holds the name they connect to (tested: `the certificate does not include that name`). So:
+- The agent ports (1514, 1515, 1517) always use `remoted.pem` signed by the internal CA. Let's Encrypt only covers the dashboard route, and Traefik needs `routeadm` only.
+- The CA and the signed certificates last 10 years, before 2038. Nothing renews them on a schedule: the key of the CA sits next to the others, so a short lifetime protects nothing.
+- `bin/renew-certs` is the only place that issues them. It runs at install and in `configure-module`, and issues a certificate when it is missing, not signed by the current CA, or when the host changed. The `renew-certificates` action forces it, for rare events like a weak algorithm. The CA is never renewed: a new one forces every agent to enroll again.
+- The host name is set once. `configure-module` refuses a new host while agents are enrolled. Moving the server means restoring the backup on the new node and pointing the DNS record of the same name to it.
+- The enrollment token lasts one day, for 1 to 100 agents. Enrolled agents keep their key and stay connected after it expires.
 
 **Secrets.** Never use `agent.set_env()`. `create-module/10genpasswords` writes `state/passwords.env` (mode 0600) and the container secret files.
 
@@ -111,26 +109,24 @@ Modules to watch first: mail, samba, openldap, nextcloud, traefik, crowdsec and 
 
 - [ ] **Phase 0, checks** on a test node (done: indexer rc1 starts rootless on Debian 13 with `bootstrap.memory_lock=false`, certificates readable by uid 101 with `podman unshare chown`, CTI content syncs by itself, list of standard integrations; left: manager and agent): upstream rc1 stack on rootless Podman (uid 101 permissions, `memlock`), Let's Encrypt certificate accepted by `remoted` and by an agent without an embedded CA, list of standard decoders, targeted `securityadmin.sh` with LDAP, `path.repo` for snapshots, GeoIP, dashboard over HTTP behind Traefik, OpenLDAP and core log lines.
 - [x] **Phase 1, pod** (written, not installed): three containers, systemd, passwords, internal certificates, clean start.
-- [x] **Phase 2, web access and certificate** (written, not installed): port, Traefik route, `set_certificate`, `get-certificate.service`, `certificate-changed` event, firewall 1514, 1515 and 1517.
+- [x] **Phase 2, web access and certificate**: port, Traefik route, internal certificate for the agent ports, firewall 1514, 1515 and 1517.
 - [x] **Phase 3, LDAP** (written, tested with a fake domain): OpenLDAP and Samba AD, admin group, change events.
-- [x] **Phase 4, agents** (token tested, no agent enrolled): `get-enrollment-token`, first enrolled agent, journald received.
+- [x] **Phase 4, agents** (one agent enrolled): `get-enrollment-token`, first enrolled agent, journald received.
 - [x] **Phase 5, detection** (first rules and decoders, tested with sample lines): NS8 decoders and rules through the Content Manager API, minimal rule set, Samba retest.
 - [x] **Phase 6, export and health** (webhook and health tested): webhook, module health alerts.
 - [x] **Phase 7, backup** (snapshot dump and restore tested): dump, restore, clone, agents reconnecting.
-- [x] **Phase 8, UI** (builds and lints, never opened in a browser): Status, Settings, Agents.
-- [x] **Phase 9, tests and finish** (Robot tests written, never run): Robot tests, `renovate.json`, README, `org.nethserver.images`.
+- [x] **Phase 8, UI** (checked in a browser): Status, Settings, Agents.
+- [x] **Phase 9, tests and finish** (Robot tests not run yet): Robot tests, `renovate.json`, README, `org.nethserver.images`.
 - [ ] **Second deliverable**: deploy the agent on an NS8 node (script or small module).
 
 ## Status of the phases
 
-The code of the phases 1 to 9 is written. It was checked piece by piece on a test node (certificate and password scripts, security documents applied with `securityadmin.sh`, enrollment token, health, decoders and rules with `logtest`, webhook export, snapshot dump and restore) and the UI builds and passes the linter. **It was never installed as a module on NS8.** The first real install is the next step, and the open points below are the things most likely to fail there.
+The module installs and updates on a Debian 13 node with Podman 5.4. Checked there: the pod starts, the health is green, `update-module` works, one Rocky 9 agent enrolled with `scripts/install-agent.sh`, a real Dovecot failure from another node produced the finding "NS8 authentication failure", agent revocation and re-enrollment, on-the-fly admin password change, LDAP login with an OpenLDAP domain (admin group mapped on the indexer, Wazuh API rule created but not yet checked in the dashboard), snapshot dump and restore. The UI pages were checked in a browser.
 
 Known gaps:
-- The unit files, the `configure-module` sequence and the image variables (`WAZUH_*_IMAGE`, `TCP_PORT`) were never run by the NS8 agent.
-- The Python scripts in `imageroot/bin` import `wazuh_security` and `wazuh_api` from `imageroot/pypkg`. That this folder is on their import path under `runagent` is assumed, not verified.
-- The listener certificate comes from the internal CA. Replacing it with the Traefik certificate (`get-certificate.service`, `certificate-changed` event) is written but not tested, and Let's Encrypt was not tried.
-- The LDAP login was tested with a fake domain, not with a real OpenLDAP or Samba AD.
-- No agent was enrolled, so journald collection and the detection rules were never seen on real data.
+- Let's Encrypt for the dashboard was not tried.
+- Moving the server with a restore on another node, and the agent reading the DNS again when it reconnects, were not tested.
+- The LDAP login was not tested with Samba AD, and the read-only group was not tested with a real user.
 - The Dovecot, api-server, Traefik and CrowdSec decoders were checked with sample lines copied from a running node, not with live events.
 - The geo enrichment is listed in the policy, but a login from a country outside the allowed list has no rule yet. Login outside working hours, mass file access and OpenLDAP and Samba logs are not covered.
 - The journald `localfile` configuration pushed to the agents is not written.

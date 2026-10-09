@@ -23,9 +23,10 @@ The output of the command returns the instance name, for example `wazuh1`.
 Launch `configure-module` with:
 
 - `host`: the public host name. It is the name of the dashboard and the address the agents connect to.
-- `lets_encrypt`: request a Let's Encrypt certificate for the host (true/false).
+- `lets_encrypt`: request a Let's Encrypt certificate for the dashboard (true/false). The agent ports always use the internal certificate authority.
 - `ldap_domain`: the user domain whose users can log in to the dashboard. Empty to disable.
 - `ldap_admin_group`: the group of that domain that gets the administrator role.
+- `ldap_readonly_group`: optional group of that domain that can read alerts and agents without changing anything.
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
 - `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
 - `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
@@ -49,10 +50,10 @@ Read the settings back with `api-cli run module/wazuh1/get-configuration`.
 
 ## Add an agent
 
-Create an enrollment token, valid for a limited time and a limited number of agents:
+Create an enrollment token. It allows enrollment during one day, for up to `max_uses` agents (1 to 100). Enrolled agents stay connected after it expires.
 
 ```
-api-cli run module/wazuh1/get-enrollment-token --data '{"ttl":"1h","max_uses":1,"description":"web server"}'
+api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"description":"web server"}'
 ```
 
 The same is available on the Agents page of the module. The token holds the server address and the certificate authority, so the agent needs no other setting.
@@ -60,6 +61,20 @@ The same is available on the Agents page of the module. The token holds the serv
 ## Health
 
 `get-health` returns the state of the indexer, the number of agents and the expiry date of the agent listener certificate. The Status page shows the same.
+
+## Host name and certificates
+
+Choose the host name once. Agents connect to it and check it in the server certificate, so changing it disconnects every agent. `configure-module` refuses a new host name while agents are enrolled. To move the server, restore the backup on the new node and point the DNS record of the same name to it.
+
+The module creates an internal certificate authority at install time. It signs the certificates of the indexer, of the manager connector and of the agent ports (1514, 1515, 1517). The authority and these certificates last 10 years and are not renewed automatically. The agents pin the authority when they enroll: a new authority forces every agent to enroll again. Keep the backup, it holds the authority key in `state/ca`.
+
+To issue the signed certificates again, for example after an algorithm becomes weak, run:
+
+    api-cli run module/wazuh1/renew-certificates
+
+The authority stays, so enrolled agents keep working after the pod restarts. If the server is compromised, create a new module instance and enroll the agents again.
+
+Let's Encrypt, when enabled, only covers the dashboard behind Traefik.
 
 ## Backup
 
