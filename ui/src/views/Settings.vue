@@ -210,18 +210,32 @@
                     @action="goToSmarthost"
                     :showCloseButton="false"
                   />
-                  <cv-text-area
-                    v-model.trim="notifyRecipients"
-                    :label="$t('settings.notify_recipients')"
-                    :helper-text="$t('settings.notify_recipients_helper')"
-                    :invalid-message="$t(error.notify_recipients)"
+                  <NsToggle
+                    value="notifyEnabled"
+                    :label="$t('settings.notify_enabled')"
+                    v-model="notifyEnabled"
                     :disabled="stillLoading || !smarthostEnabled"
-                    placeholder="soc@example.org"
                     class="mg-bottom"
-                    ref="notify_recipients"
                   >
-                  </cv-text-area>
-                  <template v-if="notifyRecipients">
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="notifyEnabled">
+                    <cv-text-area
+                      v-model.trim="notifyRecipients"
+                      :label="$t('settings.notify_recipients')"
+                      :helper-text="$t('settings.notify_recipients_helper')"
+                      :invalid-message="$t(error.notify_recipients)"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      placeholder="soc@example.org"
+                      class="mg-bottom"
+                      ref="notify_recipients"
+                    >
+                    </cv-text-area>
                     <NsTextInput
                       v-model.trim="notifySender"
                       :label="$t('settings.notify_sender')"
@@ -363,6 +377,7 @@ export default {
       domains: [],
       indexUnclassifiedEvents: false,
       exportUrl: "",
+      notifyEnabled: false,
       notifyRecipients: "",
       notifySender: "",
       notifyMinLevel: "medium",
@@ -457,7 +472,11 @@ export default {
       if (this.isDomainChosen && !this.ldapAdminGroup) {
         missing.push(this.$t("settings.ldap_admin_group"));
       }
-      if (this.recipientList.some((r) => !this.isEmail(r))) {
+      if (
+        this.notifyEnabled &&
+        (!this.recipientList.length ||
+          this.recipientList.some((r) => !this.isEmail(r)))
+      ) {
         missing.push(this.$t("settings.notify_recipients"));
       }
       if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
@@ -650,6 +669,7 @@ export default {
       this.ldapReadonlyGroup = config.ldap_readonly_group || "";
       this.indexUnclassifiedEvents = config.index_unclassified_events;
       this.exportUrl = config.export_url;
+      this.notifyEnabled = config.notify_enabled;
       this.notifyRecipients = config.notify_recipients.join("\n");
       this.notifySender = config.notify_sender;
       this.notifyMinLevel = config.notify_min_level;
@@ -661,7 +681,7 @@ export default {
       this.isAdvancedOpen =
         config.index_unclassified_events ||
         config.export_url !== "" ||
-        config.notify_recipients.length > 0;
+        config.notify_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -691,14 +711,21 @@ export default {
         }
         isValidationOk = false;
       }
-      if (this.recipientList.some((r) => !this.isEmail(r))) {
+      if (
+        this.notifyEnabled &&
+        this.recipientList.some((r) => !this.isEmail(r))
+      ) {
         this.error.notify_recipients = "settings.notify_recipients_invalid";
         if (isValidationOk) {
           this.focusElement("notify_recipients");
         }
         isValidationOk = false;
       }
-      if (this.notifySender && !this.isEmail(this.notifySender)) {
+      if (
+        this.notifyEnabled &&
+        this.notifySender &&
+        !this.isEmail(this.notifySender)
+      ) {
         this.error.notify_sender = "settings.notify_sender_invalid";
         if (isValidationOk) {
           this.focusElement("notify_sender");
@@ -772,8 +799,9 @@ export default {
           this.ldapDomain === "-" ? "" : this.ldapReadonlyGroup,
         index_unclassified_events: this.indexUnclassifiedEvents,
         export_url: this.exportUrl,
+        notify_enabled: this.notifyEnabled,
         notify_recipients: [...new Set(this.recipientList)],
-        notify_sender: this.recipientList.length ? this.notifySender : "",
+        notify_sender: this.notifySender,
         notify_min_level: this.notifyMinLevel,
       };
       // The password is sent only when typed: nothing means keep the current one
