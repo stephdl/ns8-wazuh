@@ -13,6 +13,7 @@
 # inside the container and is lost when it is created again. So the indexer unit calls this script
 # with --secrets-only after each start.
 
+import hashlib
 import json
 import os
 import sys
@@ -29,6 +30,8 @@ KEYSTORE = "/usr/share/wazuh-indexer/bin/opensearch-keystore"
 KEY_PREFIX = f"opensearch.notifications.core.email.{ACCOUNT}"
 LEVELS = ["informational", "low", "medium", "high", "critical"]
 INTERVAL = 5
+# Hash of the last monitor saved, see the end of this script
+STATE_FILE = "notifications-applied.sha256"
 
 host = os.environ.get("TRAEFIK_HOST", "")
 recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
@@ -108,6 +111,8 @@ if not enabled:
     for old_id in (channel_id, group_id, account_id):
         if old_id:
             api("DELETE", f"_plugins/_notifications/configs/{old_id}")
+    if os.path.exists(STATE_FILE):
+        os.remove(STATE_FILE)
     log("email notifications disabled")
     sys.exit(0)
 
@@ -198,25 +203,24 @@ monitor = {
 }
 
 
-def same_monitor(old, new):
-    # A saved monitor runs again at once and mails the same window: only save a real change
-    keys = ("enabled", "schedule", "inputs", "triggers")
-    strip = lambda t: [{**x, "query_level_trigger": {k: v for k, v in x["query_level_trigger"].items() if k != "id"}} for x in t]
-    old_triggers = strip(old.get("triggers", []))
-    for trigger in old_triggers:
-        trigger["query_level_trigger"]["actions"] = [{k: v for k, v in a.items() if k not in ("id",)} for a in trigger["query_level_trigger"].get("actions", [])]
-    return json.dumps({k: old.get(k) for k in keys[:3]} | {"triggers": old_triggers}, sort_keys=True) == \
-        json.dumps({k: new.get(k) for k in keys[:3]} | {"triggers": new["triggers"]}, sort_keys=True)
+# OpenSearch rewrites a saved query, so compare a hash of what this script generated.
+# A save runs the monitor again at once and mails the same window: only save a real change.
+digest = hashlib.sha256(json.dumps([channel_id, monitor], sort_keys=True).encode()).hexdigest()
+try:
+    with open(STATE_FILE) as f:
+        applied = f.read().strip()
+except FileNotFoundError:
+    applied = ""
 
-
+if monitor_ids and applied == digest:
+    log("email monitor unchanged")
+    sys.exit(0)
 if monitor_ids:
-    current = api("GET", f"_plugins/_alerting/monitors/{monitor_ids[0]}").get("monitor", {})
-    if same_monitor(current, monitor):
-        log("email monitor unchanged")
-        sys.exit(0)
     answer = api("PUT", f"_plugins/_alerting/monitors/{monitor_ids[0]}", monitor)
 else:
     answer = api("POST", "_plugins/_alerting/monitors", monitor)
 if "_id" not in answer:
     raise SystemExit(f"monitor: {answer}")
+with open(STATE_FILE, "w") as f:
+    f.write(digest)
 log(f"email monitor ok, levels {','.join(levels)}, {len(recipients)} recipients")
