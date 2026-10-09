@@ -7,8 +7,8 @@
 
 # The Wazuh images drop to uid 101 inside the pod. The core runs "chown -R" on the module
 # directory at each update and it fails on a file owned by a subuid, so nothing under state/
-# may belong to uid 101. The certificates stay owned by the module and are readable by all:
-# they are reached only through a bind mount, and the module home is private to the module.
+# may belong to uid 101. So the certificates and their private keys stay owned by the module and
+# readable by all: uid 101 reads them as "other". Only the module reaches them, its home is 0700.
 
 set -e
 exec 1>&2
