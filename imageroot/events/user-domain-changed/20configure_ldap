@@ -15,4 +15,4 @@ event = json.load(sys.stdin)
 if not os.environ.get("LDAP_DOMAIN") or event.get("domain") != os.environ["LDAP_DOMAIN"]:
     sys.exit(0)  # not our user domain
 
-agent.run_helper("setup-ldap").check_returncode()
+agent.run_helper("setup-ldap", "--force").check_returncode()

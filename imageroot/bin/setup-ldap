@@ -11,6 +11,7 @@
 # password never touches the host disk.
 
 import os
+import sys
 import time
 
 import agent
@@ -18,13 +19,15 @@ from agent.ldapproxy import Ldapproxy
 
 import wazuh_security
 from wazuh_api import manager_api
-from wazuh_securityadmin import apply_document, read_default, wait_indexer
+from wazuh_securityadmin import apply_document_if_changed, read_default, wait_indexer
 
 wait_indexer()
 
 ldap_domain = os.environ.get("LDAP_DOMAIN", "")
 admin_group = os.environ.get("LDAP_ADMIN_GROUP", "")
 readonly_group = os.environ.get("LDAP_READONLY_GROUP", "")
+# The user domain event passes --force: the bind password may change without any setting change
+force = "--force" in sys.argv[1:]
 
 domain = None
 users_filter = ""
@@ -35,10 +38,10 @@ if ldap_domain:
     agent.bind_user_domains([ldap_domain])
     users_filter = proxy.get_ldap_users_search_filter_clause(ldap_domain)
 
-apply_document(wazuh_security.build_security_config(read_default("config.yml", "config"), domain, users_filter), "config")
+apply_document_if_changed(wazuh_security.build_security_config(read_default("config.yml", "config"), domain, users_filter), "config", force)
 if not domain:
     admin_group = readonly_group = ""
-apply_document(wazuh_security.build_roles_mapping(read_default("roles_mapping.yml", "all_access"), admin_group, readonly_group), "rolesmapping")
+apply_document_if_changed(wazuh_security.build_roles_mapping(read_default("roles_mapping.yml", "all_access"), admin_group, readonly_group), "rolesmapping", force)
 
 
 def api_items(path):

@@ -8,6 +8,9 @@
 The documents are streamed through stdin into the container, so a password or
 a hash never touches the host disk."""
 
+import hashlib
+import json
+import os
 import subprocess
 import sys
 import time
@@ -62,3 +65,45 @@ def apply_document(document, doc_type):
         agent.assert_exp(proc.returncode == 0, f"securityadmin.sh failed for {doc_type}")
     finally:
         podman_exec(["rm", "-f", tmp])
+
+
+APPLIED_FILE = "security-applied.json"
+
+
+def _security_index_uuid():
+    # Imported here: wazuh_api is not needed by the other helpers of this file
+    from wazuh_api import api
+    answer = api("GET", "_cat/indices/.opendistro_security?format=json&h=uuid", admin_cert=True)
+    return answer[0]["uuid"] if isinstance(answer, list) and answer else ""
+
+
+def _fingerprints(index_uuid):
+    try:
+        with open(APPLIED_FILE) as f:
+            applied = json.load(f)
+    except (FileNotFoundError, ValueError):
+        return {}
+    # A new security index (new data volume, restore) holds the defaults again
+    return applied if applied.get("index") == index_uuid else {}
+
+
+def apply_document_if_changed(document, doc_type, force=False):
+    """Apply the document only when it differs from the last one applied.
+
+    securityadmin.sh takes about 8 seconds each time. Only a hash is kept on disk:
+    the config document holds the LDAP bind password.
+    """
+    digest = hashlib.sha256(json.dumps(document, sort_keys=True).encode()).hexdigest()
+    index_uuid = _security_index_uuid()
+    applied = _fingerprints(index_uuid)
+    if not force and index_uuid and applied.get(doc_type) == digest:
+        print(f"{doc_type} unchanged, not applied", file=sys.stderr)
+        return False
+    apply_document(document, doc_type)
+    applied[doc_type] = digest
+    applied["index"] = index_uuid
+    fd = os.open(APPLIED_FILE + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(applied, f)
+    os.replace(APPLIED_FILE + ".new", APPLIED_FILE)
+    return True
