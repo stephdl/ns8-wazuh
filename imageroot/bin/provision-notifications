@@ -13,6 +13,7 @@
 # inside the container and is lost when it is created again. So the indexer unit calls this script
 # with --secrets-only after each start.
 
+import json
 import os
 import sys
 
@@ -138,11 +139,33 @@ channel_id = save_config(channel_id, {
 log("email channel ok")
 
 levels = LEVELS[LEVELS.index(min_level):] if min_level in LEVELS else LEVELS[2:]
-body = ("{{ctx.results.0.hits.total.value}} new findings in the last " + str(INTERVAL) + " minutes.\n\n"
-        "{{#ctx.results.0.hits.hits}}"
-        "- {{_source.@timestamp}} [{{_source.wazuh.rule.level}}] {{_source.wazuh.rule.title}}"
-        " on {{_source.wazuh.agent.name}}\n"
-        "{{/ctx.results.0.hits.hits}}\n"
+
+# Expected on an NS8 node: each rootless module has its own systemd session, and the log collector
+# restarts with it. Kept in the dashboard, left out of the email. Module users and firewall changes stay in:
+# installing or removing a module is rare enough to be worth a line.
+NOISE = [
+    {"prefix": {"wazuh.rule.title": "System service stopped - user@"}},
+    {"prefix": {"wazuh.rule.title": "System service started - user@"}},
+    {"prefix": {"wazuh.rule.title": "System service stopped - fix-xdg-state@"}},
+    {"prefix": {"wazuh.rule.title": "System service started - fix-xdg-state@"}},
+    {"prefix": {"wazuh.rule.title": "System service deleted - user"}},
+    {"prefix": {"wazuh.rule.title": "System service deleted - fix-xdg-state@"}},
+    {"terms": {"wazuh.rule.title": [
+        "System service stopped - promtail", "System service started - promtail",
+        "System service stopped - systemd-hostnamed", "System service started - systemd-hostnamed",
+        "System service stopped - dnf-makecache", "System service started - dnf-makecache",
+        "System service stopped - backup-timers", "System service started - backup-timers",
+    ]}},
+]
+
+# One block per agent, one line per rule with a count, instead of one line per finding
+body = ("{{ctx.results.0.hits.total.value}} new findings in the last " + str(INTERVAL) + " minutes.\n"
+        "{{#ctx.results.0.aggregations.agents.buckets}}"
+        "\n{{key}}\n"
+        "{{#rules.buckets}}"
+        "  {{doc_count}} x {{key}}\n"
+        "{{/rules.buckets}}"
+        "{{/ctx.results.0.aggregations.agents.buckets}}\n"
         f"Open the dashboard: https://{host}/\n")
 monitor = {
     "type": "monitor",
@@ -152,9 +175,13 @@ monitor = {
     "schedule": {"period": {"interval": INTERVAL, "unit": "MINUTES"}},
     "inputs": [{"search": {
         "indices": ["wazuh-findings-v5-*"],
-        "query": {"size": 50, "sort": [{"@timestamp": "desc"}], "query": {"bool": {"filter": [
-            {"range": {"@timestamp": {"gt": "{{period_end}}||-" + str(INTERVAL) + "m", "lte": "{{period_end}}", "format": "epoch_millis"}}},
-            {"terms": {"wazuh.rule.level": levels}}]}}},
+        "query": {"size": 0, "query": {"bool": {
+            "filter": [
+                {"range": {"@timestamp": {"gt": "{{period_end}}||-" + str(INTERVAL) + "m", "lte": "{{period_end}}", "format": "epoch_millis"}}},
+                {"terms": {"wazuh.rule.level": levels}}],
+            "must_not": NOISE}},
+            "aggs": {"agents": {"terms": {"field": "wazuh.agent.name", "size": 20},
+                                "aggs": {"rules": {"terms": {"field": "wazuh.rule.title", "size": 20}}}}}},
     }}],
     "triggers": [{"query_level_trigger": {
         "name": "new findings",
@@ -169,7 +196,24 @@ monitor = {
         }],
     }}],
 }
+
+
+def same_monitor(old, new):
+    # A saved monitor runs again at once and mails the same window: only save a real change
+    keys = ("enabled", "schedule", "inputs", "triggers")
+    strip = lambda t: [{**x, "query_level_trigger": {k: v for k, v in x["query_level_trigger"].items() if k != "id"}} for x in t]
+    old_triggers = strip(old.get("triggers", []))
+    for trigger in old_triggers:
+        trigger["query_level_trigger"]["actions"] = [{k: v for k, v in a.items() if k not in ("id",)} for a in trigger["query_level_trigger"].get("actions", [])]
+    return json.dumps({k: old.get(k) for k in keys[:3]} | {"triggers": old_triggers}, sort_keys=True) == \
+        json.dumps({k: new.get(k) for k in keys[:3]} | {"triggers": new["triggers"]}, sort_keys=True)
+
+
 if monitor_ids:
+    current = api("GET", f"_plugins/_alerting/monitors/{monitor_ids[0]}").get("monitor", {})
+    if same_monitor(current, monitor):
+        log("email monitor unchanged")
+        sys.exit(0)
     answer = api("PUT", f"_plugins/_alerting/monitors/{monitor_ids[0]}", monitor)
 else:
     answer = api("POST", "_plugins/_alerting/monitors", monitor)
