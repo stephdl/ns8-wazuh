@@ -16,7 +16,8 @@
                 "soc@example.org"
             ],
             "notify_sender": "",
-            "notify_min_level": "medium"
+            "notify_min_level": "medium",
+            "notify_enabled": true
         }
     ],
     "type": "object",
@@ -73,6 +74,11 @@
             "minLength": 12,
             "maxLength": 64
         },
+        "notify_enabled": {
+            "type": "boolean",
+            "title": "Email notifications",
+            "description": "Send a summary of the new findings by email every 5 minutes. Needs the cluster smarthost and at least one recipient."
+        },
         "notify_recipients": {
             "type": "array",
             "title": "Email recipients",
@@ -106,6 +112,26 @@
                 "high",
                 "critical"
             ]
+        }
+    },
+    "if": {
+        "properties": {
+            "notify_enabled": {
+                "const": true
+            }
+        },
+        "required": [
+            "notify_enabled"
+        ]
+    },
+    "then": {
+        "required": [
+            "notify_recipients"
+        ],
+        "properties": {
+            "notify_recipients": {
+                "minItems": 1
+            }
         }
     }
 }

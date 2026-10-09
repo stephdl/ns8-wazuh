@@ -19,7 +19,8 @@
             ],
             "notify_sender": "",
             "notify_min_level": "medium",
-            "smarthost_enabled": true
+            "smarthost_enabled": true,
+            "notify_enabled": true
         }
     ],
     "type": "object",
@@ -36,7 +37,8 @@
         "notify_recipients",
         "notify_sender",
         "notify_min_level",
-        "smarthost_enabled"
+        "smarthost_enabled",
+        "notify_enabled"
     ],
     "properties": {
         "host": {
@@ -86,6 +88,11 @@
             ],
             "title": "Enrolled agents",
             "description": "Number of enrolled agents, null when the Wazuh API does not answer. The host cannot change while it is not zero."
+        },
+        "notify_enabled": {
+            "type": "boolean",
+            "title": "Email notifications",
+            "description": "Send a summary of the new findings by email every 5 minutes. Needs the cluster smarthost and at least one recipient."
         },
         "notify_recipients": {
             "type": "array",

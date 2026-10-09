@@ -30,7 +30,8 @@ Launch `configure-module` with:
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
 - `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
 - `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
-- `notify_recipients`: email addresses that receive a summary of the new findings every 5 minutes. Empty to disable.
+- `notify_enabled`: send a summary of the new findings by email every 5 minutes (true/false). Needs at least one recipient.
+- `notify_recipients`: email addresses that receive this summary. They are kept when the emails are disabled.
 - `notify_sender`: sender address of these emails. Empty means `wazuh@` followed by the host name.
 - `notify_min_level`: only the findings at this level or above are mailed: `low`, `medium` (default), `high` or `critical`.
 
@@ -90,7 +91,7 @@ The script covers Linux only. Install the Wazuh 5 agent following the [Wazuh doc
 
 ## Email notifications
 
-The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Without a smarthost or without recipients, nothing is sent. Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above. When the smarthost changes, the module applies it at once.
+The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Nothing is sent when the emails are disabled or when the cluster has no smarthost. Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above. When the smarthost changes, the module applies it at once.
 
 The SMTP password is kept in the keystore of the indexer, never in the module environment. The indexer always checks the TLS certificate of the smarthost, even when the cluster setting disables the check.
 

@@ -7,7 +7,7 @@
 
 # Send the new findings by email through the cluster smarthost.
 # It creates an SMTP sender, a recipient group, an email channel and an Alerting monitor
-# that mails a summary every 5 minutes. Without smarthost or recipients, all of them are removed.
+# that mails a summary every 5 minutes. When disabled, or without smarthost or recipients, all of them are removed.
 #
 # The SMTP credentials cannot go through the API: they live in the indexer keystore, which sits
 # inside the container and is lost when it is created again. So the indexer unit calls this script
@@ -31,13 +31,15 @@ INTERVAL = 5
 
 host = os.environ.get("TRAEFIK_HOST", "")
 recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
+# Before the toggle existed, a recipient was enough to send emails
+notify_enabled = os.environ.get("NOTIFY_ENABLED", str(bool(recipients))) == "True"
 sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
 min_level = os.environ.get("NOTIFY_MIN_LEVEL", "medium")
 secrets_only = "--secrets-only" in sys.argv[1:]
 
 # The replica, so the indexer still starts when the leader is unreachable
 smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
-enabled = smtp["enabled"] and bool(smtp["host"]) and bool(recipients) and bool(host)
+enabled = notify_enabled and smtp["enabled"] and bool(smtp["host"]) and bool(recipients) and bool(host)
 
 
 def log(message):
