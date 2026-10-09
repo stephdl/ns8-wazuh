@@ -144,7 +144,17 @@ Known gaps:
 - Let's Encrypt for the dashboard, with a real host name.
 - Remote agent update with a WPK package, once 5.0.0 is out (see below).
 - Slack, Microsoft Teams and Mattermost channels (see below).
+- Generic NS8 dashboards shipped with the module (see below).
 - Move from `5.0.0-rc1` to `5.0.0` through the Renovate pull request. Check the agent package name and the staging repository of the install script then: the final packages will likely move to the stable Wazuh repository.
+
+**Generic NS8 dashboards.** The dashboard imports saved objects (ndjson) through `POST /api/saved_objects/_import?overwrite=true`. The module could ship them in `imageroot/content/dashboards/` and load them at each configuration and update, like the decoders and rules. Useful to any NS8 customer:
+- Logins: Dovecot and api-server successes and failures, by user, source IP and country.
+- Web: Traefik requests by status code, top source IPs and paths, bursts of 4xx and 5xx.
+- CrowdSec: triggered scenarios and banned IPs.
+- Fleet: findings by level and agent over time, disconnected agents.
+- System changes: users created or deleted, services stopped, firewall changes.
+
+Each one is named `NS8 - ...` with a fixed id, so an update replaces it: an administrator copies it before changing it. They live in the `.kibana` index, so the backup snapshot keeps them. The field names may change between `5.0.0-rc1` and `5.0.0`: check them at the version change.
 
 **Remote agent update.** The Wazuh API can upgrade an agent through its own connection with a signed WPK package (`PUT /agents/upgrade`), without SSH. No WPK is published for 5.0.0-rc1. To look at once 5.0.0 is out, as a button next to the update command.
 
