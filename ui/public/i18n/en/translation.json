@@ -189,6 +189,10 @@
     "requirement_os": "The script supports Debian, Ubuntu, Rocky Linux, AlmaLinux and RHEL, on x86_64 and aarch64.",
     "requirement_logs": "The agent reads the system journal (journald) by default.",
     "script_doc": "Script options and manual install",
-    "other_systems_doc": "Wazuh agent documentation"
+    "other_systems_doc": "Wazuh agent documentation",
+    "outdated": "Outdated",
+    "update_command": "Update command",
+    "update_title": "Update the agent",
+    "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed."
   }
 }

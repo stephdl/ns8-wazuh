@@ -84,9 +84,15 @@
                             :kind="statusKind(row.status)"
                           />
                         </cv-data-table-cell>
-                        <cv-data-table-cell>{{
-                          row.version || "-"
-                        }}</cv-data-table-cell>
+                        <cv-data-table-cell>
+                          {{ row.version || "-" }}
+                          <NsTag
+                            v-if="isOutdated(row)"
+                            :label="$t('agents.outdated')"
+                            kind="warm-gray"
+                            size="sm"
+                          />
+                        </cv-data-table-cell>
                         <cv-data-table-cell>{{
                           row.os || "-"
                         }}</cv-data-table-cell>
@@ -98,6 +104,16 @@
                             flip-menu
                             class="table-overflow-menu"
                           >
+                            <cv-overflow-menu-item
+                              :disabled="!isOutdated(row)"
+                              @click="showUpdateModal(row)"
+                            >
+                              <NsMenuItem
+                                :icon="Upgrade20"
+                                :label="$t('agents.update_command')"
+                              />
+                            </cv-overflow-menu-item>
+                            <NsMenuDivider />
                             <cv-overflow-menu-item
                               danger
                               @click="showRevokeModal(row)"
@@ -248,6 +264,34 @@
         </NsTabs>
       </cv-column>
     </cv-row>
+    <NsModal
+      size="default"
+      :visible="!!agentToUpdate"
+      @modal-hidden="agentToUpdate = null"
+    >
+      <template slot="title">{{ $t("agents.update_title") }}</template>
+      <template slot="content">
+        <p class="mg-bottom">
+          {{
+            $t("agents.update_description", {
+              name: agentToUpdate ? agentToUpdate.name : "",
+              from: agentToUpdate ? agentToUpdate.version : "",
+              to: managerVersion,
+            })
+          }}
+        </p>
+        <NsCodeSnippet
+          :copyTooltip="$t('agents.copy')"
+          :copyFeedback="$t('agents.copied')"
+          :feedbackAriaLabel="$t('agents.copied')"
+          :moreText="$t('agents.show_more')"
+          :lessText="$t('agents.show_less')"
+          :wrapText="true"
+          >{{ updateCommand }}</NsCodeSnippet
+        >
+      </template>
+      <template slot="secondary-button">{{ core.$t("common.close") }}</template>
+    </NsModal>
     <NsDangerDeleteModal
       :isShown="isShownRevokeModal"
       :name="agentToRevoke ? agentToRevoke.name : ''"
@@ -320,6 +364,9 @@ export default {
       result: null,
       isShownRevokeModal: false,
       agentToRevoke: null,
+      agentToUpdate: null,
+      managerVersion: "",
+      packageVersion: "",
       loading: {
         listAgents: false,
         getEnrollmentToken: false,
@@ -343,6 +390,9 @@ export default {
     // The token goes through the environment so it does not show in the process list
     installCommand() {
       return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo WAZUH_ENROLLMENT_TOKEN='${this.result.token}' bash`;
+    },
+    updateCommand() {
+      return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo bash -s -- --update --version ${this.packageVersion}`;
     },
   },
   created() {
@@ -419,7 +469,36 @@ export default {
     },
     listAgentsCompleted(taskContext, taskResult) {
       this.agents = taskResult.output.agents;
+      this.managerVersion = taskResult.output.manager_version || "";
+      this.packageVersion = taskResult.output.package_version || "";
       this.loading.listAgents = false;
+    },
+    isOutdated(agent) {
+      return (
+        !!this.managerVersion &&
+        !!agent.version &&
+        this.compareVersions(agent.version, this.managerVersion) < 0
+      );
+    },
+    // Versions look like "v5.0.0": compare them number by number
+    compareVersions(a, b) {
+      const pa = a
+        .replace(/^v/, "")
+        .split(".")
+        .map((n) => parseInt(n, 10) || 0);
+      const pb = b
+        .replace(/^v/, "")
+        .split(".")
+        .map((n) => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        if ((pa[i] || 0) !== (pb[i] || 0)) {
+          return (pa[i] || 0) - (pb[i] || 0);
+        }
+      }
+      return 0;
+    },
+    showUpdateModal(agent) {
+      this.agentToUpdate = agent;
     },
     showRevokeModal(agent) {
       this.agentToRevoke = agent;
