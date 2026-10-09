@@ -53,7 +53,7 @@ Check if wazuh reports its health
 
 Check if an enrollment token is created
     ${output}  ${rc} =    Execute Command
-    ...    api-cli run module/${module_id}/get-enrollment-token --data '{"ttl":"10m","max_uses":1,"description":"robot"}'
+    ...    api-cli run module/${module_id}/get-enrollment-token --data '{"max_uses":1,"description":"robot"}'
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
     ${token} =    Evaluate    json.loads('''${output}''')    modules=json

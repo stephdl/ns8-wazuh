@@ -19,7 +19,8 @@ agent.assert_exp(host != "", "the module is not configured yet")
 body = {
     "address": host,
     "embed_ca": True,
-    "ttl": data.get("ttl", "1h"),
+    # Enough to enroll by hand or by script, short enough that a forgotten token dies soon
+    "ttl": "1d",
     "max_uses": data.get("max_uses", 1),
 }
 if data.get("description"):

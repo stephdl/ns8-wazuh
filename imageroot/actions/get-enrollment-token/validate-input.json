@@ -2,29 +2,22 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Get an enrollment token",
     "$id": "http://nethserver.org/json-schema/task/input/wazuh/get-enrollment-token",
-    "description": "Create a token that lets one or more Wazuh agents enroll to this server",
+    "description": "Create a token that lets one or more Wazuh agents enroll to this server during one day",
     "examples": [
         {
-            "ttl": "1h",
             "max_uses": 1,
             "description": "web server"
         }
     ],
     "type": "object",
     "properties": {
-        "ttl": {
-            "type": "string",
-            "title": "Validity",
-            "description": "How long the token can be used, like '30m', '1h' or '7d'",
-            "pattern": "^[0-9]+[smhd]$",
-            "default": "1h"
-        },
         "max_uses": {
             "type": "integer",
             "title": "Maximum uses",
             "description": "How many agents can enroll with this token",
             "minimum": 1,
-            "default": 1
+            "default": 1,
+            "maximum": 100
         },
         "description": {
             "type": "string",
