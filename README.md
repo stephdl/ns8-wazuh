@@ -70,7 +70,7 @@ The module creates an internal certificate authority at install time. It signs t
 
 To issue the signed certificates again, for example after an algorithm becomes weak, run:
 
-    api-cli run module/wazuh1/renew-certificates
+    api-cli run module/wazuh1/renew-certificates --data '{}'
 
 The authority stays, so enrolled agents keep working after the pod restarts. If the server is compromised, create a new module instance and enroll the agents again.
 
