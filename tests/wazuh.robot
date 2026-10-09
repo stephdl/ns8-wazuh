@@ -78,6 +78,14 @@ Check if the agent ports are open on the node
         Should Be Equal As Integers    ${rc}  0
     END
 
+Check if the findings timers are enabled
+    Use the install node
+    FOR    ${timer}    IN    send-findings-export.timer    send-findings-email.timer
+        ${rc} =    Execute Command    runagent -m ${module_id} systemctl --user is-enabled ${timer}
+        ...    return_rc=True  return_stdout=False
+        Should Be Equal As Integers    ${rc}  0
+    END
+
 Check if wazuh reports its health
     ${health} =    Run action    get-health
     Should Be Equal    ${health}[indexer][status]    green
