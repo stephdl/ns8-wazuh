@@ -16,5 +16,13 @@ exec 1>&2
 cd "${AGENT_STATE_DIR}"
 chmod 0644 certs/*.pem
 
+# Rocky keeps vm.max_map_count at 65530 and a rootless module cannot raise it.
+# Below the 262144 the indexer expects, stop it from mapping the index files in memory.
+if (( $(cat /proc/sys/vm/max_map_count) < 262144 )); then
+    echo "node.store.allow_mmap=false" > indexer-tuning.env
+else
+    : > indexer-tuning.env
+fi
+
 # The snapshots volume belongs to uid 101: wazuh-indexer.service fixes it once the container runs
 podman volume exists wazuh-snapshots || podman volume create wazuh-snapshots
