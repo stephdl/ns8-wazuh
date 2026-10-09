@@ -68,7 +68,7 @@
     "index_unclassified_events": "Keep unclassified logs",
     "index_unclassified_events_tooltip": "Index the logs that no decoder recognizes. They take more disk space and cannot be filtered by field.",
     "export_url": "Export URL",
-    "export_url_helper": "The new findings are sent to this HTTPS address as JSON. Leave empty to disable.",
+    "export_url_helper": "Forward the alerts to an external system (SIEM, log collector) as JSON over HTTPS. Leave empty to disable.",
     "export_url_https": "The address must start with https://",
     "export_token": "Export token",
     "export_token_helper": "Optional. Sent as a bearer token. Leave empty to keep the current one.",
