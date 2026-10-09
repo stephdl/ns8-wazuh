@@ -1,32 +1,13 @@
-#!/usr/bin/env python3
+#!/bin/bash
 
 #
 # Copyright (C) 2026 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-import json
-import os
-import subprocess
-import sys
+set -e
+exec 1>&2
 
-data = json.load(sys.stdin)
-host = data["host"]
-
-# The manager does not start without the agent listener certificate.
-# Until the Traefik certificate is wired in, issue one from the internal CA for the public host name.
-try:
-    with open("certs/remoted.host") as f:
-        current = f.read().strip()
-except FileNotFoundError:
-    current = ""
-
-if current != host or not os.path.exists("certs/remoted.pem"):
-    subprocess.run([
-        os.path.join(os.environ["AGENT_INSTALL_DIR"], "bin", "mkcert"),
-        "remoted",
-        f"/C=US/L=California/O=Wazuh/OU=Wazuh/CN={host}",
-        f"DNS:{host}",
-    ], check=True)
-    with open("certs/remoted.host", "w") as f:
-        f.write(host + "\n")
+# The manager does not start without the agent listener certificate, issued for the public host name.
+# The services restart in a later step, so no restart here.
+REMOTED_HOST=$(jq -r .host) "${AGENT_INSTALL_DIR}/bin/renew-certs"

@@ -23,7 +23,7 @@ rm -f "certs/${name}.pem" "certs/${name}-key.pem"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "certs/${name}-key.pem"
 openssl req -new -key "certs/${name}-key.pem" -subj "${subject}" -out "certs/${name}.csr"
 printf 'subjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth,clientAuth\n' "${san}" > "certs/${name}.ext"
-# 10 years: these certificates never leave the pod and no renewal job exists
+# 10 years, same as the CA: renew-certs issues them again on demand
 openssl x509 -req -in "certs/${name}.csr" -CA ca/root-ca.pem -CAkey ca/root-ca-key.pem \
     -CAcreateserial -days 3650 -extfile "certs/${name}.ext" -out "certs/${name}.pem"
 rm -f "certs/${name}.csr" "certs/${name}.ext"

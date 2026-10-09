@@ -1,0 +1,11 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Renew certificates",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/renew-certificates",
+    "description": "Issue again the certificates signed by the internal certificate authority. The authority itself is kept, so enrolled agents keep working.",
+    "examples": [
+        {}
+    ],
+    "type": "object",
+    "additionalProperties": false
+}

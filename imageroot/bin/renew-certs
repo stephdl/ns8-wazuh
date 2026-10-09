@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Issue the certificates signed by the internal CA when they are missing, not signed
+# by the current CA (after a restore), or when the public host changed.
+# The CA itself is never renewed: the agents pinned it at enrollment.
+# Usage: renew-certs [--force] [--restart]
+# --force issues all of them again, --restart restarts the pod when one was issued.
+
+set -e
+exec 1>&2
+
+cd "${AGENT_STATE_DIR:-.}"
+
+host=${REMOTED_HOST:-${TRAEFIK_HOST}}
+force=0
+restart=0
+for arg in "$@"; do
+    case "${arg}" in
+        --force) force=1 ;;
+        --restart) restart=1 ;;
+        *) echo "unknown option ${arg}"; exit 2 ;;
+    esac
+done
+renewed=0
+
+needs_renewal() {
+    local pem="certs/$1.pem"
+    [[ "${force}" == 1 ]] && return 0
+    [[ -f "${pem}" && -f "certs/$1-key.pem" ]] || return 0
+    openssl verify -CAfile ca/root-ca.pem "${pem}" >/dev/null 2>&1 || return 0
+    return 1
+}
+
+issue() {
+    if needs_renewal "$1"; then
+        echo "Issuing the $1 certificate"
+        "${AGENT_INSTALL_DIR}/bin/mkcert" "$@"
+        renewed=1
+    fi
+}
+
+# The subject of the indexer certificate must match NODES_DN in wazuh-indexer.service
+issue indexer "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.indexer" "DNS:wazuh.indexer,DNS:localhost,IP:127.0.0.1"
+issue admin "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=admin" "DNS:admin"
+issue connector "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.manager" "DNS:wazuh.manager,DNS:localhost,IP:127.0.0.1"
+
+# The agent listener needs the public host name, known after the first configure-module
+if [[ -n "${host}" ]]; then
+    # Enrollment tokens are refused when their address is not in this certificate
+    if [[ "$(cat certs/remoted.host 2>/dev/null)" != "${host}" ]]; then
+        rm -f certs/remoted.pem
+    fi
+    issue remoted "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=${host}" "DNS:${host}"
+    echo "${host}" > certs/remoted.host
+fi
+
+if [[ "${renewed}" == 1 && "${restart}" == 1 ]]; then
+    systemctl --user try-restart wazuh.service wazuh-indexer.service wazuh-manager.service wazuh-dashboard.service
+fi

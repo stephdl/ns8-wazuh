@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Issue again every certificate signed by the internal CA, then restart the pod.
+# For rare events only, like a weak algorithm: agents keep working because the CA stays.
+
+set -e
+exec 1>&2
+
+runagent renew-certs --force --restart

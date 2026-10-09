@@ -60,6 +60,14 @@ Check if an enrollment token is created
     Should Be Equal    ${token}[address]    ${TEST_HOST}
     Should Not Be Empty    ${token}[token]
 
+Check if the certificates can be issued again
+    ${rc} =    Execute Command    api-cli run module/${module_id}/renew-certificates
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+    ${rc} =    Execute Command    runagent -m ${module_id} systemctl --user is-active wazuh-manager.service
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+
 Check if wazuh is removed correctly
     ${rc} =    Execute Command    remove-module --no-preserve ${module_id}
     ...    return_rc=True  return_stdout=False
