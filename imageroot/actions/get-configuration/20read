@@ -26,6 +26,10 @@ config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
 config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
 config["ldap_readonly_group"] = os.getenv("LDAP_READONLY_GROUP", "")
 config["export_url"] = os.getenv("EXPORT_URL", "")
+config["notify_recipients"] = [r for r in os.getenv("NOTIFY_RECIPIENTS", "").split(",") if r]
+config["notify_sender"] = os.getenv("NOTIFY_SENDER", "")
+config["notify_min_level"] = os.getenv("NOTIFY_MIN_LEVEL", "medium")
+config["smarthost_enabled"] = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))["enabled"]
 config["export_token_set"] = os.path.exists("secrets/export.env")
 config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"
 config["lets_encrypt"] = agent.get_route(os.environ['MODULE_ID']).get('lets_encrypt', False)

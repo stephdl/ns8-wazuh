@@ -23,4 +23,13 @@ for evar in [
     ]:
     agent.set_env(evar, original_environment[evar])
 
+# Missing in backups taken before these settings existed
+for evar, default in [
+        ("LDAP_READONLY_GROUP", ""),
+        ("NOTIFY_RECIPIENTS", ""),
+        ("NOTIFY_SENDER", ""),
+        ("NOTIFY_MIN_LEVEL", "medium"),
+    ]:
+    agent.set_env(evar, original_environment.get(evar, default))
+
 agent.dump_env()

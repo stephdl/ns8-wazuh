@@ -18,7 +18,11 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "lets_encrypt": renv["TRAEFIK_LETS_ENCRYPT"] == "True",
     "ldap_domain": renv["LDAP_DOMAIN"],
     "ldap_admin_group": renv["LDAP_ADMIN_GROUP"],
+    "ldap_readonly_group": renv.get("LDAP_READONLY_GROUP", ""),
     "index_unclassified_events": renv["INDEX_UNCLASSIFIED_EVENTS"] == "True",
     "export_url": renv["EXPORT_URL"],
+    "notify_recipients": [r for r in renv.get("NOTIFY_RECIPIENTS", "").split(",") if r],
+    "notify_sender": renv.get("NOTIFY_SENDER", ""),
+    "notify_min_level": renv.get("NOTIFY_MIN_LEVEL", "medium"),
 })
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

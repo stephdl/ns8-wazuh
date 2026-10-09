@@ -11,7 +11,12 @@
             "ldap_admin_group": "wazuh-admins",
             "ldap_readonly_group": "wazuh-readers",
             "index_unclassified_events": false,
-            "export_url": "https://logs.example.org/wazuh"
+            "export_url": "https://logs.example.org/wazuh",
+            "notify_recipients": [
+                "soc@example.org"
+            ],
+            "notify_sender": "",
+            "notify_min_level": "medium"
         }
     ],
     "type": "object",
@@ -67,6 +72,40 @@
             "description": "New password of the dashboard administrator, 12 to 64 characters from A-Z a-z 0-9 . , _ + : @ % ^ = ~ - with at least one uppercase letter, one lowercase letter, one digit and one symbol. Omit it to keep the current one.",
             "minLength": 12,
             "maxLength": 64
+        },
+        "notify_recipients": {
+            "type": "array",
+            "title": "Email recipients",
+            "description": "Addresses that receive a summary of the new findings every 5 minutes. Empty to disable. Needs the cluster smarthost.",
+            "items": {
+                "type": "string",
+                "format": "email"
+            },
+            "uniqueItems": true
+        },
+        "notify_sender": {
+            "type": "string",
+            "title": "Email sender",
+            "description": "Sender address of the emails. Empty means wazuh@ followed by the host name.",
+            "anyOf": [
+                {
+                    "const": ""
+                },
+                {
+                    "format": "email"
+                }
+            ]
+        },
+        "notify_min_level": {
+            "type": "string",
+            "title": "Minimum level",
+            "description": "Only the findings at this level or above are sent by email.",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+            ]
         }
     }
 }

@@ -13,7 +13,13 @@
             "index_unclassified_events": false,
             "export_url": "https://logs.example.org/wazuh",
             "export_token_set": true,
-            "agents_enrolled": 3
+            "agents_enrolled": 3,
+            "notify_recipients": [
+                "soc@example.org"
+            ],
+            "notify_sender": "",
+            "notify_min_level": "medium",
+            "smarthost_enabled": true
         }
     ],
     "type": "object",
@@ -26,7 +32,11 @@
         "index_unclassified_events",
         "export_url",
         "export_token_set",
-        "agents_enrolled"
+        "agents_enrolled",
+        "notify_recipients",
+        "notify_sender",
+        "notify_min_level",
+        "smarthost_enabled"
     ],
     "properties": {
         "host": {
@@ -76,6 +86,45 @@
             ],
             "title": "Enrolled agents",
             "description": "Number of enrolled agents, null when the Wazuh API does not answer. The host cannot change while it is not zero."
+        },
+        "notify_recipients": {
+            "type": "array",
+            "title": "Email recipients",
+            "description": "Addresses that receive a summary of the new findings every 5 minutes. Empty to disable. Needs the cluster smarthost.",
+            "items": {
+                "type": "string",
+                "format": "email"
+            },
+            "uniqueItems": true
+        },
+        "notify_sender": {
+            "type": "string",
+            "title": "Email sender",
+            "description": "Sender address of the emails. Empty means wazuh@ followed by the host name.",
+            "anyOf": [
+                {
+                    "const": ""
+                },
+                {
+                    "format": "email"
+                }
+            ]
+        },
+        "notify_min_level": {
+            "type": "string",
+            "title": "Minimum level",
+            "description": "Only the findings at this level or above are sent by email.",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+            ]
+        },
+        "smarthost_enabled": {
+            "type": "boolean",
+            "title": "Smarthost enabled",
+            "description": "The cluster smarthost is configured, so emails can be sent."
         }
     }
 }
