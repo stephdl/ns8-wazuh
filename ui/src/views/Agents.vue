@@ -153,14 +153,11 @@
                 <cv-tile light>
                   <cv-form @submit.prevent="getEnrollmentToken">
                     <NsTextInput
-                      v-model.trim="ttl"
+                      :value="$t('agents.ttl_value')"
                       :label="$t('agents.ttl')"
-                      placeholder="1h"
                       :helper-text="$t('agents.ttl_helper')"
-                      :invalid-message="$t(error.ttl)"
-                      :disabled="loading.getEnrollmentToken"
+                      disabled
                       class="mg-bottom"
-                      ref="ttl"
                     />
                     <NsTextInput
                       v-model.trim="maxUses"
@@ -303,7 +300,6 @@ export default {
         "os",
         "last_keep_alive",
       ],
-      ttl: "1h",
       maxUses: "1",
       description: "",
       result: null,
@@ -318,7 +314,6 @@ export default {
         listAgents: "",
         removeAgent: "",
         getEnrollmentToken: "",
-        ttl: "",
         max_uses: "",
       },
     };
@@ -463,16 +458,10 @@ export default {
     validate() {
       this.clearErrors(this);
       let isValidationOk = true;
-      if (!/^[0-9]+[smhd]$/.test(this.ttl)) {
-        this.error.ttl = "agents.ttl_invalid";
-        this.focusElement("ttl");
-        isValidationOk = false;
-      }
-      if (!/^[1-9][0-9]*$/.test(this.maxUses)) {
+      const maxUses = parseInt(this.maxUses, 10);
+      if (!/^[0-9]+$/.test(this.maxUses) || maxUses < 1 || maxUses > 100) {
         this.error.max_uses = "agents.max_uses_invalid";
-        if (isValidationOk) {
-          this.focusElement("max_uses");
-        }
+        this.focusElement("max_uses");
         isValidationOk = false;
       }
       return isValidationOk;
@@ -493,7 +482,7 @@ export default {
         `${taskAction}-completed-${eventId}`,
         this.getEnrollmentTokenCompleted
       );
-      const data = { ttl: this.ttl, max_uses: parseInt(this.maxUses, 10) };
+      const data = { max_uses: parseInt(this.maxUses, 10) };
       if (this.description) {
         data.description = this.description;
       }
