@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Send the new findings to the export endpoint (--export) or by email (--email).
+#
+# A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
+# delivery or a slow detector loses nothing: the next run starts after the cursor and
+# catches up. The cursor moves only after a successful delivery, so a finding may be sent
+# twice after a partial failure, never zero times.
+
+import fcntl
+import json
+import os
+import smtplib
+import ssl
+import sys
+import urllib.request
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
+
+import agent
+
+from wazuh_api import api
+
+INDICES = "wazuh-findings-v5-*"
+PAGE = 500
+EXPORT_BATCH = 100
+# A finding becomes searchable a little after its @timestamp: leave the last minute for the next run
+SETTLE = timedelta(minutes=1)
+LEVELS = ["informational", "low", "medium", "high", "critical"]
+
+# Expected on an NS8 node: each rootless module has its own systemd session, and the log collector
+# restarts with it. Kept in the dashboard, left out of the email. Module users and firewall changes stay in:
+# installing or removing a module is rare enough to be worth a line.
+NOISE = [
+    {"prefix": {"wazuh.rule.title": "System service stopped - user@"}},
+    {"prefix": {"wazuh.rule.title": "System service started - user@"}},
+    {"prefix": {"wazuh.rule.title": "System service stopped - fix-xdg-state@"}},
+    {"prefix": {"wazuh.rule.title": "System service started - fix-xdg-state@"}},
+    {"prefix": {"wazuh.rule.title": "System service deleted - user"}},
+    {"prefix": {"wazuh.rule.title": "System service deleted - fix-xdg-state@"}},
+    {"terms": {"wazuh.rule.title": [
+        "System service stopped - promtail", "System service started - promtail",
+        "System service stopped - systemd-hostnamed", "System service started - systemd-hostnamed",
+        "System service stopped - dnf-makecache", "System service started - dnf-makecache",
+        "System service stopped - backup-timers", "System service started - backup-timers",
+    ]}},
+]
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def iso(moment):
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+class Cursor:
+    """Position of the last finding sent: its @timestamp and the ids sent at that same time."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def load(self):
+        try:
+            with open(self.path) as f:
+                data = json.load(f)
+            return data["ts"], set(data["ids"])
+        except (FileNotFoundError, ValueError, KeyError):
+            # First run: start now, never send the whole history
+            return iso(datetime.now(timezone.utc) - SETTLE), set()
+
+    def save(self, ts, ids):
+        tmp = self.path + ".new"
+        with open(tmp, "w") as f:
+            json.dump({"ts": ts, "ids": sorted(ids)}, f)
+        os.replace(tmp, self.path)
+
+    def forget(self):
+        if os.path.exists(self.path):
+            os.remove(self.path)
+
+
+def pages(cursor_ts, cursor_ids, filters, must_not):
+    """Yield the pages of findings after the cursor, oldest first, up to the settle time."""
+    until = iso(datetime.now(timezone.utc) - SETTLE)
+    ts, ids = cursor_ts, set(cursor_ids)
+    while True:
+        query = {"bool": {
+            "filter": [{"range": {"@timestamp": {"gte": ts, "lte": until}}}] + filters,
+            "must_not": must_not + ([{"ids": {"values": sorted(ids)}}] if ids else []),
+        }}
+        answer = api("POST", f"{INDICES}/_search", {"size": PAGE, "sort": [{"@timestamp": "asc"}], "query": query})
+        if "hits" not in answer:
+            raise RuntimeError(f"search failed: {json.dumps(answer)[:300]}")
+        hits = answer["hits"]["hits"]
+        if not hits:
+            return
+        last = hits[-1]["_source"]["@timestamp"]
+        # Findings at the same millisecond as the last one are excluded by id at the next page
+        ids = (ids if last == ts else set()) | {h["_id"] for h in hits if h["_source"]["@timestamp"] == last}
+        ts = last
+        yield hits, ts, ids
+        if len(hits) < PAGE:
+            return
+
+
+def read_secret(path, key):
+    try:
+        with open(path) as f:
+            for line in f:
+                if line.startswith(f"{key}="):
+                    return line.rstrip("\n").split("=", 1)[1]
+    except FileNotFoundError:
+        pass
+    return ""
+
+
+def post(url, token, hits):
+    body = json.dumps({"source": "ns8-wazuh", "host": os.environ.get("TRAEFIK_HOST", ""), "findings": hits}).encode()
+    request = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(request, timeout=30) as answer:
+        if not 200 <= answer.status < 300:
+            raise RuntimeError(f"the endpoint answered {answer.status}")
+
+
+def export(cursor):
+    url = os.environ.get("EXPORT_URL", "")
+    if not url:
+        cursor.forget()
+        return 0
+    token = read_secret(os.environ.get("EXPORT_SECRETS", "secrets/export.env"), "EXPORT_TOKEN")
+    ts, ids = cursor.load()
+    sent = 0
+    for hits, ts, ids in pages(ts, ids, [], []):
+        for start in range(0, len(hits), EXPORT_BATCH):
+            post(url, token, hits[start:start + EXPORT_BATCH])
+        cursor.save(ts, ids)
+        sent += len(hits)
+    # Also on a quiet first run: the next run must start from here, not from its own now
+    cursor.save(ts, ids)
+    if sent:
+        log(f"{sent} findings exported")
+    return 0
+
+
+def send_mail(smtp, sender, recipients, subject, text):
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = ", ".join(recipients)
+    message["Subject"] = subject
+    message.set_content(text)
+    context = ssl.create_default_context()
+    if not smtp["tls_verify"]:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    if smtp["encrypt_smtp"] == "tls":
+        client = smtplib.SMTP_SSL(smtp["host"], smtp["port"], timeout=30, context=context)
+    else:
+        client = smtplib.SMTP(smtp["host"], smtp["port"], timeout=30)
+    with client:
+        if smtp["encrypt_smtp"] == "starttls":
+            client.starttls(context=context)
+        if smtp["username"]:
+            client.login(smtp["username"], smtp["password"])
+        client.send_message(message)
+
+
+def email(cursor):
+    host = os.environ.get("TRAEFIK_HOST", "")
+    recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
+    # Before the switch existed, a recipient was enough to send emails
+    enabled = os.environ.get("NOTIFY_ENABLED", str(bool(recipients))) == "True"
+    smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
+    if not (enabled and recipients and host and smtp["enabled"] and smtp["host"]):
+        cursor.forget()
+        return 0
+    min_level = os.environ.get("NOTIFY_MIN_LEVEL", "medium")
+    levels = LEVELS[LEVELS.index(min_level):] if min_level in LEVELS else LEVELS[2:]
+    sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
+
+    ts, ids = cursor.load()
+    counts = Counter()
+    total = 0
+    for hits, ts, ids in pages(ts, ids, [{"terms": {"wazuh.rule.level": levels}}], NOISE):
+        for hit in hits:
+            source = hit["_source"]["wazuh"]
+            counts[(source.get("agent", {}).get("name", "?"), source.get("rule", {}).get("title", "?"))] += 1
+        total += len(hits)
+    if total:
+        # One block per agent, one line per rule with a count, instead of one line per finding
+        lines = [f"{total} new findings.", ""]
+        for agent_name in sorted({a for a, _ in counts}):
+            lines.append(agent_name)
+            rules = [(n, r) for (a, r), n in counts.items() if a == agent_name]
+            lines += [f"  {n} x {r}" for n, r in sorted(rules, key=lambda x: (-x[0], x[1]))]
+            lines.append("")
+        lines.append(f"Open the dashboard: https://{host}/")
+        send_mail(smtp, sender, recipients, f"Wazuh: {total} new findings on {host}", "\n".join(lines))
+        log(f"email sent, {total} findings")
+    # Saved after the email only: a failed delivery is sent again at the next run
+    cursor.save(ts, ids)
+    return 0
+
+
+def main():
+    output = (sys.argv[1:] or [""])[0].lstrip("-")
+    if output not in ("export", "email"):
+        raise SystemExit("usage: send-findings --export|--email")
+    # A run that lasts longer than the timer period must not overlap with the next one
+    with open(f"send-findings-{output}.lock", "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            log("previous run still going")
+            return 0
+        cursor = Cursor(f"send-findings-{output}.cursor")
+        return export(cursor) if output == "export" else email(cursor)
+
+
+sys.exit(main())

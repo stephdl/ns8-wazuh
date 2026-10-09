@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Earlier versions sent the findings through Alerting monitors and Notifications channels.
+# send-findings replaced them: remove them, or the findings would go out twice.
+
+import os
+import sys
+
+from wazuh_api import api
+from wazuh_securityadmin import podman_exec, wait_indexer
+
+MONITORS = ("ns8-export", "ns8-email")
+CONFIGS = ("ns8-export", "ns8-email", "ns8-recipients", "ns8-smtp")
+KEYSTORE = "/usr/share/wazuh-indexer/bin/opensearch-keystore"
+KEY_PREFIX = "opensearch.notifications.core.email.ns8-smtp"
+
+wait_indexer()
+hits = api("POST", "_plugins/_alerting/monitors/_search", {"size": 500, "query": {"match_all": {}}}).get("hits", {}).get("hits", [])
+for hit in hits:
+    if hit["_source"].get("name") in MONITORS:
+        api("DELETE", f"_plugins/_alerting/monitors/{hit['_id']}")
+        print(f"monitor {hit['_source']['name']} removed", file=sys.stderr)
+for config in api("GET", "_plugins/_notifications/configs?max_items=100").get("config_list", []):
+    if config["config"]["name"] in CONFIGS:
+        api("DELETE", f"_plugins/_notifications/configs/{config['config_id']}")
+        print(f"channel {config['config']['name']} removed", file=sys.stderr)
+
+conf = ["env", "OPENSEARCH_PATH_CONF=/usr/share/wazuh-indexer/config", KEYSTORE]
+names = podman_exec(conf + ["list"]).stdout.split()
+for field in ("username", "password"):
+    if f"{KEY_PREFIX}.{field}" in names:
+        podman_exec(conf + ["remove", f"{KEY_PREFIX}.{field}"])
+if os.path.exists("notifications-applied.sha256"):
+    os.remove("notifications-applied.sha256")

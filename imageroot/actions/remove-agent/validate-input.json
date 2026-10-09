@@ -1,0 +1,21 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Remove an agent",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/remove-agent",
+    "description": "Revoke an agent: the manager forgets it and its key stops working",
+    "examples": [
+        {
+            "id": "001"
+        }
+    ],
+    "type": "object",
+    "required": ["id"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "title": "Agent id",
+            "description": "Identifier of the agent, as returned by list-agents",
+            "pattern": "^[0-9]{3,}$"
+        }
+    }
+}

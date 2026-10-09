@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Apply the NS8 user domain to the indexer security configuration and to the
+# Wazuh API rules, so both sides give the same rights to the same groups.
+# The documents are streamed through stdin into the container, so the bind
+# password never touches the host disk.
+
+import os
+import sys
+import time
+
+import agent
+from agent.ldapproxy import Ldapproxy
+
+import wazuh_security
+from wazuh_api import manager_api
+from wazuh_securityadmin import apply_document_if_changed, read_default, wait_indexer
+
+wait_indexer()
+
+ldap_domain = os.environ.get("LDAP_DOMAIN", "")
+admin_group = os.environ.get("LDAP_ADMIN_GROUP", "")
+readonly_group = os.environ.get("LDAP_READONLY_GROUP", "")
+# The user domain event passes --force: the bind password may change without any setting change
+force = "--force" in sys.argv[1:]
+
+domain = None
+users_filter = ""
+if ldap_domain:
+    proxy = Ldapproxy()
+    domain = proxy.get_domain(ldap_domain)
+    agent.assert_exp(domain is not None, f"user domain {ldap_domain} not found")
+    agent.bind_user_domains([ldap_domain])
+    users_filter = proxy.get_ldap_users_search_filter_clause(ldap_domain)
+
+apply_document_if_changed(wazuh_security.build_security_config(read_default("config.yml", "config"), domain, users_filter), "config", force)
+if not domain:
+    admin_group = readonly_group = ""
+apply_document_if_changed(wazuh_security.build_roles_mapping(read_default("roles_mapping.yml", "all_access"), admin_group, readonly_group), "rolesmapping", force)
+
+
+def api_items(path):
+    return manager_api("GET", path)["data"]["affected_items"]
+
+
+# The API may still be starting right after the services start
+for _ in range(24):
+    try:
+        roles = {role["name"]: role["id"] for role in api_items("security/roles?limit=500")}
+        break
+    except (RuntimeError, KeyError):
+        time.sleep(5)
+else:
+    agent.assert_exp(False, "the Wazuh API is not ready")
+
+# Replace the module rules only when they differ: deleting them leaves the LDAP users without API rights
+wanted = wazuh_security.build_api_rules(admin_group, readonly_group)
+current = {rule["name"]: rule for rule in api_items("security/rules?limit=500")
+           if rule["name"] in (wazuh_security.API_RULE_ADMIN, wazuh_security.API_RULE_READONLY)}
+for name in set(wanted) | set(current):
+    role, rule = wanted.get(name, (None, None))
+    old = current.get(name)
+    if old and role and old["rule"] == rule and old.get("roles") == [roles[role]]:
+        continue
+    if old:
+        manager_api("DELETE", f"security/rules?rule_ids={old['id']}")
+    if role:
+        created = manager_api("POST", "security/rules", {"name": name, "rule": rule})
+        rule_id = created["data"]["affected_items"][0]["id"]
+        linked = manager_api("POST", f"security/roles/{roles[role]}/rules?rule_ids={rule_id}")
+        agent.assert_exp(linked["data"]["total_affected_items"] == 1, f"cannot link {name} to the {role} role")

@@ -14,12 +14,26 @@ import sys
 import json
 import agent
 
+from wazuh_api import count_agents
+
 # Prepare return variable
 config = {}
 
 # Read current configuration from the environment file
 config["host"] = os.getenv("TRAEFIK_HOST","")
-config["http2https"] = os.getenv("TRAEFIK_HTTP2HTTPS") == "True"
+config["agents_enrolled"] = count_agents() if config["host"] else 0
+config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
+config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
+config["ldap_readonly_group"] = os.getenv("LDAP_READONLY_GROUP", "")
+config["export_url"] = os.getenv("EXPORT_URL", "")
+config["notify_recipients"] = [r for r in os.getenv("NOTIFY_RECIPIENTS", "").split(",") if r]
+# Instances configured before the toggle existed sent emails as soon as a recipient was set
+config["notify_enabled"] = os.getenv("NOTIFY_ENABLED", str(bool(config["notify_recipients"]))) == "True"
+config["notify_sender"] = os.getenv("NOTIFY_SENDER", "")
+config["notify_min_level"] = os.getenv("NOTIFY_MIN_LEVEL", "medium")
+config["smarthost_enabled"] = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))["enabled"]
+config["export_token_set"] = os.path.exists("secrets/export.env")
+config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"
 config["lets_encrypt"] = agent.get_route(os.environ['MODULE_ID']).get('lets_encrypt', False)
 
 # Dump the configuration to stdout

@@ -1,0 +1,39 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Enrollment token",
+    "$id": "http://nethserver.org/json-schema/task/output/wazuh/get-enrollment-token",
+    "description": "The enrollment token and the data to enroll an agent",
+    "examples": [
+        {
+            "token": "eyJ2ZXIiOjEs...",
+            "id": "Q5YpDbCMmPhkwHEwcy5uKQ",
+            "address": "wazuh.domain.org",
+            "expires": "2026-10-08T13:57:11+00:00"
+        }
+    ],
+    "type": "object",
+    "required": [
+        "token",
+        "id",
+        "address",
+        "expires"
+    ],
+    "properties": {
+        "token": {
+            "type": "string",
+            "description": "Value for WAZUH_ENROLLMENT_TOKEN"
+        },
+        "id": {
+            "type": "string",
+            "description": "Identifier of the token"
+        },
+        "address": {
+            "type": "string",
+            "description": "Address of the server, as written in the token"
+        },
+        "expires": {
+            "type": "string",
+            "description": "Expiration date, ISO 8601"
+        }
+    }
+}

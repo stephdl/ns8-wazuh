@@ -23,16 +23,47 @@
       <cv-column>
         <cv-tile light>
           <cv-form @submit.prevent="configureModule">
+            <NsInlineNotification
+              v-if="!isConfigured && !loading.getConfiguration"
+              kind="info"
+              :title="$t('settings.host_choose_title')"
+              :description="$t('settings.host_choose_description')"
+              :showCloseButton="false"
+              class="maxwidth"
+            />
             <cv-text-input
               :label="$t('settings.wazuh_fqdn')"
               placeholder="wazuh.example.org"
               v-model.trim="host"
               class="mg-bottom"
+              :helper-text="hostHelperText"
               :invalid-message="$t(error.host)"
-              :disabled="loading.getConfiguration || loading.configureModule"
+              :disabled="
+                loading.getConfiguration ||
+                loading.configureModule ||
+                isHostLocked
+              "
               ref="host"
             >
             </cv-text-input>
+            <NsTextInput
+              type="password"
+              v-model="adminPassword"
+              autocomplete="new-password"
+              :label="$t('settings.admin_password')"
+              :placeholder="
+                isConfigured
+                  ? $t('settings.unchanged_password_placeholder')
+                  : ''
+              "
+              :helper-text="$t('settings.admin_password_rules')"
+              :invalid-message="$t(error.admin_password)"
+              :passwordShowLabel="$t('settings.show')"
+              :passwordHideLabel="$t('settings.hide')"
+              :disabled="stillLoading"
+              class="mg-bottom maxwidth"
+              ref="admin_password"
+            />
             <NsToggle
               value="letsEncrypt"
               :label="core.$t('apps_lets_encrypt.request_https_certificate')"
@@ -80,25 +111,159 @@
                 />
               </cv-column>
             </cv-row>
-            <cv-toggle
-              value="httpToHttps"
-              :label="$t('settings.http_to_https')"
-              v-model="isHttpToHttpsEnabled"
-              :disabled="loading.getConfiguration || loading.configureModule"
-              class="mg-bottom"
+            <NsComboBox
+              v-model="ldapDomain"
+              :options="domains"
+              auto-highlight
+              :title="$t('settings.ldap_domain')"
+              :label="$t('settings.choose_ldap_domain')"
+              :invalid-message="$t(error.ldap_domain)"
+              :disabled="stillLoading || loading.listUserDomains"
+              tooltipAlignment="start"
+              tooltipDirection="top"
+              class="mg-bottom maxwidth"
+              ref="ldap_domain"
             >
-              <template slot="text-left">{{
-                $t("settings.disabled")
+              <template slot="tooltip">{{
+                $t("settings.ldap_domain_tooltip")
               }}</template>
-              <template slot="text-right">{{
-                $t("settings.enabled")
-              }}</template>
-            </cv-toggle>
+            </NsComboBox>
+            <cv-text-input
+              v-if="ldapDomain && ldapDomain !== '-'"
+              :label="$t('settings.ldap_admin_group')"
+              placeholder="wazuh-admins"
+              v-model.trim="ldapAdminGroup"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.ldap_admin_group)"
+              :disabled="stillLoading"
+              ref="ldap_admin_group"
+            >
+            </cv-text-input>
+            <cv-text-input
+              v-if="ldapDomain && ldapDomain !== '-'"
+              :label="$t('settings.ldap_readonly_group')"
+              :helper-text="$t('settings.ldap_readonly_group_helper')"
+              placeholder="wazuh-readers"
+              v-model.trim="ldapReadonlyGroup"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.ldap_readonly_group)"
+              :disabled="stillLoading"
+              ref="ldap_readonly_group"
+            >
+            </cv-text-input>
             <!-- advanced options -->
             <cv-accordion ref="accordion" class="maxwidth mg-bottom">
-              <cv-accordion-item :open="toggleAccordion[0]">
+              <cv-accordion-item :open="isAdvancedOpen">
                 <template slot="title">{{ $t("settings.advanced") }}</template>
-                <template slot="content"> </template>
+                <template slot="content">
+                  <NsToggle
+                    value="indexUnclassified"
+                    :label="$t('settings.index_unclassified_events')"
+                    v-model="indexUnclassifiedEvents"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template #tooltip>{{
+                      $t("settings.index_unclassified_events_tooltip")
+                    }}</template>
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <cv-text-input
+                    :label="$t('settings.export_url')"
+                    placeholder="https://logs.example.org/wazuh"
+                    v-model.trim="exportUrl"
+                    class="mg-bottom"
+                    :helper-text="$t('settings.export_url_helper')"
+                    :invalid-message="$t(error.export_url)"
+                    :disabled="stillLoading"
+                    ref="export_url"
+                  >
+                  </cv-text-input>
+                  <NsTextInput
+                    v-if="exportUrl"
+                    type="password"
+                    v-model.trim="exportToken"
+                    :label="$t('settings.export_token')"
+                    :placeholder="
+                      exportTokenSet ? $t('settings.export_token_set') : ''
+                    "
+                    :helper-text="$t('settings.export_token_helper')"
+                    :passwordShowLabel="$t('settings.show')"
+                    :passwordHideLabel="$t('settings.hide')"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  />
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.notify_title") }}
+                  </h6>
+                  <NsInlineNotification
+                    v-if="!smarthostEnabled"
+                    kind="warning"
+                    :title="$t('settings.smarthost_missing_title')"
+                    :description="$t('settings.smarthost_missing_description')"
+                    :actionLabel="$t('settings.go_to_smarthost')"
+                    @action="goToSmarthost"
+                    :showCloseButton="false"
+                  />
+                  <NsToggle
+                    value="notifyEnabled"
+                    :label="$t('settings.notify_enabled')"
+                    v-model="notifyEnabled"
+                    :disabled="stillLoading || !smarthostEnabled"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="notifyEnabled">
+                    <cv-text-area
+                      v-model.trim="notifyRecipients"
+                      :label="$t('settings.notify_recipients')"
+                      :helper-text="$t('settings.notify_recipients_helper')"
+                      :invalid-message="$t(error.notify_recipients)"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      placeholder="soc@example.org"
+                      class="mg-bottom"
+                      ref="notify_recipients"
+                    >
+                    </cv-text-area>
+                    <NsTextInput
+                      v-model.trim="notifySender"
+                      :label="$t('settings.notify_sender')"
+                      :placeholder="
+                        host ? 'wazuh@' + host : 'wazuh@example.org'
+                      "
+                      :helper-text="$t('settings.notify_sender_helper')"
+                      :invalid-message="$t(error.notify_sender)"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      class="mg-bottom"
+                      ref="notify_sender"
+                    />
+                    <cv-dropdown
+                      v-model="notifyMinLevel"
+                      :label="$t('settings.notify_min_level')"
+                      :helper-text="$t('settings.notify_min_level_helper')"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      class="mg-bottom"
+                    >
+                      <cv-dropdown-item
+                        v-for="level in notifyLevels"
+                        :key="level"
+                        :value="level"
+                        >{{ $t("settings.level_" + level) }}</cv-dropdown-item
+                      >
+                    </cv-dropdown>
+                  </template>
+                </template>
               </cv-accordion-item>
             </cv-accordion>
             <cv-row v-if="error.configureModule">
@@ -143,11 +308,19 @@
                 </NsInlineNotification>
               </cv-column>
             </cv-row>
+            <NsInlineNotification
+              v-if="missingFields.length && !stillLoading"
+              kind="info"
+              :title="$t('settings.to_save')"
+              :description="missingFields.join(', ')"
+              :showCloseButton="false"
+              class="mg-bottom maxwidth"
+            />
             <NsButton
               kind="primary"
               :icon="Save20"
               :loading="loading.configureModule"
-              :disabled="loading.getConfiguration || loading.configureModule"
+              :disabled="stillLoading || !isFormValid"
               >{{ $t("settings.save") }}</NsButton
             >
           </cv-form>
@@ -189,23 +362,56 @@ export default {
       validationErrorDetails: [],
       urlCheckInterval: null,
       host: "",
+      configuredHost: "",
+      agentsEnrolled: 0,
+      adminPassword: "",
+      isAdvancedOpen: false,
       isLetsEncryptEnabled: false,
       isLetsEncryptCurrentlyEnabled: false,
-      isHttpToHttpsEnabled: true,
+      // Empty until the list of domains and the configuration are both loaded: NsComboBox
+      // writes its label only when the value changes while the option already exists
+      ldapDomain: "",
+      configuredLdapDomain: null,
+      ldapAdminGroup: "",
+      ldapReadonlyGroup: "",
+      domains: [],
+      indexUnclassifiedEvents: false,
+      exportUrl: "",
+      notifyEnabled: false,
+      notifyRecipients: "",
+      notifySender: "",
+      notifyMinLevel: "medium",
+      notifyLevels: ["low", "medium", "high", "critical"],
+      smarthostEnabled: true,
+      exportToken: "",
+      exportTokenSet: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
         getStatus: false,
+        listUserDomains: false,
       },
       error: {
+        admin_password: "",
+        ldap_domain: "",
+        ldap_admin_group: "",
+        ldap_readonly_group: "",
+        export_url: "",
+        notify_recipients: "",
+        notify_sender: "",
+        listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
         host: "",
         lets_encrypt: "",
-        http2https: "",
         getStatus: "",
       },
     };
+  },
+  watch: {
+    adminPassword() {
+      this.error.admin_password = "";
+    },
   },
   computed: {
     ...mapState(["instanceName", "core", "appName"]),
@@ -216,8 +422,77 @@ export default {
         this.loading.getStatus
       );
     },
+    // The first configuration must choose the password, a later one may keep it
+    isConfigured() {
+      return this.configuredHost !== "";
+    },
+    isHostLocked() {
+      // null means the API did not answer: lock too, the backend refuses the change anyway
+      return this.isConfigured && this.agentsEnrolled !== 0;
+    },
+    hostHelperText() {
+      if (!this.isConfigured) {
+        return "";
+      }
+      if (this.isHostLocked) {
+        return this.$t("settings.host_locked_helper");
+      }
+      return this.$t("settings.host_bound_helper");
+    },
+    passwordError() {
+      // Same rules as the backend: Wazuh refuses other characters than these ones
+      const value = this.adminPassword;
+      if (value.length < 12 || value.length > 64) {
+        return "settings.password_length";
+      }
+      if (!/^[A-Za-z0-9.,_+:@%^=~-]+$/.test(value)) {
+        return "settings.password_characters";
+      }
+      if (
+        !/[A-Z]/.test(value) ||
+        !/[a-z]/.test(value) ||
+        !/[0-9]/.test(value) ||
+        !/[.,_+:@%^=~-]/.test(value)
+      ) {
+        return "settings.password_classes";
+      }
+      return "";
+    },
+    isDomainChosen() {
+      return this.ldapDomain !== "" && this.ldapDomain !== "-";
+    },
+    missingFields() {
+      const missing = [];
+      if (!this.host || !this.host.includes(".")) {
+        missing.push(this.$t("settings.wazuh_fqdn"));
+      }
+      if (!this.adminPassword && !this.isConfigured) {
+        missing.push(this.$t("settings.admin_password"));
+      }
+      if (this.isDomainChosen && !this.ldapAdminGroup) {
+        missing.push(this.$t("settings.ldap_admin_group"));
+      }
+      if (
+        this.notifyEnabled &&
+        (!this.recipientList.length ||
+          this.recipientList.some((r) => !this.isEmail(r)))
+      ) {
+        missing.push(this.$t("settings.notify_recipients"));
+      }
+      if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
+        missing.push(this.$t("settings.export_url"));
+      }
+      return missing;
+    },
+    recipientList() {
+      return this.notifyRecipients.split(/[\s,;]+/).filter((r) => r !== "");
+    },
+    isFormValid() {
+      return this.missingFields.length === 0;
+    },
   },
   created() {
+    this.listUserDomains();
     this.getConfiguration();
     this.getStatus();
   },
@@ -232,6 +507,67 @@ export default {
     next();
   },
   methods: {
+    isEmail(value) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    },
+    goToSmarthost() {
+      this.core.$router.push("/settings/smarthost");
+    },
+    async listUserDomains() {
+      this.loading.listUserDomains = true;
+      this.error.listUserDomains = "";
+      const taskAction = "list-user-domains";
+      this.core.$root.$off(taskAction + "-aborted");
+      this.core.$root.$once(
+        taskAction + "-aborted",
+        this.listUserDomainsAborted
+      );
+      this.core.$root.$off(taskAction + "-completed");
+      this.core.$root.$once(
+        taskAction + "-completed",
+        this.listUserDomainsCompleted
+      );
+      const res = await to(
+        this.createClusterTaskForApp({
+          action: taskAction,
+          extra: {
+            title: this.$t("action." + taskAction),
+            isNotificationHidden: true,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.listUserDomains = this.getErrorMessage(err);
+        this.loading.listUserDomains = false;
+      }
+    },
+    listUserDomainsAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.listUserDomains = this.$t("error.generic_error");
+      this.loading.listUserDomains = false;
+    },
+    listUserDomainsCompleted(taskContext, taskResult) {
+      const options = taskResult.output.domains.map((domain) => ({
+        name: domain.name,
+        label: domain.name,
+        value: domain.name,
+      }));
+      options.unshift({
+        name: "no_user_domain",
+        label: this.$t("settings.no_user_domain"),
+        value: "-",
+      });
+      this.domains = options;
+      this.loading.listUserDomains = false;
+      this.applyLdapDomain();
+    },
+    applyLdapDomain() {
+      if (this.configuredLdapDomain !== null && this.domains.length) {
+        this.ldapDomain = this.configuredLdapDomain;
+      }
+    },
     goToCertificates() {
       this.core.$router.push("/settings/tls-certificates");
     },
@@ -322,10 +658,30 @@ export default {
     getConfigurationCompleted(taskContext, taskResult) {
       const config = taskResult.output;
       this.host = config.host;
+      this.configuredHost = config.host;
+      this.agentsEnrolled = config.agents_enrolled;
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isLetsEncryptCurrentlyEnabled = config.lets_encrypt;
-      this.isHttpToHttpsEnabled = config.http2https;
+      this.configuredLdapDomain =
+        config.ldap_domain === "" ? "-" : config.ldap_domain;
+      this.applyLdapDomain();
+      this.ldapAdminGroup = config.ldap_admin_group;
+      this.ldapReadonlyGroup = config.ldap_readonly_group || "";
+      this.indexUnclassifiedEvents = config.index_unclassified_events;
+      this.exportUrl = config.export_url;
+      this.notifyEnabled = config.notify_enabled;
+      this.notifyRecipients = config.notify_recipients.join("\n");
+      this.notifySender = config.notify_sender;
+      this.notifyMinLevel = config.notify_min_level;
+      this.smarthostEnabled = config.smarthost_enabled;
+      this.exportTokenSet = config.export_token_set;
+      this.exportToken = "";
 
+      // Show the advanced options when one of them is in use
+      this.isAdvancedOpen =
+        config.index_unclassified_events ||
+        config.export_url !== "" ||
+        config.notify_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -338,6 +694,48 @@ export default {
 
         if (isValidationOk) {
           this.focusElement("host");
+        }
+        isValidationOk = false;
+      }
+      if (this.adminPassword && this.passwordError) {
+        this.error.admin_password = this.passwordError;
+        if (isValidationOk) {
+          this.focusElement("admin_password");
+        }
+        isValidationOk = false;
+      }
+      if (this.ldapDomain && this.ldapDomain !== "-" && !this.ldapAdminGroup) {
+        this.error.ldap_admin_group = "common.required";
+        if (isValidationOk) {
+          this.focusElement("ldap_admin_group");
+        }
+        isValidationOk = false;
+      }
+      if (
+        this.notifyEnabled &&
+        this.recipientList.some((r) => !this.isEmail(r))
+      ) {
+        this.error.notify_recipients = "settings.notify_recipients_invalid";
+        if (isValidationOk) {
+          this.focusElement("notify_recipients");
+        }
+        isValidationOk = false;
+      }
+      if (
+        this.notifyEnabled &&
+        this.notifySender &&
+        !this.isEmail(this.notifySender)
+      ) {
+        this.error.notify_sender = "settings.notify_sender_invalid";
+        if (isValidationOk) {
+          this.focusElement("notify_sender");
+        }
+        isValidationOk = false;
+      }
+      if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
+        this.error.export_url = "settings.export_url_https";
+        if (isValidationOk) {
+          this.focusElement("export_url");
         }
         isValidationOk = false;
       }
@@ -392,14 +790,37 @@ export default {
         `${taskAction}-completed-${eventId}`,
         this.configureModuleCompleted
       );
+      const data = {
+        host: this.host,
+        lets_encrypt: this.isLetsEncryptEnabled,
+        ldap_domain: this.ldapDomain === "-" ? "" : this.ldapDomain,
+        ldap_admin_group: this.ldapDomain === "-" ? "" : this.ldapAdminGroup,
+        ldap_readonly_group:
+          this.ldapDomain === "-" ? "" : this.ldapReadonlyGroup,
+        index_unclassified_events: this.indexUnclassifiedEvents,
+        export_url: this.exportUrl,
+        notify_enabled: this.notifyEnabled,
+        // While the emails are off the fields are hidden: keep only what the backend accepts
+        notify_recipients: [
+          ...new Set(this.recipientList.filter((r) => this.isEmail(r))),
+        ],
+        notify_sender: this.isEmail(this.notifySender) ? this.notifySender : "",
+        notify_min_level: this.notifyMinLevel,
+      };
+      // The password is sent only when typed: nothing means keep the current one
+      if (this.adminPassword) {
+        data.admin_password = this.adminPassword;
+      }
+      // Only send the token when typed, an empty one would remove the stored token
+      if (this.exportToken) {
+        data.export_token = this.exportToken;
+      } else if (!this.exportUrl) {
+        data.export_token = "";
+      }
       const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
           action: taskAction,
-          data: {
-            host: this.host,
-            lets_encrypt: this.isLetsEncryptEnabled,
-            http2https: this.isHttpToHttpsEnabled,
-          },
+          data,
           extra: {
             title: this.$t("settings.instance_configuration", {
               instance: this.instanceName,
@@ -425,6 +846,8 @@ export default {
     },
     configureModuleCompleted() {
       this.loading.configureModule = false;
+      // Do not keep the password in the page once it is applied
+      this.adminPassword = "";
 
       // reload configuration
       this.getConfiguration();

@@ -15,8 +15,22 @@ original_environment = request['environment']
 
 for evar in [
         "TRAEFIK_HOST",
-        "TRAEFIK_HTTP2HTTPS",
+        "TRAEFIK_LETS_ENCRYPT",
+        "LDAP_DOMAIN",
+        "LDAP_ADMIN_GROUP",
+        "INDEX_UNCLASSIFIED_EVENTS",
+        "EXPORT_URL",
     ]:
     agent.set_env(evar, original_environment[evar])
+
+# Missing in backups taken before these settings existed
+for evar, default in [
+        ("LDAP_READONLY_GROUP", ""),
+        ("NOTIFY_RECIPIENTS", ""),
+        ("NOTIFY_ENABLED", str(bool(original_environment.get("NOTIFY_RECIPIENTS")))),
+        ("NOTIFY_SENDER", ""),
+        ("NOTIFY_MIN_LEVEL", "medium"),
+    ]:
+    agent.set_env(evar, original_environment.get(evar, default))
 
 agent.dump_env()

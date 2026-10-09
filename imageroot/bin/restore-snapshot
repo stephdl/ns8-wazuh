@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Runs after a restore, once the indexer is healthy: load the snapshot taken by module-dump-state.
+# The indexer has just created empty indices with the same names at its first start, so they go first.
+
+import sys
+import time
+
+from wazuh_api import api, USER_DATA_STREAMS, USER_INDICES
+
+CERT = {"admin_cert": True}
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+for _ in range(60):
+    try:
+        if api("GET", "_cluster/health").get("status") in ("green", "yellow"):
+            break
+    except RuntimeError:
+        pass
+    time.sleep(10)
+else:
+    sys.exit("the indexer is not ready")
+
+answer = api("PUT", "_snapshot/ns8", {"type": "fs", "settings": {"location": "/snapshots"}})
+if not answer.get("acknowledged"):
+    sys.exit(f"cannot register the snapshot repository: {answer}")
+
+snapshots = api("GET", "_snapshot/ns8/backup")
+if "snapshots" not in snapshots:
+    log("no snapshot in this backup, the indexer starts empty")
+    sys.exit(0)
+
+for pattern in USER_DATA_STREAMS:
+    api("DELETE", f"_data_stream/{pattern}", **CERT)
+for pattern in ("wazuh-states-*", "wazuh-agent-*", ".kibana_*"):
+    api("DELETE", pattern, **CERT)
+
+answer = api("POST", "_snapshot/ns8/backup/_restore?wait_for_completion=true", {
+    "indices": USER_INDICES,
+    "ignore_unavailable": True,
+    "include_global_state": False,
+}, **CERT)
+shards = answer.get("snapshot", {}).get("shards")
+if not shards or shards.get("failed"):
+    sys.exit(f"the restore failed: {answer}")
+log(f"restored {shards['successful']} shards")

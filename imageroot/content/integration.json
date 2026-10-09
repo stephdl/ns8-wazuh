@@ -1,0 +1,15 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "ns8",
+      "author": "NethServer",
+      "description": "Logs of the NethServer 8 modules read from journald",
+      "documentation": "https://github.com/stephdl/ns8-wazuh",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "category": "applications",
+    "enabled": true
+  }
+}

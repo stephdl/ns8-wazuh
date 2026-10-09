@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+import agent
+from agent.ldapproxy import Ldapproxy
+
+agent.set_weight(os.path.basename(__file__), 0) # Validation step, no task progress at all
+
+data = json.load(sys.stdin)
+ldap_domain = data.get("ldap_domain", "")
+
+if ldap_domain and ldap_domain not in Ldapproxy().get_domains_list():
+    agent.set_status('validation-failed')
+    json.dump([{'field': 'ldap_domain', 'parameter': 'ldap_domain', 'value': ldap_domain, 'error': 'user_domain_not_found'}], fp=sys.stdout)
+    sys.exit(3)
+
+if ldap_domain and not data.get("ldap_admin_group"):
+    agent.set_status('validation-failed')
+    json.dump([{'field': 'ldap_admin_group', 'parameter': 'ldap_admin_group', 'value': '', 'error': 'required_with_user_domain'}], fp=sys.stdout)
+    sys.exit(3)
+
+if data.get("ldap_readonly_group") and data.get("ldap_readonly_group") == data.get("ldap_admin_group"):
+    agent.set_status('validation-failed')
+    json.dump([{'field': 'ldap_readonly_group', 'parameter': 'ldap_readonly_group', 'value': data["ldap_readonly_group"], 'error': 'same_as_admin_group'}], fp=sys.stdout)
+    sys.exit(3)

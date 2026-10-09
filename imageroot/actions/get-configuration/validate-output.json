@@ -6,15 +6,39 @@
     "examples": [
         {
             "host": "wazuh.domain.org",
-            "http2https": true,
-            "lets_encrypt": true
+            "lets_encrypt": true,
+            "ldap_domain": "domain.org",
+            "ldap_admin_group": "wazuh-admins",
+            "ldap_readonly_group": "wazuh-readers",
+            "index_unclassified_events": false,
+            "export_url": "https://logs.example.org/wazuh",
+            "export_token_set": true,
+            "agents_enrolled": 3,
+            "notify_recipients": [
+                "soc@example.org"
+            ],
+            "notify_sender": "",
+            "notify_min_level": "medium",
+            "smarthost_enabled": true,
+            "notify_enabled": true
         }
     ],
     "type": "object",
     "required": [
         "host",
-        "http2https",
-        "lets_encrypt"
+        "lets_encrypt",
+        "ldap_domain",
+        "ldap_admin_group",
+        "ldap_readonly_group",
+        "index_unclassified_events",
+        "export_url",
+        "export_token_set",
+        "agents_enrolled",
+        "notify_recipients",
+        "notify_sender",
+        "notify_min_level",
+        "smarthost_enabled",
+        "notify_enabled"
     ],
     "properties": {
         "host": {
@@ -27,10 +51,87 @@
             "title": "Let's Encrypt certificate",
             "description": "Request a valid Let's Encrypt certificate."
         },
-        "http2https": {
+        "ldap_domain": {
+            "type": "string",
+            "title": "User domain",
+            "description": "NS8 user domain used to log in to the dashboard. Empty when disabled."
+        },
+        "ldap_admin_group": {
+            "type": "string",
+            "title": "Administrators group",
+            "description": "Group of the user domain that receives the administrator role."
+        },
+        "ldap_readonly_group": {
+            "type": "string",
+            "title": "Read-only group",
+            "description": "Group of the user domain that can read alerts and agents without changing anything."
+        },
+        "index_unclassified_events": {
             "type": "boolean",
-            "title": "HTTP to HTTPS redirection",
-            "description": "Redirect all the HTTP requests to HTTPS"
+            "title": "Keep unclassified logs",
+            "description": "Index the logs that no decoder recognizes. They take more disk space."
+        },
+        "export_url": {
+            "type": "string",
+            "title": "Export URL",
+            "description": "HTTPS endpoint that receives the new findings. Empty when disabled."
+        },
+        "export_token_set": {
+            "type": "boolean",
+            "title": "Export token set",
+            "description": "True when a bearer token is stored. The token itself is never returned."
+        },
+        "agents_enrolled": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "title": "Enrolled agents",
+            "description": "Number of enrolled agents, null when the Wazuh API does not answer. The host cannot change while it is not zero."
+        },
+        "notify_enabled": {
+            "type": "boolean",
+            "title": "Email notifications",
+            "description": "Send a summary of the new findings by email every 5 minutes. Needs the cluster smarthost and at least one recipient."
+        },
+        "notify_recipients": {
+            "type": "array",
+            "title": "Email recipients",
+            "description": "Addresses that receive a summary of the new findings every 5 minutes. Empty to disable. Needs the cluster smarthost.",
+            "items": {
+                "type": "string",
+                "format": "email"
+            },
+            "uniqueItems": true
+        },
+        "notify_sender": {
+            "type": "string",
+            "title": "Email sender",
+            "description": "Sender address of the emails. Empty means wazuh@ followed by the host name.",
+            "anyOf": [
+                {
+                    "const": ""
+                },
+                {
+                    "format": "email"
+                }
+            ]
+        },
+        "notify_min_level": {
+            "type": "string",
+            "title": "Minimum level",
+            "description": "Only the findings at this level or above are sent by email.",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+            ]
+        },
+        "smarthost_enabled": {
+            "type": "boolean",
+            "title": "Smarthost enabled",
+            "description": "The cluster smarthost is configured, so emails can be sent."
         }
     }
 }

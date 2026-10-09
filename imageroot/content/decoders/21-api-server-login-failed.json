@@ -1,0 +1,54 @@
+{
+  "resource": {
+    "name": "decoder/ns8-api-server-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "NS8 cluster admin failed login",
+      "description": "Failed logins to the NS8 cluster API",
+      "author": "NethServer",
+      "module": "api-server",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"[AUTH] login-failed\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~> login-failed user=<user.name> source=<source.ip><~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          }
+        ]
+      }
+    ]
+  }
+}

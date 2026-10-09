@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+from wazuh_api import api, manager_api
+
+health = {
+    "indexer": {"status": "unreachable", "disk_used_percent": None},
+    "agents": {"total": None, "active": None, "disconnected": None},
+    "certificate": {"expires": None, "days_left": None},
+}
+
+# Each part is read on its own, so a stopped container does not hide the others
+try:
+    health["indexer"]["status"] = api("GET", "_cluster/health").get("status", "unreachable")
+    allocation = api("GET", "_cat/allocation?format=json")
+    if allocation:
+        health["indexer"]["disk_used_percent"] = int(allocation[0]["disk.percent"])
+except (RuntimeError, KeyError, ValueError, TypeError) as exc:
+    print(f"indexer: {exc}", file=sys.stderr)
+
+try:
+    connection = manager_api("GET", "agents/summary/status")["data"]["connection"]
+    health["agents"] = {
+        "total": connection.get("total"),
+        "active": connection.get("active"),
+        "disconnected": connection.get("disconnected"),
+    }
+except (RuntimeError, KeyError, TypeError) as exc:
+    print(f"agents: {exc}", file=sys.stderr)
+
+proc = subprocess.run(["openssl", "x509", "-noout", "-enddate", "-in", "certs/remoted.pem"],
+                      capture_output=True, text=True)
+if proc.returncode == 0 and "=" in proc.stdout:
+    expires = datetime.strptime(proc.stdout.split("=", 1)[1].strip(), "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    health["certificate"] = {"expires": expires.isoformat(), "days_left": (expires - datetime.now(timezone.utc)).days}
+else:
+    print(f"certificate: {proc.stderr.strip()}", file=sys.stderr)
+
+json.dump(health, fp=sys.stdout)

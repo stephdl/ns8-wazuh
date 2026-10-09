@@ -1,0 +1,13 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+set -e
+exec 1>&2
+
+# Load the NS8 decoders and rules once the indexer is healthy, then run the rules on the events
+runagent provision-content
+runagent provision-detector

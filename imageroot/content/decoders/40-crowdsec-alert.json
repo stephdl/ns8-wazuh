@@ -1,0 +1,51 @@
+{
+  "resource": {
+    "name": "decoder/ns8-crowdsec-alert/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "CrowdSec alert",
+      "description": "Scenarios triggered by an IP address in CrowdSec",
+      "author": "NethServer",
+      "module": "crowdsec",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"performed '\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>msg=\"Ip <source.ip> performed '<event.reason>' \\(<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "intrusion_detection"
+            ]
+          },
+          {
+            "event.type": [
+              "info"
+            ]
+          },
+          {
+            "event.action": "crowdsec-alert"
+          }
+        ]
+      }
+    ]
+  }
+}

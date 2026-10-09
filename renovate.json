@@ -2,5 +2,20 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>NethServer/.github:ns8-automerge"
+  ],
+  "packageRules": [
+    {
+      "description": "The three Wazuh images must move together, and an upgrade needs a human review",
+      "matchPackageNames": [
+        "docker.io/wazuh/wazuh-manager",
+        "docker.io/wazuh/wazuh-indexer",
+        "docker.io/wazuh/wazuh-dashboard",
+        "wazuh/wazuh-manager",
+        "wazuh/wazuh-indexer",
+        "wazuh/wazuh-dashboard"
+      ],
+      "groupName": "wazuh",
+      "automerge": false
+    }
   ]
 }

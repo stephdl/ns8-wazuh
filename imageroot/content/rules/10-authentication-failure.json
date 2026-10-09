@@ -1,0 +1,30 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 authentication failure",
+      "description": "A login to an NS8 service failed",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0001",
+    "enabled": true,
+    "status": "experimental",
+    "level": "low",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.outcome": [
+          "failure"
+        ],
+        "event.action": [
+          "logon-failed"
+        ]
+      }
+    }
+  }
+}

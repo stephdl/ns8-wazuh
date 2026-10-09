@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+set -e
+exec 1>&2
+
+# A new version brings new decoders and rules, and the ids of the rules change at each promotion.
+# Nothing to do on a module that was never configured.
+[ -n "${TRAEFIK_HOST:-}" ] || exit 0
+
+runagent provision-content
+runagent provision-detector

@@ -1,0 +1,55 @@
+{
+  "resource": {
+    "name": "decoder/ns8-dovecot-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Dovecot failed login",
+      "description": "Authentication failures reported by Dovecot",
+      "author": "NethServer",
+      "module": "dovecot",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"auth failed\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>\\(auth failed<~>\\): user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>",
+          "<~>\\(auth failed<~>\\): user=\\<>, method=<~>, rip=<source.ip>, lip=<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          }
+        ]
+      }
+    ]
+  }
+}

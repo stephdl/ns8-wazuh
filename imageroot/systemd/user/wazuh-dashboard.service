@@ -1,0 +1,49 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Podman wazuh-dashboard.service
+BindsTo=wazuh.service
+After=wazuh.service wazuh-indexer.service wazuh-manager.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
+Restart=always
+TimeoutStartSec=300
+TimeoutStopSec=70
+Type=forking
+ExecStartPre=/bin/rm -f %t/wazuh-dashboard.pid %t/wazuh-dashboard.ctr-id
+# Traefik terminates TLS, so the dashboard speaks plain HTTP on localhost.
+# SERVER_SSL_KEY and SERVER_SSL_CERTIFICATE still have to point to existing files
+# in the rc1 image, even if SERVER_SSL_ENABLED is false: it fails to start otherwise.
+ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-dashboard.pid \
+    --cidfile %t/wazuh-dashboard.ctr-id --cgroups=no-conmon \
+    --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-dashboard \
+    --env SERVER_SSL_ENABLED=false \
+    --env SERVER_SSL_KEY=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
+    --env SERVER_SSL_CERTIFICATE=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
+    --env SERVER_PORT=5601 \
+    --env SERVER_HOST=0.0.0.0 \
+    --env OPENSEARCH_HOSTS=https://wazuh.indexer:9200 \
+    --env OPENSEARCH_SSL_CERTIFICATE_AUTHORITIES=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
+    --env WAZUH_API_URL=https://wazuh.manager \
+    --volume wazuh-dashboard-config:/usr/share/wazuh-dashboard/config:Z \
+    --volume wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom:Z \
+    --volume ./secrets/dashboard.env:/run/secrets/wazuh-credentials:ro,Z \
+    --volume ./ca/root-ca.pem:/usr/share/wazuh-dashboard/config/certs/root-ca.pem:ro,z \
+    --health-cmd='["curl","-f","-s","-o","/dev/null","http://localhost:5601/app/login"]' \
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-start-period=60s \
+    ${WAZUH_DASHBOARD_IMAGE}
+ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-dashboard.ctr-id -t 30
+ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-dashboard.ctr-id
+PIDFile=%t/wazuh-dashboard.pid
+SyslogIdentifier=%u
+
+[Install]
+WantedBy=default.target

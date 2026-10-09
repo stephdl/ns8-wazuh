@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+
+import agent
+from wazuh_api import manager_api
+
+FIELDS = "id,name,ip,registerIP,status,version,os.name,os.version,lastKeepAlive,dateAdd,group"
+
+PAGE = 500
+
+items = []
+while True:
+    response = manager_api("GET", f"agents?select={FIELDS}&limit={PAGE}&offset={len(items)}&sort=%2Bname")
+    if response.get("error", 1) != 0:
+        print(agent.SD_ERR + f"cannot list the agents: {response.get('detail')}", file=sys.stderr)
+        sys.exit(2)
+    page = response["data"]["affected_items"]
+    items += page
+    if len(page) < PAGE or len(items) >= response["data"]["total_affected_items"]:
+        break
+
+agents = []
+for item in items:
+    os_info = item.get("os") or {}
+    agents.append({
+        "id": item["id"],
+        "name": item.get("name", ""),
+        # The manager keeps the address seen at the enrollment when the agent did not give one
+        "ip": item.get("ip") or item.get("registerIP") or "",
+        "status": item.get("status", ""),
+        "version": item.get("version", ""),
+        "os": " ".join(part for part in (os_info.get("name"), os_info.get("version")) if part),
+        "last_keep_alive": item.get("lastKeepAlive", ""),
+        "date_add": item.get("dateAdd", ""),
+        "groups": item.get("group") or [],
+    })
+
+# Older managers listed themselves with the id 000: it is not an agent
+agents = [a for a in agents if a["id"] != "000"]
+api_version = manager_api("GET", "").get("data", {}).get("api_version", "")
+json.dump({
+    "agents": agents,
+    # Same form as the agent versions, to compare them in the UI
+    "manager_version": f"v{api_version}" if api_version else "",
+    # The install script takes the tag of the image, the package versions differ (5.0.0-rc1 is 5.0.0-1)
+    "package_version": os.environ.get("WAZUH_MANAGER_IMAGE", "").rpartition(":")[2],
+}, fp=sys.stdout)

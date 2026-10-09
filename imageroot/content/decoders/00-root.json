@@ -1,0 +1,28 @@
+{
+  "resource": {
+    "name": "decoder/ns8-root/0",
+    "enabled": true,
+    "metadata": {
+      "title": "NS8 root decoder",
+      "description": "Reads the JSON message sent by the Wazuh agent",
+      "author": "NethServer",
+      "module": "ns8",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "normalize": [
+      {
+        "map": [
+          {
+            "_ns8": "true"
+          }
+        ]
+      }
+    ]
+  }
+}

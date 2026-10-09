@@ -4,14 +4,19 @@
 # Copyright (C) 2023 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-set -e
 
-# Redirect any output to the journal (stderr)
+set -e
 exec 1>&2
 
-# If the control reaches this step, the service can be enabled and started
-
-touch smarthost.env
-
 systemctl --user enable wazuh.service
-systemctl --user restart wazuh.service
+systemctl --user enable --now send-findings-export.timer send-findings-email.timer
+
+# The other settings are applied through the APIs by the next steps: restart only when
+# the pod is down or a certificate changed, a restart costs about two minutes
+if [[ -f restart-needed ]] || ! systemctl --user is-active --quiet wazuh-indexer.service wazuh-manager.service wazuh-dashboard.service; then
+    # Starting the pod does not start the children, so list them all, in order
+    systemctl --user restart wazuh.service wazuh-indexer.service wazuh-manager.service wazuh-dashboard.service
+    rm -f restart-needed
+else
+    echo "Services already running, no restart needed"
+fi

@@ -1,0 +1,54 @@
+{
+  "resource": {
+    "name": "decoder/ns8-dovecot-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Dovecot successful login",
+      "description": "IMAP, POP3 and submission logins accepted by Dovecot",
+      "author": "NethServer",
+      "module": "dovecot",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"-login: Login: user=\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>Login: user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          }
+        ]
+      }
+    ]
+  }
+}

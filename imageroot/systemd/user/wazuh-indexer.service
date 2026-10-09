@@ -1,0 +1,62 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Podman wazuh-indexer.service
+BindsTo=wazuh.service
+After=wazuh.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
+Restart=always
+# The first start syncs the detection content, it takes minutes
+TimeoutStartSec=600
+TimeoutStopSec=120
+Type=forking
+ExecStartPre=/bin/rm -f %t/wazuh-indexer.pid %t/wazuh-indexer.ctr-id
+# bootstrap.memory_lock is off: a rootless user is limited to 8 MB of locked memory.
+# A heap of 1 GB is too small: the memory circuit breaker trips during the content sync and the searches fail.
+# network.host on loopback: the pod shares one localhost, and the bootstrap checks (vm.max_map_count)
+# only apply to a non-loopback address. fix-perms writes indexer-tuning.env for the host limits.
+ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-indexer.pid \
+    --cidfile %t/wazuh-indexer.ctr-id --cgroups=no-conmon \
+    --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-indexer \
+    --ulimit nofile=65536:65536 \
+    --env OPENSEARCH_JAVA_OPTS="-Xms2g -Xmx2g" \
+    --env bootstrap.memory_lock=false \
+    --env network.host=127.0.0.1 \
+    --env-file ./indexer-tuning.env \
+    --env node.name=wazuh.indexer \
+    --env cluster.initial_cluster_manager_nodes=wazuh.indexer \
+    --env discovery.seed_hosts=wazuh.indexer \
+    --env node.max_local_storage_nodes=1 \
+    --env plugins.security.allow_default_init_securityindex=true \
+    --env path.repo=/snapshots \
+    --env NODES_DN=CN=wazuh.indexer,OU=Wazuh,O=Wazuh,L=California,C=US \
+    --volume wazuh-indexer-data:/var/lib/wazuh-indexer:Z \
+    --volume wazuh-snapshots:/snapshots:Z \
+    --volume ./secrets/indexer.env:/run/secrets/wazuh-credentials:ro,Z \
+    --volume ./ca/root-ca.pem:/usr/share/wazuh-indexer/config/certs/root-ca.pem:ro,z \
+    --volume ./certs/indexer.pem:/usr/share/wazuh-indexer/config/certs/indexer.pem:ro,Z \
+    --volume ./certs/indexer-key.pem:/usr/share/wazuh-indexer/config/certs/indexer-key.pem:ro,Z \
+    --volume ./certs/admin.pem:/usr/share/wazuh-indexer/config/certs/admin.pem:ro,Z \
+    --volume ./certs/admin-key.pem:/usr/share/wazuh-indexer/config/certs/admin-key.pem:ro,Z \
+    --health-cmd='["curl","-fks","-o","/dev/null","https://localhost:9200/_plugins/_security/health"]' \
+    --health-interval=30s \
+    --health-timeout=10s \
+    ${WAZUH_INDEXER_IMAGE}
+# /snapshots is not in the image: Podman gives the mounted volume back to root,
+# so the owner can only be fixed once the container runs
+ExecStartPost=/usr/bin/podman exec wazuh-indexer chown 101:101 /snapshots
+ExecStartPost=/bin/bash -c 'while ! podman healthcheck run wazuh-indexer ; do sleep 5 ; done ; exit 0'
+ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-indexer.ctr-id -t 60
+ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-indexer.ctr-id
+PIDFile=%t/wazuh-indexer.pid
+SyslogIdentifier=%u
+
+[Install]
+WantedBy=default.target

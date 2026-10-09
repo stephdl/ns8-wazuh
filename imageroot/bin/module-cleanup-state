@@ -1,8 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-rm -vf wazuh.sql
+# Runs after the backup: the backup tool keeps its own copy, free the space of the snapshot.
+# A failure is not an error: the indexer may be stopped.
+
+import sys
+
+from wazuh_api import api
+
+try:
+    api("DELETE", "_snapshot/ns8/backup")
+except RuntimeError as exc:
+    print(f"snapshot not removed: {exc}", file=sys.stderr)

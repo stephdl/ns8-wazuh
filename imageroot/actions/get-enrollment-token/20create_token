@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+
+import agent
+from wazuh_api import manager_api
+
+data = json.load(sys.stdin)
+host = os.environ.get("TRAEFIK_HOST", "")
+agent.assert_exp(host != "", "the module is not configured yet")
+
+body = {
+    "address": host,
+    "embed_ca": True,
+    # Enough to enroll by hand or by script, short enough that a forgotten token dies soon
+    "ttl": "1d",
+    "max_uses": data.get("max_uses", 1),
+}
+if data.get("description"):
+    body["description"] = data["description"]
+
+response = manager_api("POST", "agents/enrollment-tokens", body)
+if response.get("error", 1) != 0:
+    print(agent.SD_ERR + f"enrollment token refused: {response.get('detail')}", file=sys.stderr)
+    sys.exit(2)
+
+json.dump(response["data"], fp=sys.stdout)

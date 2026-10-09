@@ -1,21 +1,30 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Nethesis S.r.l.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-set -e
+# Runs before the backup, in the state directory: take a snapshot of the user data.
+# Copying the live data volume of the indexer would give an inconsistent backup.
 
-if ! systemctl --user -q is-active wazuh.service; then
-    exit 0
-fi
+import sys
 
-podman exec mariadb-app mysqldump \
-        --databases wazuh \
-        --default-character-set=utf8mb4 \
-        --skip-dump-date \
-        --ignore-table=mysql.event \
-        --single-transaction \
-        --quick \
-        --add-drop-table  > wazuh.sql
+from wazuh_api import api, USER_INDICES
+
+answer = api("PUT", "_snapshot/ns8", {"type": "fs", "settings": {"location": "/snapshots"}})
+if not answer.get("acknowledged"):
+    sys.exit(f"cannot register the snapshot repository: {answer}")
+
+# Only the last snapshot is kept: the backup tool already keeps the history
+api("DELETE", "_snapshot/ns8/backup")
+answer = api("PUT", "_snapshot/ns8/backup?wait_for_completion=true", {
+    "indices": USER_INDICES,
+    "ignore_unavailable": True,
+    "include_global_state": False,
+})
+state = answer.get("snapshot", {}).get("state")
+if state != "SUCCESS":
+    sys.exit(f"the snapshot failed: {answer}")
+
+print("snapshot done", file=sys.stderr)
