@@ -35,12 +35,13 @@ for item in response["data"]["affected_items"]:
         "groups": item.get("group") or [],
     })
 
-# The manager itself is listed with the id 000: it is not an agent, but it gives the server version
-manager = next((a for a in agents if a["id"] == "000"), {})
+# Older managers listed themselves with the id 000: it is not an agent
 agents = [a for a in agents if a["id"] != "000"]
+api_version = manager_api("GET", "").get("data", {}).get("api_version", "")
 json.dump({
     "agents": agents,
-    "manager_version": manager.get("version", ""),
+    # Same form as the agent versions, to compare them in the UI
+    "manager_version": f"v{api_version}" if api_version else "",
     # The install script takes the tag of the image, the package versions differ (5.0.0-rc1 is 5.0.0-1)
     "package_version": os.environ.get("WAZUH_MANAGER_IMAGE", "").rpartition(":")[2],
 }, fp=sys.stdout)
