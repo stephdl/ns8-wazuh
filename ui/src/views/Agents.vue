@@ -161,6 +161,9 @@
                     />
                     <NsTextInput
                       v-model.trim="maxUses"
+                      type="number"
+                      min="1"
+                      max="100"
                       :label="$t('agents.max_uses')"
                       placeholder="1"
                       :helper-text="$t('agents.max_uses_helper')"
