@@ -6,6 +6,7 @@
 #
 
 import json
+import os
 import sys
 
 import agent
@@ -34,6 +35,12 @@ for item in response["data"]["affected_items"]:
         "groups": item.get("group") or [],
     })
 
-# The manager itself is listed with the id 000: it is not an agent
+# The manager itself is listed with the id 000: it is not an agent, but it gives the server version
+manager = next((a for a in agents if a["id"] == "000"), {})
 agents = [a for a in agents if a["id"] != "000"]
-json.dump({"agents": agents}, fp=sys.stdout)
+json.dump({
+    "agents": agents,
+    "manager_version": manager.get("version", ""),
+    # The install script takes the tag of the image, the package versions differ (5.0.0-rc1 is 5.0.0-1)
+    "package_version": os.environ.get("WAZUH_MANAGER_IMAGE", "").rpartition(":")[2],
+}, fp=sys.stdout)
