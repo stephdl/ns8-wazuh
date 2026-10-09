@@ -107,14 +107,25 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 - `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
 - `--no-start`: configure the agent without starting it.
 - `--force`: enroll again an agent that already has a key, for example after it was revoked.
+- `--update`: update an enrolled agent to `--version`, without a token.
 
 The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
 
 ### Agent updates
 
-The script installs one package file, it does not add the Wazuh repository. So the agent is not updated with the system packages. This is on purpose: Wazuh 5 is a release candidate, and an agent must not be newer than its server.
+The script installs one package file, it does not add the Wazuh repository. So the agent is not updated with the system packages. This is on purpose: an agent must not be newer than its server, and Wazuh 5 is a release candidate.
 
-The script does not update an installed agent yet. Download the new package and install it with `rpm -U` or `apt-get install`: the agent keeps its key and its settings, no token is needed.
+An agent older than its server keeps working. The Agents page tags it as Outdated, and its menu shows the command to run on it as root:
+
+```
+curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh | sudo bash -s -- --update --version 5.0.0-rc1
+```
+
+`--update` installs the package of the server version and restarts the agent. It keeps the key and the settings, so no token is needed.
+
+### NS8 nodes
+
+An NS8 node is a Linux host like any other: run the same command as root on it. The agent is not shipped as an NS8 module, because it needs root on the host to read the whole journal, the packages and the files, so a module would have to run privileged.
 
 ### Revoke an agent
 
