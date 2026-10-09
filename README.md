@@ -53,7 +53,7 @@ Launch `configure-module` with:
 - `ldap_admin_group`: the group of that domain that gets the administrator role.
 - `ldap_readonly_group`: optional group of that domain that can read alerts and agents without changing anything. Its members can still save their own dashboard views.
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
-- `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
+- `export_url`: HTTPS address that receives the new findings as JSON, every minute. Empty to disable.
 - `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
 - `notify_enabled`: send a summary of the new findings by email every 5 minutes (true/false). Needs at least one recipient.
 - `notify_recipients`: email addresses that receive this summary. They are kept when the emails are disabled.
@@ -182,25 +182,31 @@ The local `admin` account always works, also when the user domain is down. Its p
 
 `get-health` returns the state of the indexer, the number of agents and the expiry date of the agent listener certificate. The Status page shows the same.
 
-## Email notifications
+## Findings export and email notifications
 
-The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Nothing is sent when the emails are disabled or when the cluster has no smarthost. When the smarthost changes, the module applies it at once.
+A timer of the module sends the new findings, every minute to the export address and every 5 minutes by email. It keeps a cursor, the position of the last finding sent, in `state/`. So a stopped pod, an export endpoint down or a slow detector loses nothing: the next run starts after the cursor and catches up. The cursor moves only after a successful delivery, so after a partial failure a finding can be sent twice, never zero times. It waits one minute after a finding before sending it, the time it needs to become searchable.
 
-Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above, grouped by agent, with a count per rule:
+The cursor is not in the backup: a restored module starts from the time of the restore. Turning an output off forgets its cursor, so turning it on again does not send the backlog.
+
+The export posts JSON batches of up to 100 findings:
 
 ```
-12 new findings in the last 5 minutes.
+{"source": "ns8-wazuh", "host": "wazuh.domain.com", "findings": [{"_id": "...", "_index": "...", "_source": {...}}]}
+```
+
+The email goes through the SMTP smarthost of the cluster, set in the cluster settings, with its own TLS settings. Nothing is sent when the emails are disabled or when the cluster has no smarthost. One email lists the findings at the chosen level or above, grouped by agent, with a count per rule:
+
+```
+12 new findings.
 
 r1-node1
   2 x User account kuma13 deleted
   1 x Group deleted - kuma13
 ```
 
-Some events are normal on an NS8 node and stay out of the email: the systemd sessions of the rootless modules (`user@`, `fix-xdg-state@`) and the restarts of `promtail`, `systemd-hostnamed`, `dnf-makecache` and `backup-timers`. They stay in the dashboard. Module users created or deleted and firewall changes are mailed, because installing or removing a module is rare.
+Some events are normal on an NS8 node and stay out of the email: the systemd sessions of the rootless modules (`user@`, `fix-xdg-state@`) and the restarts of `promtail`, `systemd-hostnamed`, `dnf-makecache` and `backup-timers`. They stay in the dashboard and in the export. Module users created or deleted and firewall changes are mailed, because installing or removing a module is rare.
 
 Some smarthosts refuse the default sender `wazuh@` followed by the host name. Set `notify_sender` to an address they accept.
-
-The SMTP password is kept in the keystore of the indexer, never in the module environment. The indexer always checks the TLS certificate of the smarthost, even when the cluster setting disables the check.
 
 ## Host name and certificates
 
