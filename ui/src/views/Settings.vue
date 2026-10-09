@@ -23,13 +23,26 @@
       <cv-column>
         <cv-tile light>
           <cv-form @submit.prevent="configureModule">
+            <NsInlineNotification
+              v-if="!isConfigured && !loading.getConfiguration"
+              kind="info"
+              :title="$t('settings.host_choose_title')"
+              :description="$t('settings.host_choose_description')"
+              :showCloseButton="false"
+              class="maxwidth"
+            />
             <cv-text-input
               :label="$t('settings.wazuh_fqdn')"
               placeholder="wazuh.example.org"
               v-model.trim="host"
               class="mg-bottom"
+              :helper-text="hostHelperText"
               :invalid-message="$t(error.host)"
-              :disabled="loading.getConfiguration || loading.configureModule"
+              :disabled="
+                loading.getConfiguration ||
+                loading.configureModule ||
+                isHostLocked
+              "
               ref="host"
             >
             </cv-text-input>
@@ -285,6 +298,7 @@ export default {
       urlCheckInterval: null,
       host: "",
       configuredHost: "",
+      agentsEnrolled: 0,
       adminPassword: "",
       isAdvancedOpen: false,
       isLetsEncryptEnabled: false,
@@ -338,6 +352,19 @@ export default {
     // The first configuration must choose the password, a later one may keep it
     isConfigured() {
       return this.configuredHost !== "";
+    },
+    isHostLocked() {
+      // null means the API did not answer: lock too, the backend refuses the change anyway
+      return this.isConfigured && this.agentsEnrolled !== 0;
+    },
+    hostHelperText() {
+      if (!this.isConfigured) {
+        return "";
+      }
+      if (this.isHostLocked) {
+        return this.$t("settings.host_locked_helper");
+      }
+      return this.$t("settings.host_bound_helper");
     },
     passwordError() {
       // Same rules as the backend: Wazuh refuses other characters than these ones
@@ -543,6 +570,7 @@ export default {
       const config = taskResult.output;
       this.host = config.host;
       this.configuredHost = config.host;
+      this.agentsEnrolled = config.agents_enrolled;
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isLetsEncryptCurrentlyEnabled = config.lets_encrypt;
       this.configuredLdapDomain =
