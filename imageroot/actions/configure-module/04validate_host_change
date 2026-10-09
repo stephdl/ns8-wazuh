@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Enrolled agents check the host name in the server certificate:
+# changing it would disconnect all of them, so refuse while any agent exists.
+
+import json
+import os
+import sys
+
+import agent
+
+from wazuh_api import count_agents
+
+agent.set_weight(os.path.basename(__file__), 0)
+
+data = json.load(sys.stdin)
+current = os.environ.get("TRAEFIK_HOST", "")
+
+if current and data["host"] != current:
+    agents = count_agents()
+    if agents is None or agents > 0:
+        agent.set_status('validation-failed')
+        error = "cannot_check_agents" if agents is None else "host_locked_by_agents"
+        json.dump([{'field': 'host', 'parameter': 'host', 'value': data["host"], 'error': error}], fp=sys.stdout)
+        sys.exit(4)

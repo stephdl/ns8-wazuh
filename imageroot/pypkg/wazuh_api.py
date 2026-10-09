@@ -101,3 +101,11 @@ def manager_api(method, path, body=None):
         return json.loads(_manager_curl(config))
     except ValueError:
         raise RuntimeError("the Wazuh API did not answer with JSON")
+
+
+def count_agents():
+    """Return the number of enrolled agents, the manager excluded, or None when the API does not answer."""
+    try:
+        return manager_api("GET", "agents/summary/status")["data"]["connection"]["total"]
+    except (RuntimeError, KeyError, TypeError):
+        return None

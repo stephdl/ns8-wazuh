@@ -14,11 +14,14 @@ import sys
 import json
 import agent
 
+from wazuh_api import count_agents
+
 # Prepare return variable
 config = {}
 
 # Read current configuration from the environment file
 config["host"] = os.getenv("TRAEFIK_HOST","")
+config["agents_enrolled"] = count_agents() if config["host"] else 0
 config["ldap_domain"] = os.getenv("LDAP_DOMAIN", "")
 config["ldap_admin_group"] = os.getenv("LDAP_ADMIN_GROUP", "")
 config["ldap_readonly_group"] = os.getenv("LDAP_READONLY_GROUP", "")

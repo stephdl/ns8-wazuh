@@ -12,7 +12,8 @@
             "ldap_readonly_group": "wazuh-readers",
             "index_unclassified_events": false,
             "export_url": "https://logs.example.org/wazuh",
-            "export_token_set": true
+            "export_token_set": true,
+            "agents_enrolled": 3
         }
     ],
     "type": "object",
@@ -24,7 +25,8 @@
         "ldap_readonly_group",
         "index_unclassified_events",
         "export_url",
-        "export_token_set"
+        "export_token_set",
+        "agents_enrolled"
     ],
     "properties": {
         "host": {
@@ -66,6 +68,14 @@
             "type": "boolean",
             "title": "Export token set",
             "description": "True when a bearer token is stored. The token itself is never returned."
+        },
+        "agents_enrolled": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "title": "Enrolled agents",
+            "description": "Number of enrolled agents, null when the Wazuh API does not answer. The host cannot change while it is not zero."
         }
     }
 }
