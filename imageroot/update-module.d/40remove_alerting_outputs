@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+set -e
+exec 1>&2
+
+# Nothing to do on a module that was never configured
+[ -n "${TRAEFIK_HOST:-}" ] || exit 0
+
+runagent remove-alerting-outputs

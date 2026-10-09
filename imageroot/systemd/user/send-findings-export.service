@@ -1,0 +1,14 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Send the new findings to the export endpoint
+
+[Service]
+Type=oneshot
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
+SyslogIdentifier=%N
+ExecStart=runagent send-findings --export

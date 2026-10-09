@@ -9,6 +9,7 @@ set -e
 exec 1>&2
 
 systemctl --user enable wazuh.service
+systemctl --user enable --now send-findings-export.timer send-findings-email.timer
 
 # The other settings are applied through the APIs by the next steps: restart only when
 # the pod is down or a certificate changed, a restart costs about two minutes

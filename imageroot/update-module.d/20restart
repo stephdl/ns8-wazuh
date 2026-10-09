@@ -8,4 +8,5 @@
 set -e
 exec 1>&2
 
+systemctl --user enable --now send-findings-export.timer send-findings-email.timer
 systemctl --user try-restart wazuh.service wazuh-indexer.service wazuh-manager.service wazuh-dashboard.service
