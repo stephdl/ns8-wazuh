@@ -187,7 +187,7 @@
                   <NsTextInput
                     v-if="exportUrl"
                     type="password"
-                    v-model="exportToken"
+                    v-model.trim="exportToken"
                     :label="$t('settings.export_token')"
                     :placeholder="
                       exportTokenSet ? $t('settings.export_token_set') : ''
@@ -800,8 +800,11 @@ export default {
         index_unclassified_events: this.indexUnclassifiedEvents,
         export_url: this.exportUrl,
         notify_enabled: this.notifyEnabled,
-        notify_recipients: [...new Set(this.recipientList)],
-        notify_sender: this.notifySender,
+        // While the emails are off the fields are hidden: keep only what the backend accepts
+        notify_recipients: [
+          ...new Set(this.recipientList.filter((r) => this.isEmail(r))),
+        ],
+        notify_sender: this.isEmail(this.notifySender) ? this.notifySender : "",
         notify_min_level: this.notifyMinLevel,
       };
       // The password is sent only when typed: nothing means keep the current one
