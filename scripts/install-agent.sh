@@ -13,7 +13,11 @@
 #
 # The token is read from the environment, so it does not show in the process list
 # of the script. Options (after "bash -s --"): --token, --token-file, --name,
-# --version, --package-url, --sha256, --no-start, --force, --help.
+# --version, --package-url, --sha256, --no-start, --force, --update, --help.
+#
+# Update an enrolled agent to the version of its server, without a token:
+#
+#   curl -fsSL .../install-agent.sh | sudo bash -s -- --update --version <server version>
 
 set -euo pipefail
 
@@ -30,6 +34,7 @@ PACKAGE_URL=""
 SHA256=""
 START=1
 FORCE=0
+UPDATE=0
 WORKDIR=""
 
 say() { printf '%s\n' "$*" >&2; }
@@ -49,6 +54,7 @@ The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
   --sha256 HASH        Expected SHA-256 of the package, needed to check a deb
   --no-start           Configure the agent but do not start it
   --force              Enroll again even if the agent already has a key
+  --update             Install the package of --version on an enrolled agent, keep its key
   --help               Show this help
 EOF
 }
@@ -63,6 +69,7 @@ while [ $# -gt 0 ]; do
         --sha256) SHA256="${2:?--sha256 needs a value}"; shift 2 ;;
         --no-start) START=0; shift ;;
         --force) FORCE=1; shift ;;
+        --update) UPDATE=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) usage; die "unknown option: $1" ;;
     esac
@@ -77,7 +84,11 @@ trap cleanup EXIT
 
 [ "$(id -u)" -eq 0 ] || die "run it as root, for example with sudo"
 command -v curl >/dev/null 2>&1 || die "curl is required"
-[ -n "${TOKEN}" ] || { usage; die "no enrollment token: set WAZUH_ENROLLMENT_TOKEN"; }
+if [ "${UPDATE}" -eq 1 ]; then
+    [ "${FORCE}" -eq 0 ] || die "--update and --force cannot be used together"
+else
+    [ -n "${TOKEN}" ] || { usage; die "no enrollment token: set WAZUH_ENROLLMENT_TOKEN"; }
+fi
 
 # The agent name goes into the XML configuration
 case "${AGENT_NAME}" in
@@ -106,8 +117,16 @@ else
 fi
 PACKAGE_URL="${PACKAGE_URL:-${default_url}}"
 
+installed_version() {
+    if [ "${family}" = rpm ]; then
+        rpm -q --qf '%{VERSION}-%{RELEASE}' wazuh-agent 2>/dev/null || true
+    else
+        dpkg-query -W -f '${Version}' wazuh-agent 2>/dev/null || true
+    fi
+}
+
 install_package() {
-    if [ -x "${INSTALL_DIR}/bin/wazuh-agentd" ]; then
+    if [ -x "${INSTALL_DIR}/bin/wazuh-agentd" ] && [ "${UPDATE}" -ne 1 ]; then
         say "The agent is already installed, the package is not downloaded again."
         return
     fi
@@ -129,16 +148,40 @@ install_package() {
         rpm --import "${WORKDIR}/wazuh.gpg"
         rpm -K "${file}" 2>&1 | grep -q "digests signatures OK" || die "the signature of the package is not valid"
         say "Signature checked."
+        # Image tags and package versions differ (5.0.0-rc1 is the package 5.0.0-1): compare the package itself
+        if [ "${UPDATE}" -eq 1 ] && [ "$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "${file}" 2>/dev/null)" = "$(installed_version)" ]; then
+            say "The agent already runs this version, nothing to do."
+            exit 0
+        fi
         rpm -U "${file}"
     else
         # The signature of a deb is in the metadata of the repository, which is not public for a pre-release
         if [ -z "${SHA256}" ]; then
             say "Warning: this deb is not checked. It comes from the Wazuh server over HTTPS. Use --sha256 to check it."
         fi
+        if [ "${UPDATE}" -eq 1 ] && [ "$(dpkg-deb -f "${file}" Version 2>/dev/null)" = "$(installed_version)" ]; then
+            say "The agent already runs this version, nothing to do."
+            exit 0
+        fi
         DEBIAN_FRONTEND=noninteractive apt-get install -y "${file}" >&2 \
             || DEBIAN_FRONTEND=noninteractive dpkg -i "${file}" >&2
     fi
 }
+
+if [ "${UPDATE}" -eq 1 ]; then
+    [ -s "${INSTALL_DIR}/etc/client.keys" ] || die "the agent is not enrolled: install it with a token first"
+    before="$(installed_version)"
+    say "Installed version: ${before:-unknown}, wanted: ${VERSION}"
+    install_package
+    # The package keeps ossec.conf and the key, a restart loads the new binaries
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl restart wazuh-agent
+    else
+        "${INSTALL_DIR}/bin/wazuh-control" restart
+    fi
+    say "Updated from ${before:-unknown} to $(installed_version). The agent keeps its key and its settings."
+    exit 0
+fi
 
 install_package
 [ -x "${INSTALL_DIR}/bin/wazuh-agentd" ] || die "the agent is not installed"
