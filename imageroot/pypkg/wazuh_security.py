@@ -13,8 +13,10 @@ LDAP_HOST_FROM_POD = "10.0.2.2"
 # Service accounts must keep using the internal database only
 INTERNAL_USERS = ["admin", "kibanaserver", "wazuh-manager", "wazuh-wui"]
 
-# kibana_read_only hides the dashboard buttons that would save objects
-READONLY_INDEXER_ROLES = ["readall", "kibana_user", "kibana_read_only"]
+# Read access to the data and to the dashboard. Not kibana_read_only: the dashboard puts that
+# role in read-only mode, which keeps only its own Dashboards app and hides the Wazuh app.
+# The Wazuh API readonly role blocks the changes to agents and rules.
+READONLY_INDEXER_ROLES = ["readall", "kibana_user"]
 
 # Names of the Wazuh API rules owned by the module, so they can be found and replaced
 API_RULE_ADMIN = "ns8_ldap_admin"
