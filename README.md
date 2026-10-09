@@ -228,6 +228,12 @@ A restore or a clone on another node gives back the same server: same host name,
 
 ## Test
 
-The Robot tests are in `tests/`. They need a node and the image URL:
+The Robot tests are in `tests/`. They install the module, configure it, install an agent on the same node with the script of this repository, then check the enrollment, the locked host name, `--update`, `renew-certificates`, the revocation and the removal. The node needs Internet access for the agent package.
 
-    ./test-module.sh <node address> ghcr.io/stephdl/wazuh:latest
+    ./test-module.sh <leader address> ghcr.io/stephdl/wazuh:latest
+
+To put the module and the agent on another node of the cluster, give its number and an address the test runner can reach:
+
+    ROBOT_ARGS="-v INSTALL_NODE:2 -v INSTALL_ADDR:<node address>" ./test-module.sh <leader address> <image>
+
+The GitHub workflow runs the same tests on a fresh Rocky Linux 9 and Debian 13 node after each image build.
