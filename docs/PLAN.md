@@ -133,6 +133,17 @@ Known gaps:
 
 ## 8. Open points
 
+**Samba file audit (on hold).** Tested on a node: ns8-samba 3.5.0 logs each audited operation (`create_file`, `unlinkat`, `renameat`, `mkdirat`, `fsetxattr`) with user, source IP, share, result and path, but syslog-ng sends them only to TimescaleDB (`samba-dc/etc/syslog-ng/syslog-ng.conf`, destination `d_sql`), never to journald. So a Wazuh agent cannot see them. A second syslog-ng destination writing to the container output brought them to journald in a manual test, for example:
+
+    smbd_audit: SMB3_11|192.168.13.25|AD\alice|wazuhtest|unlinkat|ok|/srv/shares/wazuhtest/a.txt|||||
+
+Two ways, none done yet:
+- A PR in ns8-samba: an option, off by default, that also writes the audit to journald. The lines hold personal data (who touches which file) and can be very many, so it must stay a choice of the administrator. To discuss with the Samba maintainers first.
+- Without changing Samba: a script on the node, run by the agent `command` wodle every minute, that reads the new rows of the `samba_audit` table. It depends on the internals of ns8-samba (table, port, password).
+
+Once the lines reach Wazuh: a decoder for the `|` separated record, a rule per deletion, and a rule for mass activity by one user.
+
+
 - LDAP and `securityadmin.sh` in practice in the rc1 image. The 5.0 documentation does not cover LDAP.
 - Rootless: uid 101 permissions, `memlock`. `vm.max_map_count` is a host setting that a rootless module cannot change.
 - Consistency of the indexer snapshot and `path.repo`.
