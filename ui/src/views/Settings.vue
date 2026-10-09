@@ -198,6 +198,57 @@
                     :disabled="stillLoading"
                     class="mg-bottom"
                   />
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.notify_title") }}
+                  </h6>
+                  <NsInlineNotification
+                    v-if="!smarthostEnabled"
+                    kind="warning"
+                    :title="$t('settings.smarthost_missing_title')"
+                    :description="$t('settings.smarthost_missing_description')"
+                    :actionLabel="$t('settings.go_to_smarthost')"
+                    @action="goToSmarthost"
+                    :showCloseButton="false"
+                  />
+                  <cv-text-area
+                    v-model.trim="notifyRecipients"
+                    :label="$t('settings.notify_recipients')"
+                    :helper-text="$t('settings.notify_recipients_helper')"
+                    :invalid-message="$t(error.notify_recipients)"
+                    :disabled="stillLoading || !smarthostEnabled"
+                    placeholder="soc@example.org"
+                    class="mg-bottom"
+                    ref="notify_recipients"
+                  >
+                  </cv-text-area>
+                  <template v-if="notifyRecipients">
+                    <NsTextInput
+                      v-model.trim="notifySender"
+                      :label="$t('settings.notify_sender')"
+                      :placeholder="
+                        host ? 'wazuh@' + host : 'wazuh@example.org'
+                      "
+                      :helper-text="$t('settings.notify_sender_helper')"
+                      :invalid-message="$t(error.notify_sender)"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      class="mg-bottom"
+                      ref="notify_sender"
+                    />
+                    <cv-dropdown
+                      v-model="notifyMinLevel"
+                      :label="$t('settings.notify_min_level')"
+                      :helper-text="$t('settings.notify_min_level_helper')"
+                      :disabled="stillLoading || !smarthostEnabled"
+                      class="mg-bottom"
+                    >
+                      <cv-dropdown-item
+                        v-for="level in notifyLevels"
+                        :key="level"
+                        :value="level"
+                        >{{ $t("settings.level_" + level) }}</cv-dropdown-item
+                      >
+                    </cv-dropdown>
+                  </template>
                 </template>
               </cv-accordion-item>
             </cv-accordion>
@@ -312,6 +363,11 @@ export default {
       domains: [],
       indexUnclassifiedEvents: false,
       exportUrl: "",
+      notifyRecipients: "",
+      notifySender: "",
+      notifyMinLevel: "medium",
+      notifyLevels: ["low", "medium", "high", "critical"],
+      smarthostEnabled: true,
       exportToken: "",
       exportTokenSet: false,
       loading: {
@@ -326,6 +382,8 @@ export default {
         ldap_admin_group: "",
         ldap_readonly_group: "",
         export_url: "",
+        notify_recipients: "",
+        notify_sender: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -399,10 +457,16 @@ export default {
       if (this.isDomainChosen && !this.ldapAdminGroup) {
         missing.push(this.$t("settings.ldap_admin_group"));
       }
+      if (this.recipientList.some((r) => !this.isEmail(r))) {
+        missing.push(this.$t("settings.notify_recipients"));
+      }
       if (this.exportUrl && !this.exportUrl.startsWith("https://")) {
         missing.push(this.$t("settings.export_url"));
       }
       return missing;
+    },
+    recipientList() {
+      return this.notifyRecipients.split(/[\s,;]+/).filter((r) => r !== "");
     },
     isFormValid() {
       return this.missingFields.length === 0;
@@ -424,6 +488,12 @@ export default {
     next();
   },
   methods: {
+    isEmail(value) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    },
+    goToSmarthost() {
+      this.core.$router.push("/settings/smarthost");
+    },
     async listUserDomains() {
       this.loading.listUserDomains = true;
       this.error.listUserDomains = "";
@@ -580,12 +650,18 @@ export default {
       this.ldapReadonlyGroup = config.ldap_readonly_group || "";
       this.indexUnclassifiedEvents = config.index_unclassified_events;
       this.exportUrl = config.export_url;
+      this.notifyRecipients = config.notify_recipients.join("\n");
+      this.notifySender = config.notify_sender;
+      this.notifyMinLevel = config.notify_min_level;
+      this.smarthostEnabled = config.smarthost_enabled;
       this.exportTokenSet = config.export_token_set;
       this.exportToken = "";
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
-        config.index_unclassified_events || config.export_url !== "";
+        config.index_unclassified_events ||
+        config.export_url !== "" ||
+        config.notify_recipients.length > 0;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -612,6 +688,20 @@ export default {
         this.error.ldap_admin_group = "common.required";
         if (isValidationOk) {
           this.focusElement("ldap_admin_group");
+        }
+        isValidationOk = false;
+      }
+      if (this.recipientList.some((r) => !this.isEmail(r))) {
+        this.error.notify_recipients = "settings.notify_recipients_invalid";
+        if (isValidationOk) {
+          this.focusElement("notify_recipients");
+        }
+        isValidationOk = false;
+      }
+      if (this.notifySender && !this.isEmail(this.notifySender)) {
+        this.error.notify_sender = "settings.notify_sender_invalid";
+        if (isValidationOk) {
+          this.focusElement("notify_sender");
         }
         isValidationOk = false;
       }
@@ -682,6 +772,9 @@ export default {
           this.ldapDomain === "-" ? "" : this.ldapReadonlyGroup,
         index_unclassified_events: this.indexUnclassifiedEvents,
         export_url: this.exportUrl,
+        notify_recipients: [...new Set(this.recipientList)],
+        notify_sender: this.recipientList.length ? this.notifySender : "",
+        notify_min_level: this.notifyMinLevel,
       };
       // The password is sent only when typed: nothing means keep the current one
       if (this.adminPassword) {

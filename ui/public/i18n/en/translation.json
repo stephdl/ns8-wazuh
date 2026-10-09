@@ -81,7 +81,23 @@
     "to_save": "To save, complete",
     "password_length": "The password must have 12 to 64 characters",
     "password_characters": "Only A-Z a-z 0-9 and . , _ + : @ % ^ = ~ - are accepted",
-    "password_classes": "The password needs an uppercase letter, a lowercase letter, a digit and a symbol among . , _ + : @ % ^ = ~ -"
+    "password_classes": "The password needs an uppercase letter, a lowercase letter, a digit and a symbol among . , _ + : @ % ^ = ~ -",
+    "notify_title": "Email notifications",
+    "smarthost_missing_title": "No SMTP smarthost",
+    "smarthost_missing_description": "Configure the smarthost in the cluster settings to send emails.",
+    "go_to_smarthost": "Go to smarthost",
+    "notify_recipients": "Email recipients",
+    "notify_recipients_helper": "One address per line. A summary of the new findings is sent every 5 minutes. Empty to disable.",
+    "notify_recipients_invalid": "Each line must be a valid email address",
+    "notify_sender": "Sender address",
+    "notify_sender_helper": "Leave empty to use the default. Change it if the smarthost refuses this sender.",
+    "notify_sender_invalid": "Must be a valid email address",
+    "notify_min_level": "Minimum level",
+    "notify_min_level_helper": "Only the findings at this level or above are sent",
+    "level_low": "Low",
+    "level_medium": "Medium",
+    "level_high": "High",
+    "level_critical": "Critical"
   },
   "about": {
     "title": "About"
@@ -158,7 +174,7 @@
     "linux_command": "On a Debian or Red Hat family Linux, run as root:",
     "linux_hint": "The script installs the agent package, checks its signature, enrolls the agent and starts it.",
     "other_systems_title": "Windows and macOS",
-    "other_systems": "The script does not cover them. Install the agent from the Wazuh documentation, then enroll it with this token.",
+    "other_systems": "The script covers Linux only. Install the Wazuh 5 agent from the Wazuh documentation, then enroll it with this token: it carries the server address and the certificate authority, so no other certificate is needed.",
     "tabs": "Agent pages",
     "tab_list": "Agents",
     "tab_enrollment": "Enrollment",
@@ -170,6 +186,8 @@
     "requirement_dns": "The server to watch must resolve the public host name of this Wazuh server.",
     "requirement_ports": "It must reach this server on TCP ports 1514, 1515 and 1517. The installer already opened them here.",
     "requirement_os": "The script supports Debian, Ubuntu, Rocky Linux, AlmaLinux and RHEL, on x86_64 and aarch64.",
-    "requirement_logs": "The agent reads the system journal (journald) by default."
+    "requirement_logs": "The agent reads the system journal (journald) by default.",
+    "script_doc": "Script options and manual install",
+    "other_systems_doc": "Wazuh agent documentation"
   }
 }

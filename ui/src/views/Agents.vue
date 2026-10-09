@@ -135,6 +135,12 @@
                     <li>{{ $t("agents.requirement_os") }}</li>
                     <li>{{ $t("agents.requirement_logs") }}</li>
                   </ul>
+                  <NsButton
+                    kind="ghost"
+                    :icon="Launch20"
+                    @click="openUrl(readmeUrl)"
+                    >{{ $t("agents.script_doc") }}</NsButton
+                  >
                 </cv-tile>
               </cv-column>
             </cv-row>
@@ -231,6 +237,8 @@
                     kind="info"
                     :title="$t('agents.other_systems_title')"
                     :description="$t('agents.other_systems')"
+                    :actionLabel="$t('agents.other_systems_doc')"
+                    @action="openUrl(wazuhAgentDocUrl)"
                     :showCloseButton="false"
                   />
                 </cv-tile>
@@ -304,6 +312,10 @@ export default {
         "last_keep_alive",
       ],
       maxUses: "1",
+      readmeUrl:
+        "https://github.com/stephdl/ns8-wazuh/blob/main/README.md#add-an-agent",
+      wazuhAgentDocUrl:
+        "https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html",
       description: "",
       result: null,
       isShownRevokeModal: false,
@@ -347,6 +359,9 @@ export default {
     next();
   },
   methods: {
+    openUrl(url) {
+      window.open(url, "_blank", "noopener");
+    },
     statusKind(status) {
       if (status === "active") {
         return "green";
