@@ -6,11 +6,33 @@ It is meant to run on its own node, outside the clusters it watches. Wazuh agent
 
 The module is not ready for production: it targets Wazuh `5.0.0-rc1`. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
+## How it works
+
+```
+ Watched servers                          NS8 node running this module
+ ┌──────────────────────┐                 ┌──────────────────────────────────────┐
+ │ journald, files      │  1514 events    │ manager  ── decoders, rules ──┐      │
+ │        ▼             │ ──────────────▶ │   ▲ API 55000 (pod only)      ▼      │
+ │ wazuh-agent (deb/rpm)│  1517 enroll    │   └────── dashboard ◀──── indexer   │
+ └──────────────────────┘                 └───────────────┬──────────────────────┘
+                                                          │ Traefik, HTTPS
+                                                          ▼
+                                              Wazuh dashboard, LDAP login
+```
+
+The agent is a service installed on each watched server. It reads the system journal and the files it is told to, watches file changes (FIM), lists packages and checks the configuration (SCA). It sends everything over an encrypted channel to the manager.
+
+The manager decodes each line into fields (user, source IP, URL...) and stores it as an event in the indexer. Rules run on these events: when one matches, the indexer stores a finding, which is the alert. The dashboard shows events, findings, agents and their inventory. The module can mail the new findings or post them to an HTTPS endpoint.
+
+The agent always connects to the server, never the opposite: only the inbound ports of the Wazuh node must be open.
+
 ## What runs
 
 One rootless pod with three containers: the Wazuh manager (agents, API), the indexer (data) and the dashboard (web interface). Traefik publishes the dashboard over HTTPS, always. The agents connect to the ports 1514, 1515 and 1517 of the node, which the module opens in the firewall. For this reason only one instance can run on a node.
 
-The node needs `vm.max_map_count=262144`, at least 6 GB of RAM (the indexer alone takes a 2 GB heap, about 3 GB in total) and 50 GB of disk.
+The node needs at least 6 GB of RAM (the indexer alone takes a 2 GB heap, about 3 GB in total) and 50 GB of disk. With the default `vm.max_map_count` of Rocky Linux (65530), the indexer reads its files without memory mapping: it works, a bit slower. `vm.max_map_count=262144` on the node is better.
+
+Saving the settings does not restart the containers, unless the host name changed or a service is down.
 
 ## Install
 
@@ -22,9 +44,10 @@ The output of the command returns the instance name, for example `wazuh1`.
 
 Launch `configure-module` with:
 
-- `host`: the public host name. It is the name of the dashboard and the address the agents connect to.
+- `host`: the public host name. It is the name of the dashboard and the address the agents connect to. It cannot change while agents are enrolled.
+- `admin_password`: password of the local `admin` account of the dashboard. Required the first time, then optional: it changes at once, nothing restarts. 12 to 64 characters with an uppercase letter, a lowercase letter, a digit and a symbol among `. , _ + : @ % ^ = ~ -`.
 - `lets_encrypt`: request a Let's Encrypt certificate for the dashboard (true/false). The agent ports always use the internal certificate authority.
-- `ldap_domain`: the user domain whose users can log in to the dashboard. Empty to disable.
+- `ldap_domain`: the user domain (OpenLDAP or Samba AD) whose users can log in to the dashboard. Empty to disable. The local `admin` account always works.
 - `ldap_admin_group`: the group of that domain that gets the administrator role.
 - `ldap_readonly_group`: optional group of that domain that can read alerts and agents without changing anything.
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
@@ -44,8 +67,14 @@ api-cli run module/wazuh1/configure-module --data - <<EOF
   "lets_encrypt": true,
   "ldap_domain": "domain.com",
   "ldap_admin_group": "wazuh-admins",
+  "ldap_readonly_group": "wazuh-readers",
+  "admin_password": "Change.Me-2026",
   "index_unclassified_events": false,
-  "export_url": ""
+  "export_url": "",
+  "notify_enabled": true,
+  "notify_recipients": ["soc@domain.com"],
+  "notify_sender": "",
+  "notify_min_level": "medium"
 }
 EOF
 ```
@@ -70,7 +99,7 @@ On Debian, Ubuntu, Rocky Linux, AlmaLinux or RHEL (x86_64 or aarch64), run as ro
 curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh | sudo WAZUH_ENROLLMENT_TOKEN='<token>' bash
 ```
 
-The script installs the Wazuh 5 agent package, checks that port 1517 of the server answers, writes the server address, enrolls the agent and starts it. Pass options after `bash -s --`:
+The script installs the Wazuh 5 agent package, checks that port 1517 of the server answers, writes the server address, enrolls the agent and starts it. The agent reads the system journal by default. Pass options after `bash -s --`:
 
 - `--token-file FILE`: read the token from a file instead of the environment.
 - `--name NAME`: agent name, the host name by default.
@@ -81,9 +110,40 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 
 The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
 
+### Agent updates
+
+The script installs one package file, it does not add the Wazuh repository. So the agent is not updated with the system packages. This is on purpose: Wazuh 5 is a release candidate, and an agent must not be newer than its server.
+
+The script does not update an installed agent yet. Download the new package and install it with `rpm -U` or `apt-get install`: the agent keeps its key and its settings, no token is needed.
+
+### Revoke an agent
+
+On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection. To bring it back, create a token and run the script again with `--force`.
+
 ### Windows and macOS
 
 The script covers Linux only. Install the Wazuh 5 agent following the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token. The token carries the server address and the certificate authority, so no other certificate is needed.
+
+## Detection content
+
+Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node needs Internet access. They cover common Linux services (sshd, sudo, auditd, systemd...), but not the NS8 applications. The module adds its own content, in `imageroot/content/`:
+
+| Source | Decoded fields |
+|---|---|
+| Dovecot login, success and failure | user, source IP |
+| NS8 API server login, success and failure | user, source IP |
+| Traefik access log | source IP, method, path, status |
+| CrowdSec alerts | scenario, source IP |
+
+Two rules raise findings: `NS8 authentication failure` (level low) and `NS8 CrowdSec scenario triggered` (level medium). The module loads them at each configuration and update, through the Content Manager API, and runs the rules every minute.
+
+To watch something specific:
+
+- A log that already reaches the server: add a decoder to extract its fields, then a rule on these fields, in `imageroot/content/`. The test tool of the Content Manager checks a sample line before the content is promoted.
+- A log the agent does not read yet: add a `<localfile>` block in `/var/ossec/etc/ossec.conf` on the agent, then restart it. For a journald unit, filter on its name.
+- A file or directory to watch for changes: add it to the `<syscheck>` block (FIM) of the agent.
+
+The logs that no decoder recognizes are dropped, unless `index_unclassified_events` is true.
 
 ## Health
 
@@ -111,7 +171,9 @@ Let's Encrypt, when enabled, only covers the dashboard behind Traefik.
 
 ## Backup
 
-The module is backed up by the NS8 backup. Before each backup the indexer writes a snapshot of the user data (events, findings, dashboards). The detection content comes back by itself from the Wazuh CTI at start and from this module. Restoring a module also restores the snapshot.
+The module is backed up by the NS8 backup. Before each backup the indexer writes a snapshot of the user data (events, findings, dashboards). The backup also holds the settings, the certificate authority, the agent keys and the API configuration. It leaves out the vulnerability feed of the manager, about 7 GB, which is downloaded again. The detection content comes back by itself from the Wazuh CTI at start and from this module.
+
+A restore or a clone on another node gives back the same server: same host name, same certificate authority, same agents and history. To move the server, restore it on the new node, then point the DNS record of the host name to it: the agents reconnect by themselves, without a new token. Only one instance can run on a node.
 
 ## Uninstall
 
