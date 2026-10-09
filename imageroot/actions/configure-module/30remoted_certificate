@@ -9,9 +9,9 @@ set -e
 exec 1>&2
 
 # The manager does not start without the agent listener certificate, issued for the public host name.
-# A new certificate needs a restart: leave a mark for 80start_services instead of restarting here.
-before=$(sha256sum certs/remoted.pem 2>/dev/null || true)
+# Any new certificate needs a restart: leave a mark for 80start_services instead of restarting here.
+before=$(cat certs/*.pem 2>/dev/null | sha256sum)
 REMOTED_HOST=$(jq -r .host) "${AGENT_INSTALL_DIR}/bin/renew-certs"
-if [[ "$(sha256sum certs/remoted.pem 2>/dev/null)" != "${before}" ]]; then
+if [[ "$(cat certs/*.pem 2>/dev/null | sha256sum)" != "${before}" ]]; then
     touch restart-needed
 fi
