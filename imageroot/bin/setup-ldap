@@ -58,14 +58,19 @@ for _ in range(24):
 else:
     agent.assert_exp(False, "the Wazuh API is not ready")
 
-# Rebuild the module rules each time: the groups may have changed or been removed
+# Replace the module rules only when they differ: deleting them leaves the LDAP users without API rights
 wanted = wazuh_security.build_api_rules(admin_group, readonly_group)
-owned = [rule["id"] for rule in api_items("security/rules?limit=500")
-         if rule["name"] in (wazuh_security.API_RULE_ADMIN, wazuh_security.API_RULE_READONLY)]
-if owned:
-    manager_api("DELETE", "security/rules?rule_ids=" + ",".join(str(rule_id) for rule_id in owned))
-for name, (role, rule) in wanted.items():
-    created = manager_api("POST", "security/rules", {"name": name, "rule": rule})
-    rule_id = created["data"]["affected_items"][0]["id"]
-    linked = manager_api("POST", f"security/roles/{roles[role]}/rules?rule_ids={rule_id}")
-    agent.assert_exp(linked["data"]["total_affected_items"] == 1, f"cannot link {name} to the {role} role")
+current = {rule["name"]: rule for rule in api_items("security/rules?limit=500")
+           if rule["name"] in (wazuh_security.API_RULE_ADMIN, wazuh_security.API_RULE_READONLY)}
+for name in set(wanted) | set(current):
+    role, rule = wanted.get(name, (None, None))
+    old = current.get(name)
+    if old and role and old["rule"] == rule and old.get("roles") == [roles[role]]:
+        continue
+    if old:
+        manager_api("DELETE", f"security/rules?rule_ids={old['id']}")
+    if role:
+        created = manager_api("POST", "security/rules", {"name": name, "rule": rule})
+        rule_id = created["data"]["affected_items"][0]["id"]
+        linked = manager_api("POST", f"security/roles/{roles[role]}/rules?rule_ids={rule_id}")
+        agent.assert_exp(linked["data"]["total_affected_items"] == 1, f"cannot link {name} to the {role} role")
