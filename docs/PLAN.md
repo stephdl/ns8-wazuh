@@ -113,7 +113,7 @@ Modules to watch first: mail, samba, openldap, nextcloud, traefik, crowdsec and 
 - [x] **Phase 3, LDAP** (written, tested with a fake domain): OpenLDAP and Samba AD, admin group, change events.
 - [x] **Phase 4, agents** (one agent enrolled): `get-enrollment-token`, first enrolled agent, journald received.
 - [x] **Phase 5, detection** (first rules and decoders, tested with sample lines): NS8 decoders and rules through the Content Manager API, minimal rule set, Samba retest.
-- [x] **Phase 6, export and health** (webhook and health tested): webhook, module health alerts.
+- [x] **Phase 6, export and health**: webhook, email summary through the cluster smarthost, module health.
 - [x] **Phase 7, backup** (snapshot dump and restore tested): dump, restore, clone, agents reconnecting.
 - [x] **Phase 8, UI** (checked in a browser): Status, Settings, Agents.
 - [x] **Phase 9, tests and finish** (Robot tests not run yet): Robot tests, `renovate.json`, README, `org.nethserver.images`.

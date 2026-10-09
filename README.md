@@ -30,6 +30,9 @@ Launch `configure-module` with:
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
 - `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
 - `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
+- `notify_recipients`: email addresses that receive a summary of the new findings every 5 minutes. Empty to disable.
+- `notify_sender`: sender address of these emails. Empty means `wazuh@` followed by the host name.
+- `notify_min_level`: only the findings at this level or above are mailed: `low`, `medium` (default), `high` or `critical`.
 
 Example:
 
@@ -58,9 +61,38 @@ api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"descriptio
 
 The same is available on the Agents page of the module. The token holds the server address and the certificate authority, so the agent needs no other setting.
 
+### Linux
+
+On Debian, Ubuntu, Rocky Linux, AlmaLinux or RHEL (x86_64 or aarch64), run as root:
+
+```
+curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh | sudo WAZUH_ENROLLMENT_TOKEN='<token>' bash
+```
+
+The script installs the Wazuh 5 agent package, checks that port 1517 of the server answers, writes the server address, enrolls the agent and starts it. Pass options after `bash -s --`:
+
+- `--token-file FILE`: read the token from a file instead of the environment.
+- `--name NAME`: agent name, the host name by default.
+- `--version VERSION`, `--package-url URL`: install another agent package.
+- `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
+- `--no-start`: configure the agent without starting it.
+- `--force`: enroll again an agent that already has a key, for example after it was revoked.
+
+The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
+
+### Windows and macOS
+
+The script covers Linux only. Install the Wazuh 5 agent following the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token. The token carries the server address and the certificate authority, so no other certificate is needed.
+
 ## Health
 
 `get-health` returns the state of the indexer, the number of agents and the expiry date of the agent listener certificate. The Status page shows the same.
+
+## Email notifications
+
+The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Without a smarthost or without recipients, nothing is sent. Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above. When the smarthost changes, the module applies it at once.
+
+The SMTP password is kept in the keystore of the indexer, never in the module environment. The indexer always checks the TLS certificate of the smarthost, even when the cluster setting disables the check.
 
 ## Host name and certificates
 
