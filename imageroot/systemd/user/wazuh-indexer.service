@@ -46,6 +46,9 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-indexer.pid \
     --health-interval=30s \
     --health-timeout=10s \
     ${WAZUH_INDEXER_IMAGE}
+# /snapshots is not in the image: Podman gives the mounted volume back to root,
+# so the owner can only be fixed once the container runs
+ExecStartPost=/usr/bin/podman exec wazuh-indexer chown 101:101 /snapshots
 ExecStartPost=/bin/bash -c 'while ! podman healthcheck run wazuh-indexer ; do sleep 5 ; done ; exit 0'
 # The SMTP credentials live in the keystore of the container, lost each time it is created
 ExecStartPost=-runagent provision-notifications --secrets-only

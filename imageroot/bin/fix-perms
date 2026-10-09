@@ -16,6 +16,5 @@ exec 1>&2
 cd "${AGENT_STATE_DIR}"
 chmod 0644 certs/*.pem
 
-# A volume lives outside the module directory, so it can belong to uid 101, which writes the snapshots
+# The snapshots volume belongs to uid 101: wazuh-indexer.service fixes it once the container runs
 podman volume exists wazuh-snapshots || podman volume create wazuh-snapshots
-podman unshare chown 101:101 "$(podman volume inspect wazuh-snapshots --format '{{.Mountpoint}}')"
