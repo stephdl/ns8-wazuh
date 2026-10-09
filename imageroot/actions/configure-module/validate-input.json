@@ -65,7 +65,8 @@
         "export_token": {
             "type": "string",
             "title": "Export token",
-            "description": "Optional bearer token sent to the export URL. Omit to keep the current one, send an empty string to remove it."
+            "description": "Optional bearer token sent to the export URL, without spaces or line breaks. Omit to keep the current one, send an empty string to remove it.",
+            "pattern": "^[^\\s]*$"
         },
         "admin_password": {
             "type": "string",
