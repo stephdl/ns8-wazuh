@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Send the new findings by email through the cluster smarthost.
+# It creates an SMTP sender, a recipient group, an email channel and an Alerting monitor
+# that mails a summary every 5 minutes. Without smarthost or recipients, all of them are removed.
+#
+# The SMTP credentials cannot go through the API: they live in the indexer keystore, which sits
+# inside the container and is lost when it is created again. So the indexer unit calls this script
+# with --secrets-only after each start.
+
+import os
+import sys
+
+import agent
+
+from wazuh_api import api
+from wazuh_securityadmin import podman_exec
+
+NAME = "ns8-email"
+ACCOUNT = "ns8-smtp"
+GROUP = "ns8-recipients"
+KEYSTORE = "/usr/share/wazuh-indexer/bin/opensearch-keystore"
+KEY_PREFIX = f"opensearch.notifications.core.email.{ACCOUNT}"
+LEVELS = ["informational", "low", "medium", "high", "critical"]
+INTERVAL = 5
+
+host = os.environ.get("TRAEFIK_HOST", "")
+recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
+sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
+min_level = os.environ.get("NOTIFY_MIN_LEVEL", "medium")
+secrets_only = "--secrets-only" in sys.argv[1:]
+
+# The replica, so the indexer still starts when the leader is unreachable
+smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
+enabled = smtp["enabled"] and bool(smtp["host"]) and bool(recipients) and bool(host)
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def keystore(args, value=None):
+    # Values go through stdin only: never on a command line
+    proc = podman_exec(["env", "OPENSEARCH_PATH_CONF=/usr/share/wazuh-indexer/config", KEYSTORE] + args, value)
+    if proc.returncode != 0:
+        raise SystemExit(f"keystore {args[0]} failed: {proc.stderr.strip()[-300:]}")
+    return proc.stdout
+
+
+def write_secrets():
+    names = keystore(["list"]).split()
+    for field in ("username", "password"):
+        key = f"{KEY_PREFIX}.{field}"
+        if enabled and smtp["username"]:
+            keystore(["add", "--stdin", "--force", key], smtp[field] + "\n")
+        elif key in names:
+            keystore(["remove", key])
+    answer = api("POST", "_nodes/reload_secure_settings")
+    if answer.get("_nodes", {}).get("failed"):
+        raise SystemExit(f"reload_secure_settings: {answer}")
+
+
+def find_config(config_type, name):
+    answer = api("GET", f"_plugins/_notifications/configs?config_type={config_type}&max_items=100")
+    for config in answer.get("config_list", []):
+        if config["config"]["name"] == name:
+            return config["config_id"]
+    return None
+
+
+def save_config(config_id, body):
+    if config_id:
+        answer = api("PUT", f"_plugins/_notifications/configs/{config_id}", {"config": body})
+    else:
+        answer = api("POST", "_plugins/_notifications/configs", {"config": body})
+        config_id = answer.get("config_id")
+    if not config_id:
+        raise SystemExit(f"{body['name']}: {answer}")
+    return config_id
+
+
+def find_monitors():
+    # The search by name does not match on this version, so list them all and filter here
+    answer = api("POST", "_plugins/_alerting/monitors/_search", {"size": 500, "query": {"match_all": {}}})
+    return [hit["_id"] for hit in answer.get("hits", {}).get("hits", []) if hit["_source"].get("name") == NAME]
+
+
+write_secrets()
+if secrets_only:
+    sys.exit(0)
+
+monitor_ids = find_monitors()
+channel_id = find_config("email", NAME)
+group_id = find_config("email_group", GROUP)
+account_id = find_config("smtp_account", ACCOUNT)
+
+if not enabled:
+    for old_id in monitor_ids:
+        api("DELETE", f"_plugins/_alerting/monitors/{old_id}")
+    for old_id in (channel_id, group_id, account_id):
+        if old_id:
+            api("DELETE", f"_plugins/_notifications/configs/{old_id}")
+    log("email notifications disabled")
+    sys.exit(0)
+
+if not smtp["tls_verify"]:
+    log("the smarthost asks to skip the TLS check, the indexer always checks it")
+
+method = {"starttls": "start_tls", "tls": "ssl"}.get(smtp["encrypt_smtp"], "none")
+account_id = save_config(account_id, {
+    "name": ACCOUNT,
+    "description": "Cluster smarthost",
+    "config_type": "smtp_account",
+    "is_enabled": True,
+    "smtp_account": {"host": smtp["host"], "port": smtp["port"], "method": method, "from_address": sender},
+})
+group_id = save_config(group_id, {
+    "name": GROUP,
+    "description": "Recipients of the Wazuh findings",
+    "config_type": "email_group",
+    "is_enabled": True,
+    "email_group": {"recipient_list": [{"recipient": r} for r in recipients]},
+})
+channel_id = save_config(channel_id, {
+    "name": NAME,
+    "description": "Findings sent by email",
+    "config_type": "email",
+    "is_enabled": True,
+    "email": {"email_account_id": account_id, "recipient_list": [], "email_group_id_list": [group_id]},
+})
+log("email channel ok")
+
+levels = LEVELS[LEVELS.index(min_level):] if min_level in LEVELS else LEVELS[2:]
+body = ("{{ctx.results.0.hits.total.value}} new findings in the last " + str(INTERVAL) + " minutes.\n\n"
+        "{{#ctx.results.0.hits.hits}}"
+        "- {{_source.@timestamp}} [{{_source.wazuh.rule.level}}] {{_source.wazuh.rule.title}}"
+        " on {{_source.wazuh.agent.name}}\n"
+        "{{/ctx.results.0.hits.hits}}\n"
+        f"Open the dashboard: https://{host}/\n")
+monitor = {
+    "type": "monitor",
+    "name": NAME,
+    "monitor_type": "query_level_monitor",
+    "enabled": True,
+    "schedule": {"period": {"interval": INTERVAL, "unit": "MINUTES"}},
+    "inputs": [{"search": {
+        "indices": ["wazuh-findings-v5-*"],
+        "query": {"size": 50, "sort": [{"@timestamp": "desc"}], "query": {"bool": {"filter": [
+            {"range": {"@timestamp": {"gt": "{{period_end}}||-" + str(INTERVAL) + "m", "lte": "{{period_end}}", "format": "epoch_millis"}}},
+            {"terms": {"wazuh.rule.level": levels}}]}}},
+    }}],
+    "triggers": [{"query_level_trigger": {
+        "name": "new findings",
+        "severity": "1",
+        "condition": {"script": {"source": "ctx.results[0].hits.total.value > 0", "lang": "painless"}},
+        "actions": [{
+            "name": NAME,
+            "destination_id": channel_id,
+            "subject_template": {"source": "Wazuh: {{ctx.results.0.hits.total.value}} new findings on " + host, "lang": "mustache"},
+            "message_template": {"source": body, "lang": "mustache"},
+            "throttle_enabled": False,
+        }],
+    }}],
+}
+if monitor_ids:
+    answer = api("PUT", f"_plugins/_alerting/monitors/{monitor_ids[0]}", monitor)
+else:
+    answer = api("POST", "_plugins/_alerting/monitors", monitor)
+if "_id" not in answer:
+    raise SystemExit(f"monitor: {answer}")
+log(f"email monitor ok, levels {','.join(levels)}, {len(recipients)} recipients")

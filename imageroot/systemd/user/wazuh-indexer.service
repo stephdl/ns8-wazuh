@@ -47,6 +47,8 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-indexer.pid \
     --health-timeout=10s \
     ${WAZUH_INDEXER_IMAGE}
 ExecStartPost=/bin/bash -c 'while ! podman healthcheck run wazuh-indexer ; do sleep 5 ; done ; exit 0'
+# The SMTP credentials live in the keystore of the container, lost each time it is created
+ExecStartPost=-runagent provision-notifications --secrets-only
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-indexer.ctr-id -t 60
 ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-indexer.ctr-id
 PIDFile=%t/wazuh-indexer.pid
