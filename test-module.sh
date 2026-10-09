@@ -21,7 +21,7 @@ podman run -i \
     pip install -r /home/pwuser/ns8-module/tests/pythonreq.txt
     mkdir ~/outputs
     cd /home/pwuser/ns8-module
-    robot -v NODE_ADDR:${LEADER_NODE} \
+    robot -v NODE_ADDR:${LEADER_NODE} ${ROBOT_ARGS:-} \
         -v IMAGE_URL:${IMAGE_URL} \
         -v SSH_KEYFILE:/home/pwuser/ns8-key \
 	-d ~/outputs /home/pwuser/ns8-module/tests/
