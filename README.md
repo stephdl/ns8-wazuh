@@ -6,6 +6,8 @@ It is meant to run on its own node, outside the clusters it watches. Wazuh agent
 
 The module is not ready for production: it targets Wazuh `5.0.0-rc1`. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
+The work happens on the `docs-plan` branch until it is merged. Until then, replace `main` with `docs-plan` in the script address below.
+
 ## How it works
 
 ```
@@ -49,7 +51,7 @@ Launch `configure-module` with:
 - `lets_encrypt`: request a Let's Encrypt certificate for the dashboard (true/false). The agent ports always use the internal certificate authority.
 - `ldap_domain`: the user domain (OpenLDAP or Samba AD) whose users can log in to the dashboard. Empty to disable. The local `admin` account always works.
 - `ldap_admin_group`: the group of that domain that gets the administrator role.
-- `ldap_readonly_group`: optional group of that domain that can read alerts and agents without changing anything.
+- `ldap_readonly_group`: optional group of that domain that can read alerts and agents without changing anything. Its members can still save their own dashboard views.
 - `index_unclassified_events`: also keep the logs that no decoder recognizes (true/false).
 - `export_url`: HTTPS address that receives the new findings as JSON. Empty to disable.
 - `export_token`: optional bearer token sent to the export address. It is stored in a secret file.
@@ -131,6 +133,15 @@ An NS8 node is a Linux host like any other: run the same command as root on it. 
 
 On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection. To bring it back, create a token and run the script again with `--force`.
 
+The same with the API:
+
+```
+api-cli run module/wazuh1/list-agents
+api-cli run module/wazuh1/remove-agent --data '{"id":"001"}'
+```
+
+`list-agents` also returns the server version, used by the Agents page to tag the outdated agents.
+
 ### Windows and macOS
 
 The script covers Linux only. Install the Wazuh 5 agent following the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token. The token carries the server address and the certificate authority, so no other certificate is needed.
@@ -156,13 +167,38 @@ To watch something specific:
 
 The logs that no decoder recognizes are dropped, unless `index_unclassified_events` is true.
 
+## LDAP login
+
+The user domain is optional. When it is set, the indexer checks the logins against it through the NS8 LDAP proxy, and the module gives the same rights on the indexer and on the Wazuh API, which the dashboard calls on behalf of the user:
+
+| Group | Indexer | Wazuh API |
+|---|---|---|
+| `ldap_admin_group` | `all_access` | `administrator` |
+| `ldap_readonly_group` | `readall`, `kibana_user` | `readonly` |
+
+The local `admin` account always works, also when the user domain is down. Its password is changed from the Settings page, without restart.
+
 ## Health
 
 `get-health` returns the state of the indexer, the number of agents and the expiry date of the agent listener certificate. The Status page shows the same.
 
 ## Email notifications
 
-The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Nothing is sent when the emails are disabled or when the cluster has no smarthost. Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above. When the smarthost changes, the module applies it at once.
+The module sends the new findings by email through the SMTP smarthost of the cluster, set in the cluster settings. Nothing is sent when the emails are disabled or when the cluster has no smarthost. When the smarthost changes, the module applies it at once.
+
+Every 5 minutes, one email lists the findings of the last 5 minutes at the chosen level or above, grouped by agent, with a count per rule:
+
+```
+12 new findings in the last 5 minutes.
+
+r1-node1
+  2 x User account kuma13 deleted
+  1 x Group deleted - kuma13
+```
+
+Some events are normal on an NS8 node and stay out of the email: the systemd sessions of the rootless modules (`user@`, `fix-xdg-state@`) and the restarts of `promtail`, `systemd-hostnamed`, `dnf-makecache` and `backup-timers`. They stay in the dashboard. Module users created or deleted and firewall changes are mailed, because installing or removing a module is rare.
+
+Some smarthosts refuse the default sender `wazuh@` followed by the host name. Set `notify_sender` to an address they accept.
 
 The SMTP password is kept in the keystore of the indexer, never in the module environment. The indexer always checks the TLS certificate of the smarthost, even when the cluster setting disables the check.
 
