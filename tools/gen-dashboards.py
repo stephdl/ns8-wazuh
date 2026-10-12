@@ -408,3 +408,28 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
                terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
     (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
 ]))
+
+PVE = "process.name:proxmox"
+PVE_AUTH = f"{PVE} and event.category:authentication"
+PVE_TASK = f"{PVE} and event.action:task-started"
+write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
+    "Proxmox VE hosts with a Wazuh agent: web and API logins, tasks on the guests, failed backups", [
+    (vis("ns8-proxmox-logins", "Logins by outcome", APPS, PVE_AUTH,
+         metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
+    (vis("ns8-proxmox-tasks-timeline", "Tasks over time", APPS, PVE_TASK,
+         over_time(terms("3", "event.code", "group", size=10), kind="histogram")), 32, 8),
+    (vis("ns8-proxmox-failed-sources", "Failed logins by source", APPS, f"{PVE_AUTH} and event.outcome:failure",
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "user.name", "bucket", size=3, label="User"),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+    (vis("ns8-proxmox-tasks-by-user", "Tasks by type and user", APPS, PVE_TASK,
+         table(terms("2", "event.code", "bucket", size=30, label="Task"),
+               terms("3", "user.name", "bucket", size=5, label="User"))), 24, 14),
+    (search("ns8-proxmox-failed-tasks", "NS8 - Proxmox failed tasks", APPS,
+            f"{PVE} and event.action:task-ended and event.outcome:failure",
+            ["wazuh.agent.name", "event.code", "service.name", "user.name", "event.reason"]), 48, 12),
+    (search("ns8-proxmox-destroyed", "NS8 - Proxmox deleted guests", APPS,
+            f"{PVE_TASK} and event.code:(qmdestroy or vzdestroy)",
+            ["wazuh.agent.name", "event.code", "service.name", "user.name"]), 48, 10),
+    (vis("ns8-proxmox-map", "Failed logins map", APPS, f"{PVE_AUTH} and event.outcome:failure", geo_map()), 48, 14),
+]))
