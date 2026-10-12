@@ -325,3 +325,31 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))
+
+SAMBA_AUTH = "process.name:samba and event.category:authentication"
+SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
+SAMBA_IAM = "process.name:samba and event.category:iam and not event.action:primary-group-set"
+write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
+    "Samba domain controller of the ns8-samba module: logins, failures, locked accounts and account changes. "
+    "Needs the Samba audit, see the README", [
+    (vis("ns8-directory-outcome", "Domain logins by outcome", APPS, SAMBA_AUTH,
+         metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
+    (vis("ns8-directory-timeline", "Domain logins over time", APPS, SAMBA_AUTH,
+         over_time(terms("3", "event.outcome", "group", size=3), kind="histogram")), 32, 8),
+    (vis("ns8-directory-failures-reason", "Failure reasons", APPS, SAMBA_FAIL,
+         pie(terms("2", "event.reason", "segment", size=10))), 16, 14),
+    (vis("ns8-directory-failed-users", "Failed logins by account", APPS, SAMBA_FAIL,
+         table(terms("2", "user.name", "bucket", size=50, label="Account"),
+               terms("3", "event.reason", "bucket", size=2, label="Reason"))), 16, 14),
+    (vis("ns8-directory-failed-sources", "Failed logins by source", APPS, SAMBA_FAIL,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.domain", "bucket", size=3, label="Workstation", missing=True),
+               terms("4", "service.name", "bucket", size=3, label="Service"))), 16, 14),
+    (vis("ns8-directory-services", "Logins by service", APPS, SAMBA_AUTH,
+         bars(terms("2", "service.name", "segment", size=10),
+              series=terms("3", "event.outcome", "group", size=3))), 24, 12),
+    (vis("ns8-directory-changes", "Account changes by type", APPS, SAMBA_IAM,
+         bars(terms("2", "event.action", "segment", size=10))), 24, 12),
+    (search("ns8-directory-changes-list", "NS8 - Directory changes", APPS, SAMBA_IAM,
+            ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
+]))

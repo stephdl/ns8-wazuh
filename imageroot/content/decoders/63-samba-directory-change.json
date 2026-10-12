@@ -1,0 +1,97 @@
+{
+  "resource": {
+    "name": "decoder/ns8-samba-directory-change/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Samba directory change",
+      "description": "Objects added, deleted or changed in the domain directory",
+      "author": "NethServer",
+      "module": "samba",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"{\\\"timestamp\\\": \\\"\")"
+      },
+      {
+        "event.original": "contains(\"\\\"type\\\": \\\"dsdbChange\\\"\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>]: <_samba_raw>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "_samba_raw": "replace(\"\\n\", \"\")"
+          },
+          {
+            "_samba": "parse_json($_samba_raw)"
+          },
+          {
+            "process.name": "samba"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "iam"
+            ]
+          },
+          {
+            "event.type": [
+              "change"
+            ]
+          },
+          {
+            "event.reason": "$_samba.dsdbChange.status"
+          }
+        ]
+      },
+      {
+        "parse|_samba.dsdbChange.dn": [
+          "CN=<user.target.name>,<~>",
+          "<~>"
+        ]
+      },
+      {
+        "check": "string_equal($_samba.dsdbChange.operation, 'Add')",
+        "map": [
+          {
+            "event.action": "directory-object-added"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.dsdbChange.operation, 'Delete')",
+        "map": [
+          {
+            "event.action": "directory-object-deleted"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.dsdbChange.operation, 'Modify')",
+        "map": [
+          {
+            "event.action": "directory-object-modified"
+          }
+        ]
+      }
+    ]
+  }
+}

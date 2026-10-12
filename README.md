@@ -178,7 +178,7 @@ The logs that no decoder recognizes are dropped, unless `index_unclassified_even
 
 ## Dashboards
 
-The module adds five dashboards to the Wazuh dashboard, under Explore > Dashboards:
+The module adds seven dashboards to the Wazuh dashboard, under Explore > Dashboards:
 
 | Dashboard | Content |
 |---|---|
@@ -187,6 +187,19 @@ The module adds five dashboards to the Wazuh dashboard, under Explore > Dashboar
 | NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
 | NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
 | NS8 - System changes | users, groups, services and firewall changed on the hosts |
+| NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
+| NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
+
+### Samba audit
+
+The NS8 - Directory dashboard reads the audit of the Samba domain controller: logins and their failures (LDAP, Kerberos, NTLM, SMB), group membership, password resets, created and deleted accounts, and password policy changes. The samba module does not log the logins by default, so turn the audit on once on the node that runs it. Replace `samba1` with the instance name:
+
+```
+runagent -m samba1 podman exec samba-dc sh -c 'echo "log level = 0 auth_json_audit:3 dsdb_json_audit:5 dsdb_password_json_audit:5 dsdb_group_json_audit:5" >> /etc/samba/include.conf'
+runagent -m samba1 systemctl --user restart samba-dc
+```
+
+`include.conf` is meant for local settings and is kept by the samba updates. The node needs a Wazuh agent. The address in the events is the one that reached the domain controller, a local or VPN address, so the dashboard shows no country. For a Windows login, the workstation name tells where it comes from.
 
 The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 
