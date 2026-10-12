@@ -15,7 +15,7 @@ import os
 import sys
 import time
 
-from wazuh_api import dashboard_api
+from wazuh_api import api, dashboard_api
 
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 
@@ -31,7 +31,24 @@ def wait_ready():
     raise SystemExit("the dashboard is not ready")
 
 
+def search_words_in_message():
+    """A word typed alone in the search bar matches the log text, not only the agent fields."""
+    extra = {"message", "process.name"}
+    current = api("GET", "wazuh-events-v5-*/_settings/index.query.default_field")
+    fields = {f for v in current.values() for f in v["settings"]["index"]["query"]["default_field"]}
+    if not extra <= fields:
+        api("PUT", "wazuh-events-v5-*/_settings", {"index": {"query": {"default_field": sorted(fields | extra)}}})
+    # The templates too, so the next index of each data stream gets it
+    for item in api("GET", "_index_template/wazuh-events-v5-*").get("index_templates", []):
+        template = item["index_template"]
+        query = template.setdefault("template", {}).setdefault("settings", {}).setdefault("index", {}).setdefault("query", {})
+        if not extra <= set(query.get("default_field", [])):
+            query["default_field"] = sorted(set(query.get("default_field", [])) | extra)
+            api("PUT", f"_index_template/{item['name']}", template)
+
+
 wait_ready()
+search_words_in_message()
 
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):
     objects = []

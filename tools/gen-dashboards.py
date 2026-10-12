@@ -438,7 +438,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
-    "Log lines of every server, like journalctl: pick a customer, a server and a program, and search words with message:*word* in the search bar", [
+    "Log lines of every server, like journalctl: pick a customer, a server and a program, and type a word in the search bar, such as *crowdsec*", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
             ["wazuh.agent.name", "process.name", "message"]), 48, 80),
 ], program=True))
