@@ -371,3 +371,23 @@ write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collabora
                terms("4", "process.name", "bucket", size=3, label="Application"))), 24, 14),
     (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
 ]))
+
+HOSTING = "event.category:web and service.name:(lamp* or webserver* or wordpress* or dokuwiki*)"
+PROBES = (f"{HOSTING} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
+          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
+write("90-web-hosting.ndjson", dashboard("ns8-web-hosting", "NS8 - Web hosting",
+    "Sites of the lamp, webserver, wordpress and dokuwiki modules, read from Traefik: traffic, errors and scanners", [
+    (vis("ns8-hosting-sites", "Requests by site", APPS, HOSTING,
+         bars(terms("2", "service.name", "segment", size=20), series=status_ranges("3"))), 24, 12),
+    (vis("ns8-hosting-timeline", "Requests over time", APPS, HOSTING,
+         over_time(terms("3", "service.name", "group", size=10), kind="histogram")), 24, 12),
+    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
+         table(terms("2", "url.path", "bucket", size=50, label="Path"),
+               terms("3", "service.name", "bucket", size=3, label="Site"))), 24, 14),
+    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{HOSTING} and http.response.status_code >= 500",
+         table(terms("2", "service.name", "bucket", size=20, label="Site"),
+               terms("3", "url.path", "bucket", size=5, label="Path"))), 48, 12),
+]))

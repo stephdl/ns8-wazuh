@@ -26,6 +26,7 @@
     "normalize": [
       {
         "parse|event.original": [
+          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<~>\" <~> \"<service.name>@<~>\" <~>",
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
         ]
       },

@@ -1,0 +1,37 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 web scan",
+      "description": "A source asked for a typical attack path on a hosted site, such as wp-login.php or .env",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0009",
+    "enabled": true,
+    "status": "experimental",
+    "level": "low",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.category": [
+          "web"
+        ],
+        "http.response.status_code": [
+          404
+        ],
+        "url.path|contains": [
+          "wp-login.php",
+          "xmlrpc.php",
+          "/.env",
+          "/.git/",
+          "phpmyadmin"
+        ]
+      }
+    }
+  }
+}
