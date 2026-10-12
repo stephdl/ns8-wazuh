@@ -84,7 +84,7 @@ def set_default_settings():
 
 try:
     set_default_settings()
-except (RuntimeError, AttributeError) as error:
+except (RuntimeError, KeyError, TypeError, AttributeError) as error:
     print(f"Warning: the dashboard settings are not set: {error}", file=sys.stderr)
 
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):

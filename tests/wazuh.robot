@@ -116,7 +116,8 @@ Check if the log retention is set in the indexer
         ${output} =    Execute Command
         ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' https://localhost:9200/_plugins/_ism/policies/${policy}
         Should Contain    ${output}    "min_rollover_age":"400d"
-        Should Contain    ${output}    "min_index_age":"30d"
+        # 400 days: a rollover every 33 days, so each stream keeps about 13 indices
+        Should Contain    ${output}    "min_index_age":"33d"
     END
 
 Check if an agent on the same node can enroll

@@ -79,7 +79,7 @@
         "retention_days": {
             "type": "integer",
             "title": "Log retention",
-            "description": "Days the events and findings are kept at least. They are deleted month by month, so a log can stay up to about 30 days more.",
+            "description": "Days the events and findings are kept at least. They are deleted index by index, so a log can stay up to about 30 days more, or a twelfth of the retention when it is longer than a year.",
             "minimum": 30,
             "maximum": 3650
         },

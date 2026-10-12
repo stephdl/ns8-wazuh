@@ -124,6 +124,18 @@ def manager_api(method, path, body=None):
         raise RuntimeError("the Wazuh API did not answer with JSON")
 
 
+def wait_indexer(statuses=("green", "yellow")):
+    """Wait up to 10 minutes for the indexer cluster to reach one of the statuses."""
+    for _ in range(60):
+        try:
+            if api("GET", "_cluster/health").get("status") in statuses:
+                return
+        except RuntimeError:
+            pass
+        time.sleep(10)
+    raise SystemExit("the indexer is not ready")
+
+
 def dashboard_container():
     return os.environ.get("DASHBOARD_CONTAINER", "wazuh-dashboard")
 

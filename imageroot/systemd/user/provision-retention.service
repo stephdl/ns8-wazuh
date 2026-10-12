@@ -5,6 +5,8 @@
 
 [Unit]
 Description=Apply the log retention to the indexer policies
+# Skip the run while the module is stopped
+Requisite=wazuh-indexer.service
 After=wazuh-indexer.service
 
 [Service]

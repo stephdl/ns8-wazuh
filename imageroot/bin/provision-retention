@@ -8,7 +8,8 @@
 # Keep the events and the findings for LOG_RETENTION_DAYS days.
 # The Wazuh ISM policies roll over at 20 GB only, so a small server never deletes anything,
 # and they delete events one hour after the rollover. Here each stream rolls over every month,
-# and an index is deleted once its newest line is older than the retention.
+# or less often for a long retention, and an index is deleted once its newest line is older
+# than the retention.
 # Wazuh writes its policies again at each start of the indexer, once the cluster is green:
 # a timer runs this script every hour. Each index keeps its own copy of the policy, so only
 # the indices created in between start with the Wazuh conditions, and they are attached again here.
@@ -16,15 +17,12 @@
 import copy
 import os
 import sys
-import time
 
 import wazuh_api
-from wazuh_api import api
+from wazuh_api import api, wait_indexer
 
 wazuh_api.MEMORY_RETRY_SECONDS = 120
 
-# One index per stream and per month: 16 streams stay far below the shard limit of a single node
-ROLLOVER_AGE = "30d"
 POLICIES = {
     "stream-events-policy": "wazuh-events-v5-*",
     "stream-findings-policy": "wazuh-findings-v5-*",
@@ -35,32 +33,35 @@ def log(message):
     print(message, file=sys.stderr)
 
 
-def wait_ready():
-    for _ in range(60):
-        try:
-            if api("GET", "_cluster/health").get("status") in ("green", "yellow"):
-                return
-        except RuntimeError:
-            pass
-        time.sleep(10)
-    raise SystemExit("the indexer is not ready")
+def rollover_days(days):
+    """Keep about 13 indices per stream whatever the retention.
+
+    16 streams with one index a month would pass the 1000 shards of a single node after
+    about 5 years. A log then stays at most about a twelfth of the retention longer.
+    """
+    return max(30, days // 12)
 
 
-def retention_policy(policy, delete_after):
-    """Return a copy of the policy with a monthly rollover and the deletion delay."""
+def retention_policy(policy, days):
+    """Return a copy of the policy with the rollover age and the deletion delay."""
     policy = copy.deepcopy(policy)
     states = {state["name"]: state for state in policy["states"]}
     hot = states[policy["default_state"]]
+    size_cap = ""
     for action in hot["actions"]:
         if "rollover" in action:
             # The size limits stay as a safety cap on a busy server
-            action["rollover"]["min_index_age"] = ROLLOVER_AGE
+            action["rollover"]["min_index_age"] = f"{rollover_days(days)}d"
+            size = action["rollover"].get("min_primary_shard_size") or action["rollover"].get("min_size")
+            if size:
+                size_cap = f" or at {size}"
     for transition in hot["transitions"]:
         if any("delete" in action for action in states[transition["state_name"]]["actions"]):
             # Counted from the rollover, when the index stops receiving lines
-            transition["conditions"] = {"min_rollover_age": delete_after}
-    # The Wazuh description tells about the 20 GB rollover, which is no longer the rule
-    policy["description"] = f"Set by NS8: rolls over every {ROLLOVER_AGE} or at 20 GB, deletes {delete_after} after the rollover."
+            transition["conditions"] = {"min_rollover_age": f"{days}d"}
+    # The Wazuh description tells about the size rollover only, which is no longer the rule
+    policy["description"] = (f"Set by NS8: rolls over every {rollover_days(days)} days{size_cap}, "
+                             f"deletes {days} days after the rollover.")
     keys = ("description", "default_state", "states", "ism_template", "error_notification")
     return {"policy": {key: policy[key] for key in keys if policy.get(key) is not None}}
 
@@ -83,7 +84,9 @@ def apply_to_existing(policy_id, pattern, states):
             # A change of policy waits for the end of the current action, and a rollover that is not
             # due never ends: the index is attached again so it starts with the new conditions.
             # A rolled over index skips the rollover and goes straight to the deletion check.
-            api("POST", f"_plugins/_ism/remove/{name}")
+            answer = api("POST", f"_plugins/_ism/remove/{name}")
+            if answer.get("failures"):
+                raise SystemExit(f"{name}: {answer.get('failed_indices', answer)}")
         elif managed_by is not None:
             continue
         # An index without policy comes from a backup: the policy only catches new indices
@@ -94,18 +97,28 @@ def apply_to_existing(policy_id, pattern, states):
     log(f"{policy_id}: {updated} existing indices updated")
 
 
-days = int(os.environ.get("LOG_RETENTION_DAYS", "365"))
-wait_ready()
-
-for policy_id, pattern in POLICIES.items():
-    current = api("GET", f"_plugins/_ism/policies/{policy_id}")
-    if "policy" not in current:
-        raise SystemExit(f"{policy_id}: {current.get('error', current)}")
-    wanted = retention_policy(current["policy"], f"{days}d")
-    if wanted["policy"] != {key: current["policy"].get(key) for key in wanted["policy"]}:
+def update_policy(policy_id, days):
+    """Write the policy and return its states, again when Wazuh rewrites it at the same moment."""
+    for _ in range(3):
+        current = api("GET", f"_plugins/_ism/policies/{policy_id}")
+        if "policy" not in current:
+            raise SystemExit(f"{policy_id}: {current.get('error', current)}")
+        wanted = retention_policy(current["policy"], days)
+        if wanted["policy"] == {key: current["policy"].get(key) for key in wanted["policy"]}:
+            return wanted["policy"]["states"]
         answer = api("PUT", f"_plugins/_ism/policies/{policy_id}"
                      f"?if_seq_no={current['_seq_no']}&if_primary_term={current['_primary_term']}", wanted)
-        if "_seq_no" not in answer:
+        if "_seq_no" in answer:
+            log(f"{policy_id}: deletion {days} days after a rollover every {rollover_days(days)} days")
+            return wanted["policy"]["states"]
+        if answer.get("status") != 409:
             raise SystemExit(f"{policy_id}: {answer.get('error', answer)}")
-        log(f"{policy_id}: deletion {days} days after the monthly rollover")
-    apply_to_existing(policy_id, pattern, wanted["policy"]["states"])
+    raise SystemExit(f"{policy_id}: the policy keeps changing")
+
+
+days = int(os.environ.get("LOG_RETENTION_DAYS", "365"))
+# Wazuh writes back its policies once the cluster is green: wait for it, so ours come after
+wait_indexer(("green",))
+
+for policy_id, pattern in POLICIES.items():
+    apply_to_existing(policy_id, pattern, update_policy(policy_id, days))
