@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"auth failed\")"
+        "_line": "contains(\"auth failed\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>\\(auth failed<~>\\): user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>",
           "<~>\\(auth failed<~>\\): user=\\<>, method=<~>, rip=<source.ip>, lip=<~>"
         ]
@@ -47,6 +47,9 @@
           },
           {
             "event.outcome": "failure"
+          },
+          {
+            "process.name": "dovecot"
           }
         ]
       }

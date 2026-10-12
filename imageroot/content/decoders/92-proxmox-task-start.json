@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-proxmox-task-start/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Proxmox task started",
+      "description": "VM, container, backup and other tasks started on Proxmox",
+      "author": "NethServer",
+      "module": "proxmox",
+      "compatibility": "Proxmox VE",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/wazuh/wazuh/blob/v4.14.5/ruleset/decoders/0440-proxmox-ve_decoders.xml"
+      ],
+      "versions": [
+        "Proxmox VE 8.*",
+        "Proxmox VE 9.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"> starting task UPID:\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>:<~>",
+          "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>:",
+          "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "configuration"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "task-started"
+          },
+          {
+            "process.name": "proxmox"
+          },
+          {
+            "service.name": "$_vmid"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,6 +8,8 @@
 set -e
 exec 1>&2
 
-# The services run since 50traefik called configure-module: load the snapshot, then reload the dashboard
+# The services run since 50traefik called configure-module: load the snapshot, then reload the dashboard.
+# The snapshot brings back the dashboards of the backup: load the ones of this version again.
 runagent restore-snapshot
 systemctl --user try-restart wazuh-dashboard.service
+runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"

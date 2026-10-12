@@ -1,0 +1,86 @@
+{
+  "resource": {
+    "name": "decoder/ns8-nethvoice-cti-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "NethVoice CTI failed login",
+      "description": "Wrong passwords or 2FA codes on the NethVoice CTI",
+      "author": "NethServer",
+      "module": "nethvoice",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/NethServer/ns8-crowdsec/pull/182"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"nethvoice\")"
+      },
+      {
+        "_line": "contains(\"[GIN] \")"
+      },
+      {
+        "_line": "contains(\"| 401 |\")"
+      },
+      {
+        "_line": "contains(\"POST\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>[GIN] <~> | <event.code> |<~>| <~>",
+          "<~>"
+        ]
+      },
+      {
+        "parse|_line": [
+          "<~>| <~> |<~>| <_gin_ip> | <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "_gin_ip": "trim(both, \" \")"
+          },
+          {
+            "source.ip": "$_gin_ip"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "nethvoice"
+          },
+          {
+            "service.name": "CTI"
+          }
+        ]
+      }
+    ]
+  }
+}

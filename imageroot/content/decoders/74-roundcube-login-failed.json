@@ -1,0 +1,58 @@
+{
+  "resource": {
+    "name": "decoder/ns8-roundcube-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Roundcube failed login",
+      "description": "Wrong passwords on the Roundcube webmail",
+      "author": "NethServer",
+      "module": "roundcubemail",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"IMAP Error: Login failed for \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>Login failed for <user.name> against <~> \\(X-Real-IP: <source.ip>,<~>",
+          "<~>Login failed for <user.name> against <~> from <source.ip>. <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "roundcube"
+          }
+        ]
+      }
+    ]
+  }
+}

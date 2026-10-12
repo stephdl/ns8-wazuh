@@ -16,7 +16,10 @@ import re
 import sys
 import time
 
+import wazuh_api
 from wazuh_api import api
+
+wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 CM = "_plugins/_content_manager"

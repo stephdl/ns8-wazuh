@@ -1,0 +1,112 @@
+{
+  "resource": {
+    "name": "decoder/ns8-samba-auth/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Samba authentication",
+      "description": "Logins checked by the Samba domain controller: LDAP, Kerberos, NTLM and SMB",
+      "author": "NethServer",
+      "module": "samba",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"{\\\"timestamp\\\": \\\"\")"
+      },
+      {
+        "_line": "contains(\"\\\"type\\\": \\\"Authentication\\\"\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>]: <_samba_raw>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "_samba_raw": "replace(\"\\n\", \"\")"
+          },
+          {
+            "_samba": "parse_json($_samba_raw)"
+          },
+          {
+            "process.name": "samba"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "service.name": "$_samba.Authentication.serviceDescription"
+          },
+          {
+            "event.reason": "$_samba.Authentication.status"
+          },
+          {
+            "user.name": "$_samba.Authentication.clientAccount"
+          },
+          {
+            "user.domain": "$_samba.Authentication.clientDomain"
+          },
+          {
+            "source.domain": "$_samba.Authentication.workstation"
+          }
+        ]
+      },
+      {
+        "parse|_samba.Authentication.remoteAddress": [
+          "ipv4:<source.ip>:<~>",
+          "<~>"
+        ]
+      },
+      {
+        "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK')",
+        "map": [
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logon"
+          },
+          {
+            "event.outcome": "success"
+          }
+        ]
+      },
+      {
+        "check": "exists($_samba.Authentication.status) AND NOT string_equal($_samba.Authentication.status, 'NT_STATUS_OK')",
+        "map": [
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          }
+        ]
+      }
+    ]
+  }
+}

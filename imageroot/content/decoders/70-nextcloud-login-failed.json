@@ -1,0 +1,60 @@
+{
+  "resource": {
+    "name": "decoder/ns8-nextcloud-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Nextcloud failed login",
+      "description": "Wrong passwords on the Nextcloud web interface, WebDAV and the sync clients",
+      "author": "NethServer",
+      "module": "nextcloud",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"Login failed: '\")"
+      },
+      {
+        "_line": "contains(\"Remote IP: '\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>Login failed: '<user.name>' \\(Remote IP: '<source.ip>'\\)<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "nextcloud"
+          }
+        ]
+      }
+    ]
+  }
+}

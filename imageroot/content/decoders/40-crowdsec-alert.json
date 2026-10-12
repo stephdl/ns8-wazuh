@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"performed '\")"
+        "_line": "contains(\"performed '\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>msg=\"Ip <source.ip> performed '<event.reason>' \\(<~>"
         ]
       },
@@ -43,6 +43,9 @@
           },
           {
             "event.action": "crowdsec-alert"
+          },
+          {
+            "process.name": "crowdsec"
           }
         ]
       }

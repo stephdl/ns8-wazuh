@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"-login: Login: user=\")"
+        "_line": "contains(\"-login: Login: user=\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>Login: user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>"
         ]
       },
@@ -46,6 +46,9 @@
           },
           {
             "event.outcome": "success"
+          },
+          {
+            "process.name": "dovecot"
           }
         ]
       }

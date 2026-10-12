@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"[AUTH] login-failed\")"
+        "_line": "contains(\"[AUTH] login-failed\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~> login-failed user=<user.name> source=<source.ip><~>"
         ]
       },
@@ -46,6 +46,9 @@
           },
           {
             "event.outcome": "failure"
+          },
+          {
+            "process.name": "api-server"
           }
         ]
       }

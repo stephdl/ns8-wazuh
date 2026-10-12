@@ -1,0 +1,66 @@
+{
+  "resource": {
+    "name": "decoder/ns8-proxmox-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Proxmox failed login",
+      "description": "Wrong passwords on the Proxmox web interface and API",
+      "author": "NethServer",
+      "module": "proxmox",
+      "compatibility": "Proxmox VE",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/wazuh/wazuh/blob/v4.14.5/ruleset/decoders/0440-proxmox-ve_decoders.xml"
+      ],
+      "versions": [
+        "Proxmox VE 8.*",
+        "Proxmox VE 9.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"pvedaemon[\")"
+      },
+      {
+        "_line": "contains(\"authentication failure; rhost=\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>rhost=::ffff:<source.ip> user=<user.name>@<user.domain> msg=<event.reason>",
+          "<~>rhost=<source.ip> user=<user.name>@<user.domain> msg=<event.reason>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "proxmox"
+          },
+          {
+            "service.name": "Proxmox"
+          }
+        ]
+      }
+    ]
+  }
+}

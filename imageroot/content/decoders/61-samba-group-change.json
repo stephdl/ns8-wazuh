@@ -1,0 +1,104 @@
+{
+  "resource": {
+    "name": "decoder/ns8-samba-group-change/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Samba group change",
+      "description": "Users added to or removed from a domain group",
+      "author": "NethServer",
+      "module": "samba",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"{\\\"timestamp\\\": \\\"\")"
+      },
+      {
+        "_line": "contains(\"\\\"type\\\": \\\"groupChange\\\"\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>]: <_samba_raw>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "_samba_raw": "replace(\"\\n\", \"\")"
+          },
+          {
+            "_samba": "parse_json($_samba_raw)"
+          },
+          {
+            "process.name": "samba"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "iam"
+            ]
+          },
+          {
+            "event.type": [
+              "group",
+              "change"
+            ]
+          },
+          {
+            "event.reason": "$_samba.groupChange.status"
+          }
+        ]
+      },
+      {
+        "parse|_samba.groupChange.group": [
+          "CN=<group.name>,<~>",
+          "<~>"
+        ]
+      },
+      {
+        "parse|_samba.groupChange.user": [
+          "CN=<user.target.name>,<~>",
+          "<~>"
+        ]
+      },
+      {
+        "check": "string_equal($_samba.groupChange.action, 'Added')",
+        "map": [
+          {
+            "event.action": "group-member-added"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.groupChange.action, 'Removed')",
+        "map": [
+          {
+            "event.action": "group-member-removed"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.groupChange.action, 'PrimaryGroup')",
+        "map": [
+          {
+            "event.action": "primary-group-set"
+          }
+        ]
+      }
+    ]
+  }
+}

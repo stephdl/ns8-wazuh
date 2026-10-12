@@ -1,0 +1,75 @@
+{
+  "resource": {
+    "name": "decoder/ns8-proxmox-task-end/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Proxmox task ended",
+      "description": "Result of the Proxmox tasks: OK or the error",
+      "author": "NethServer",
+      "module": "proxmox",
+      "compatibility": "Proxmox VE",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/wazuh/wazuh/blob/v4.14.5/ruleset/decoders/0440-proxmox-ve_decoders.xml"
+      ],
+      "versions": [
+        "Proxmox VE 8.*",
+        "Proxmox VE 9.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"> end task UPID:\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>end task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>: <event.reason>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "configuration"
+            ]
+          },
+          {
+            "event.type": [
+              "end"
+            ]
+          },
+          {
+            "event.action": "task-ended"
+          },
+          {
+            "process.name": "proxmox"
+          },
+          {
+            "service.name": "$_vmid"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($event.reason, 'OK')",
+        "map": [
+          {
+            "event.outcome": "success"
+          }
+        ]
+      },
+      {
+        "check": "exists($event.reason) AND NOT string_equal($event.reason, 'OK')",
+        "map": [
+          {
+            "event.outcome": "failure"
+          }
+        ]
+      }
+    ]
+  }
+}

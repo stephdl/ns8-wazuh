@@ -30,6 +30,7 @@ INSTALL_DIR=/var/ossec
 CONFIG="${INSTALL_DIR}/etc/ossec.conf"
 TOKEN="${WAZUH_ENROLLMENT_TOKEN:-}"
 AGENT_NAME="${WAZUH_AGENT_NAME:-}"
+AGENT_GROUP="${WAZUH_AGENT_GROUP:-}"
 PACKAGE_URL=""
 SHA256=""
 START=1
@@ -49,6 +50,7 @@ The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
   --token TOKEN        Enrollment token (visible in the process list, prefer the variable)
   --token-file FILE    Read the enrollment token from FILE
   --name NAME          Agent name (default: the host name)
+  --group GROUP        Agent group, the customer of this host (default: default)
   --version VERSION    Agent version to install (default: 5.0.0-rc1)
   --package-url URL    Download this package instead of the default one
   --sha256 HASH        Expected SHA-256 of the package, needed to check a deb
@@ -64,6 +66,7 @@ while [ $# -gt 0 ]; do
         --token) TOKEN="${2:?--token needs a value}"; shift 2 ;;
         --token-file) TOKEN="$(tr -d '[:space:]' < "${2:?--token-file needs a file}")"; shift 2 ;;
         --name) AGENT_NAME="${2:?--name needs a value}"; shift 2 ;;
+        --group) AGENT_GROUP="${2:?--group needs a value}"; shift 2 ;;
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
         --package-url) PACKAGE_URL="${2:?--package-url needs a value}"; shift 2 ;;
         --sha256) SHA256="${2:?--sha256 needs a value}"; shift 2 ;;
@@ -93,6 +96,9 @@ fi
 # The agent name goes into the XML configuration
 case "${AGENT_NAME}" in
     *[!A-Za-z0-9._-]*) die "the agent name may only hold letters, digits, dots, dashes and underscores" ;;
+esac
+case "${AGENT_GROUP}" in
+    *[!A-Za-z0-9._-]*|.|..) die "the agent group may only hold letters, digits, dots, dashes and underscores" ;;
 esac
 
 arch="$(uname -m)"
@@ -150,8 +156,8 @@ install_package() {
         say "Signature checked."
         # Image tags and package versions differ (5.0.0-rc1 is the package 5.0.0-1): compare the package itself
         if [ "${UPDATE}" -eq 1 ] && [ "$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "${file}" 2>/dev/null)" = "$(installed_version)" ]; then
-            say "The agent already runs this version, nothing to do."
-            exit 0
+            say "The agent already runs this version, the package is kept."
+            return 0
         fi
         rpm -U "${file}"
     else
@@ -160,12 +166,139 @@ install_package() {
             say "Warning: this deb is not checked. It comes from the Wazuh server over HTTPS. Use --sha256 to check it."
         fi
         if [ "${UPDATE}" -eq 1 ] && [ "$(dpkg-deb -f "${file}" Version 2>/dev/null)" = "$(installed_version)" ]; then
-            say "The agent already runs this version, nothing to do."
-            exit 0
+            say "The agent already runs this version, the package is kept."
+            return 0
         fi
         DEBIAN_FRONTEND=noninteractive apt-get install -y "${file}" >&2 \
             || DEBIAN_FRONTEND=noninteractive dpkg -i "${file}" >&2
     fi
+}
+
+# On an NS8 node the agent runs ns8-journal instead of reading journald itself, so each line
+# carries the module that wrote it: its own journald reader sends only "program[pid]: message"
+setup_ns8_journal() {
+    [ -d /etc/nethserver ] || command -v runagent >/dev/null 2>&1 || return 0
+    command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, the lines will not carry their NS8 module"; return 0; }
+    cat > "${INSTALL_DIR}/bin/ns8-journal" <<'NS8JOURNAL'
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Print the journal lines written since the last run, one JSON object per line, with the NS8 module
+# that wrote each of them. The Wazuh agent runs it every few seconds: its own journald reader sends
+# only "program[pid]: message" and drops the user and the unit that tell the module apart.
+
+import json
+import os
+import pwd
+import subprocess
+import sys
+
+CURSOR = "/var/ossec/var/ns8-journal.cursor"
+FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
+# Rootful modules and the core keep their state there, named after their id
+ROOTFUL_DIR = "/var/lib/nethserver"
+# A message longer than this is cut, the agent refuses lines over 64 KB
+MAX_MESSAGE = 16384
+
+_owners = {}
+
+
+def text(value):
+    # journald gives a byte array when the message is not valid UTF-8
+    if isinstance(value, list):
+        return bytes(value).decode("utf-8", "replace")
+    return value or ""
+
+
+def rootless_module(uid):
+    """Return the module id of a rootless module user, or an empty string."""
+    if uid not in _owners:
+        try:
+            user = pwd.getpwuid(int(uid))
+            _owners[uid] = user.pw_name if os.path.isdir(os.path.join(user.pw_dir, ".config", "state")) else ""
+        except (KeyError, ValueError):
+            _owners[uid] = ""
+    return _owners[uid]
+
+
+def rootful_module(unit):
+    """Return the module id found in a system unit name, or an empty string."""
+    name = unit.rsplit(".", 1)[0]
+    # agent@mail4.service runs the actions of mail4, crowdsec13-upgrade-hub.service belongs to crowdsec13
+    candidates = [name.split("@", 1)[1]] if "@" in name else [name, name.split("-", 1)[0]]
+    for candidate in candidates:
+        if candidate and os.path.isdir(os.path.join(ROOTFUL_DIR, candidate)):
+            return candidate
+    # The agent of a rootless module runs as root too
+    if "@" in name and rootless_module_by_name(candidates[0]):
+        return candidates[0]
+    return ""
+
+
+def rootless_module_by_name(name):
+    try:
+        return rootless_module(str(pwd.getpwnam(name).pw_uid))
+    except KeyError:
+        return ""
+
+
+def main():
+    # The first run starts from now: the history is already on the server, or not wanted
+    start = [] if os.path.exists(CURSOR) else ["-n", "0"]
+    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", f"--output-fields={FIELDS}",
+                             f"--cursor-file={CURSOR}"] + start, stdout=subprocess.PIPE, text=True)
+    for line in proc.stdout:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        owner = entry.get("_SYSTEMD_OWNER_UID", "0")
+        unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
+        module = rootless_module(owner) if owner != "0" else ""
+        if not module:
+            module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
+        event = {
+            "ns8_journal": 1,
+            "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
+            "pid": text(entry.get("_PID")),
+            "module": module,
+            "unit": text(unit),
+            "message": text(entry.get("MESSAGE")).rstrip("\n")[:MAX_MESSAGE],
+        }
+        print(json.dumps(event, separators=(",", ":"), ensure_ascii=False), flush=False)
+    sys.stdout.flush()
+    proc.wait()
+
+
+main()
+NS8JOURNAL
+    chmod 750 "${INSTALL_DIR}/bin/ns8-journal"
+    # Any journald block, whatever the order of its children, becomes the command block
+    python3 - "${CONFIG}" <<'NS8CONF' || die "cannot set ns8-journal in ${CONFIG}"
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+command = ("  <localfile>\n    <log_format>command</log_format>\n"
+           "    <command>/var/ossec/bin/ns8-journal</command>\n    <alias>ns8-journal</alias>\n"
+           "    <frequency>10</frequency>\n  </localfile>")
+block = re.compile(r"[ \t]*<localfile>(?:(?!</localfile>).)*?<log_format>\s*journald\s*</log_format>(?:(?!</localfile>).)*?</localfile>",
+                   re.S)
+text, count = block.subn("", text)
+if "<command>/var/ossec/bin/ns8-journal</command>" not in text:
+    if "</ossec_config>" not in text:
+        sys.exit(1)
+    head, sep, tail = text.rpartition("</ossec_config>")
+    text = head + command + "\n" + sep + tail
+open(path, "w").write(text)
+NS8CONF
+    grep -q "<command>/var/ossec/bin/ns8-journal</command>" "${CONFIG}" || die "ns8-journal is not in ${CONFIG}"
+    ! grep -q "<log_format>journald</log_format>" "${CONFIG}" || die "a journald block is left in ${CONFIG}"
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the ns8-journal setting, see ${CONFIG}"
+    say "NS8 node: the agent reads the journal through ns8-journal, with the module of each line."
 }
 
 if [ "${UPDATE}" -eq 1 ]; then
@@ -173,6 +306,7 @@ if [ "${UPDATE}" -eq 1 ]; then
     before="$(installed_version)"
     say "Installed version: ${before:-unknown}, wanted: ${VERSION}"
     install_package
+    setup_ns8_journal
     # The package keeps ossec.conf and the key, a restart loads the new binaries
     if command -v systemctl >/dev/null 2>&1; then
         systemctl restart wazuh-agent
@@ -222,12 +356,17 @@ if ! grep -q "<endpoint>${address}</endpoint>" "${CONFIG}"; then
     die "cannot write the server address in ${CONFIG}"
 fi
 
-if [ -n "${AGENT_NAME}" ]; then
-    # The name is read from the enrollment block, an agent_name next to the manager is refused
+if [ -n "${AGENT_NAME}" ] || [ -n "${AGENT_GROUP}" ]; then
+    # The name and the group are read from the enrollment block, the manager stores the group at enrollment
+    enrollment="<enrollment>"
+    [ -z "${AGENT_NAME}" ] || enrollment="${enrollment}\n      <agent_name>${AGENT_NAME}</agent_name>"
+    [ -z "${AGENT_GROUP}" ] || enrollment="${enrollment}\n      <groups>${AGENT_GROUP}</groups>"
     sed -i '/<enrollment>/,/<\/enrollment>/d' "${CONFIG}"
-    sed -i "0,/<manager>/ s#<manager>#<enrollment>\n      <agent_name>${AGENT_NAME}</agent_name>\n    </enrollment>\n    <manager>#" "${CONFIG}"
+    sed -i "0,/<manager>/ s#<manager>#${enrollment}\n    </enrollment>\n    <manager>#" "${CONFIG}"
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the configuration, see ${CONFIG}"
 fi
+
+setup_ns8_journal
 
 # Only root reads the token: the agent takes it at its first start and deletes it
 token_file="${INSTALL_DIR}/etc/enrollment_token"

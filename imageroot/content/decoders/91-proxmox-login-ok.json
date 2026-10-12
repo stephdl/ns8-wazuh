@@ -1,0 +1,69 @@
+{
+  "resource": {
+    "name": "decoder/ns8-proxmox-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Proxmox login",
+      "description": "Successful logins on the Proxmox web interface and API",
+      "author": "NethServer",
+      "module": "proxmox",
+      "compatibility": "Proxmox VE",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/wazuh/wazuh/blob/v4.14.5/ruleset/decoders/0440-proxmox-ve_decoders.xml"
+      ],
+      "versions": [
+        "Proxmox VE 8.*",
+        "Proxmox VE 9.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"pvedaemon[\")"
+      },
+      {
+        "_line": "contains(\"successful auth for user '\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>successful auth for user '<user.name>@<_realm>'<~>",
+          "<~>successful auth for user '<user.name>@<_realm>'"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logon"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "process.name": "proxmox"
+          },
+          {
+            "service.name": "Proxmox"
+          },
+          {
+            "user.domain": "$_realm"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@
 import json
 import os
 import subprocess
+import time
 
 _password = None
 
@@ -40,7 +41,27 @@ def curl_quote(value):
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def _is_memory_refusal(answer):
+    error = answer.get("error") if isinstance(answer, dict) else None
+    return isinstance(error, dict) and error.get("type") == "circuit_breaking_exception"
+
+
+# Right after a restart the indexer refuses requests while its memory is full. The provisioning
+# scripts set it to wait: the other callers must not hang on an indexer that stays short of memory.
+MEMORY_RETRY_SECONDS = 0
+
+
 def api(method, path, body=None, admin_cert=False):
+    waited = 0
+    while True:
+        answer = _api(method, path, body, admin_cert)
+        if not _is_memory_refusal(answer) or waited >= MEMORY_RETRY_SECONDS:
+            return answer
+        time.sleep(10)
+        waited += 10
+
+
+def _api(method, path, body=None, admin_cert=False):
     # The curl options go through stdin, so the password never appears in a process list.
     # Restoring protected indices needs the admin certificate: the password is not enough.
     if admin_cert:
@@ -101,6 +122,27 @@ def manager_api(method, path, body=None):
         return json.loads(_manager_curl(config))
     except ValueError:
         raise RuntimeError("the Wazuh API did not answer with JSON")
+
+
+def dashboard_container():
+    return os.environ.get("DASHBOARD_CONTAINER", "wazuh-dashboard")
+
+
+def dashboard_api(method, path, body=None):
+    """Call the Wazuh dashboard API, which listens inside the pod only."""
+    config = f'user = "admin:{curl_quote(admin_password())}"\n'
+    config += f'request = "{method}"\nurl = "http://localhost:5601/{path}"\n'
+    config += 'header = "osd-xsrf: true"\nheader = "Content-Type: application/json"\n'
+    if body is not None:
+        config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
+    proc = subprocess.run(["podman", "exec", "-i", dashboard_container(), "curl", "-s", "-K", "-"],
+                          input=config, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed: {proc.stderr}")
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        raise RuntimeError(f"not a JSON answer: {proc.stdout[:200]}")
 
 
 def count_agents():

@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-postfix-rejected/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Postfix rejection",
+      "description": "Messages refused by Postfix before they enter the queue",
+      "author": "NethServer",
+      "module": "postfix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"postfix/\")"
+      },
+      {
+        "_line": "contains(\"NOQUEUE: reject: \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>NOQUEUE: reject: <~> from <~>[<source.ip>]: <event.code> <~>: <event.reason>; from=\\<<email.from.address>> to=\\<<email.to.address>> <~>",
+          "<~>NOQUEUE: reject: <~> from <~>[<source.ip>]: <event.code> <~>: <event.reason>; from=\\<> to=\\<<email.to.address>> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "email"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "mail-rejected"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "postfix"
+          }
+        ]
+      }
+    ]
+  }
+}

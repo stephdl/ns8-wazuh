@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-postfix-milter-rejected/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Postfix filter rejection",
+      "description": "Messages refused by the spam and virus filter",
+      "author": "NethServer",
+      "module": "postfix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"postfix/\")"
+      },
+      {
+        "_line": "contains(\"milter-reject: \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>: milter-reject: <~> from <~>[<source.ip>]: <event.code> <event.reason>; from=\\<<email.from.address>> to=\\<<email.to.address>> <~>",
+          "<~>: milter-reject: <~> from <~>[<source.ip>]: <event.code> <event.reason>; from=\\<> to=\\<<email.to.address>> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "email"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "mail-rejected"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "postfix"
+          }
+        ]
+      }
+    ]
+  }
+}

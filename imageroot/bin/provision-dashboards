@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Load the NS8 dashboards into the Wazuh dashboard.
+# Each file is a saved objects export. The objects keep fixed ids, so a new version replaces them:
+# an administrator copies a dashboard before changing it.
+
+import glob
+import json
+import os
+import sys
+import time
+
+import wazuh_api
+from wazuh_api import api, dashboard_api
+
+wazuh_api.MEMORY_RETRY_SECONDS = 120
+
+CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
+
+
+def wait_ready():
+    # The callers only warn on a failure: five minutes covers a restart without stalling a configuration
+    for _ in range(30):
+        try:
+            # Yellow means a plugin is degraded, the saved objects API works
+            if dashboard_api("GET", "api/status")["status"]["overall"]["state"] in ("green", "yellow"):
+                return
+        except (RuntimeError, KeyError, TypeError):
+            pass
+        time.sleep(10)
+    raise SystemExit("the dashboard is not ready")
+
+
+def checked(answer, what):
+    if isinstance(answer, dict) and "error" in answer:
+        raise RuntimeError(f"{what}: {answer['error']}")
+    return answer
+
+
+def search_words_in_message():
+    """A word typed alone in the search bar matches the log text, whatever its case."""
+    # message is a keyword, searched as typed: a text copy of it is lowercased and split into words
+    message = {"type": "keyword", "ignore_above": 4096, "fields": {"text": {"type": "text"}}}
+    extra = {"message.text", "process.name"}
+    checked(api("PUT", "wazuh-events-v5-*/_mapping", {"properties": {"message": message}}), "message mapping")
+    current = api("GET", "wazuh-events-v5-*/_settings/index.query.default_field")
+    fields = {f for v in current.values()
+              for f in v.get("settings", {}).get("index", {}).get("query", {}).get("default_field", [])}
+    if not extra <= fields:
+        checked(api("PUT", "wazuh-events-v5-*/_settings", {"index": {"query": {"default_field": sorted(fields | extra)}}}),
+                "search fields")
+    # The templates too, so the next index of each data stream gets them
+    for item in api("GET", "_index_template/wazuh-events-v5-*").get("index_templates", []):
+        template = item["index_template"]
+        body = template.setdefault("template", {})
+        query = body.setdefault("settings", {}).setdefault("index", {}).setdefault("query", {})
+        properties = body.setdefault("mappings", {}).setdefault("properties", {})
+        if extra <= set(query.get("default_field", [])) and properties.get("message") == message:
+            continue
+        query["default_field"] = sorted(set(query.get("default_field", [])) | extra)
+        properties["message"] = message
+        checked(api("PUT", f"_index_template/{item['name']}", template), item["name"])
+
+wait_ready()
+try:
+    search_words_in_message()
+except (RuntimeError, KeyError, TypeError, AttributeError) as error:
+    # The dashboards do not depend on it: load them anyway
+    print(f"Warning: the word search is not set up: {error}", file=sys.stderr)
+
+for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):
+    objects = []
+    with open(path) as f:
+        for line in f:
+            if line.strip():
+                item = json.loads(line)
+                # The export ends with a summary line that is not an object
+                if "type" in item:
+                    objects.append({key: item[key] for key in ("type", "id", "attributes", "references", "migrationVersion")
+                                    if key in item})
+    answer = dashboard_api("POST", "api/saved_objects/_bulk_create?overwrite=true", objects)
+    errors = [o for o in answer.get("saved_objects", []) if "error" in o]
+    if "saved_objects" not in answer or errors:
+        raise SystemExit(f"{os.path.basename(path)}: {errors or answer}")
+    print(f"dashboards {os.path.basename(path)}: {len(objects)} objects", file=sys.stderr)

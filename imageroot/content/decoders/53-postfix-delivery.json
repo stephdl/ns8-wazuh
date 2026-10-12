@@ -1,0 +1,54 @@
+{
+  "resource": {
+    "name": "decoder/ns8-postfix-delivery/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Postfix delivery",
+      "description": "Delivery status of each recipient: sent, bounced or deferred",
+      "author": "NethServer",
+      "module": "postfix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"postfix/\")"
+      },
+      {
+        "_line": "contains(\" status=\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>: <email.local_id>: to=\\<<email.to.address>>, <~>dsn=<event.code>, status=<event.action> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "email"
+            ]
+          },
+          {
+            "event.type": [
+              "info"
+            ]
+          },
+          {
+            "process.name": "postfix"
+          }
+        ]
+      }
+    ]
+  }
+}

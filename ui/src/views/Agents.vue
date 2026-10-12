@@ -74,6 +74,9 @@
                         :key="`${rowIndex}`"
                         :value="`${rowIndex}`"
                       >
+                        <cv-data-table-cell>{{
+                          row.customer || "-"
+                        }}</cv-data-table-cell>
                         <cv-data-table-cell>{{ row.name }}</cv-data-table-cell>
                         <cv-data-table-cell>{{
                           row.ip || "-"
@@ -194,12 +197,29 @@
                       class="mg-bottom"
                       ref="max_uses"
                     />
-                    <NsTextInput
-                      v-model.trim="description"
-                      :label="$t('agents.description')"
+                    <NsComboBox
+                      v-model="customer"
+                      :options="customerOptions"
+                      acceptUserInput
+                      :userInputLabel="$t('agents.new_customer')"
+                      :title="$t('agents.customer')"
+                      :label="$t('agents.choose_customer')"
+                      :helper-text="$t('agents.customer_helper')"
+                      :invalid-message="$t(error.group)"
                       :disabled="loading.getEnrollmentToken"
                       class="mg-bottom"
-                      ref="description"
+                      ref="group"
+                    />
+                    <NsTextInput
+                      v-if="maxUses === '1'"
+                      v-model.trim="agentName"
+                      :label="$t('agents.agent_name')"
+                      :placeholder="$t('agents.agent_name_placeholder')"
+                      :helper-text="$t('agents.agent_name_helper')"
+                      :invalid-message="$t(error.agent_name)"
+                      :disabled="loading.getEnrollmentToken"
+                      class="mg-bottom"
+                      ref="agent_name"
                     />
                     <NsButton
                       kind="primary"
@@ -348,6 +368,7 @@ export default {
       agents: [],
       tablePage: [],
       tableColumns: [
+        "customer",
         "name",
         "ip",
         "status",
@@ -360,7 +381,8 @@ export default {
         "https://github.com/stephdl/ns8-wazuh/blob/main/README.md#add-an-agent",
       wazuhAgentDocUrl:
         "https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html",
-      description: "",
+      customer: "",
+      agentName: "",
       result: null,
       isShownRevokeModal: false,
       agentToRevoke: null,
@@ -377,6 +399,8 @@ export default {
         removeAgent: "",
         getEnrollmentToken: "",
         max_uses: "",
+        group: "",
+        agent_name: "",
       },
     };
   },
@@ -387,9 +411,37 @@ export default {
         return this.$t("agents.col_" + column);
       });
     },
+    customers() {
+      return [
+        ...new Set(
+          this.agents.flatMap((agent) =>
+            agent.groups.filter((g) => g !== "default")
+          )
+        ),
+      ].sort();
+    },
+    customerOptions() {
+      return this.customers.map((customer) => ({
+        name: customer,
+        label: customer,
+        value: customer,
+      }));
+    },
     // The token goes through the environment so it does not show in the process list
     installCommand() {
-      return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo WAZUH_ENROLLMENT_TOKEN='${this.result.token}' bash`;
+      const options = [];
+      if (this.result.group) {
+        options.push(`--group ${this.result.group}`);
+      }
+      if (this.result.agentName) {
+        options.push(`--name ${this.result.agentName}`);
+      }
+      const args = options.length ? ` -s -- ${options.join(" ")}` : "";
+      return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo WAZUH_ENROLLMENT_TOKEN='${this.result.token}' bash${args}`;
+    },
+    // A name only fits a token for one server: the manager refuses two agents with the same name
+    agentNameToSend() {
+      return this.maxUses === "1" ? this.agentName : "";
     },
     updateCommand() {
       return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo bash -s -- --update --version ${this.packageVersion}`;
@@ -468,7 +520,11 @@ export default {
       this.loading.listAgents = false;
     },
     listAgentsCompleted(taskContext, taskResult) {
-      this.agents = taskResult.output.agents;
+      // The customer is the Wazuh group the agent enrolled in, default means none
+      this.agents = taskResult.output.agents.map((agent) => ({
+        ...agent,
+        customer: agent.groups.filter((g) => g !== "default").join(", "),
+      }));
       this.managerVersion = taskResult.output.manager_version || "";
       this.packageVersion = taskResult.output.package_version || "";
       this.loading.listAgents = false;
@@ -561,6 +617,30 @@ export default {
         this.focusElement("max_uses");
         isValidationOk = false;
       }
+      // Same characters as Wazuh accepts for a group and the install script for a name
+      const namePattern = /^[A-Za-z0-9._-]{1,128}$/;
+      this.customer = (this.customer || "").trim();
+      if (
+        this.customer &&
+        (!namePattern.test(this.customer) || /^\.\.?$/.test(this.customer))
+      ) {
+        this.error.group = "agents.name_invalid";
+        if (isValidationOk) {
+          this.focusElement("group");
+        }
+        isValidationOk = false;
+      }
+      if (
+        this.maxUses === "1" &&
+        this.agentName &&
+        !namePattern.test(this.agentName)
+      ) {
+        this.error.agent_name = "agents.name_invalid";
+        if (isValidationOk) {
+          this.focusElement("agent_name");
+        }
+        isValidationOk = false;
+      }
       return isValidationOk;
     },
     async getEnrollmentToken() {
@@ -580,8 +660,15 @@ export default {
         this.getEnrollmentTokenCompleted
       );
       const data = { max_uses: parseInt(this.maxUses, 10) };
-      if (this.description) {
-        data.description = this.description;
+      if (this.customer) {
+        data.group = this.customer;
+      }
+      // The token description shows who it was made for in the manager
+      const description = [this.customer, this.agentNameToSend]
+        .filter((part) => part)
+        .join(" ");
+      if (description) {
+        data.description = description;
       }
       const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
@@ -607,7 +694,7 @@ export default {
       this.loading.getEnrollmentToken = false;
     },
     getEnrollmentTokenCompleted(taskContext, taskResult) {
-      this.result = taskResult.output;
+      this.result = { ...taskResult.output, agentName: this.agentNameToSend };
       this.loading.getEnrollmentToken = false;
     },
   },

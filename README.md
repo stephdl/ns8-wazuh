@@ -88,10 +88,18 @@ Read the settings back with `api-cli run module/wazuh1/get-configuration`.
 Create an enrollment token. It allows enrollment during one day, for up to `max_uses` agents (1 to 100). Enrolled agents stay connected after it expires.
 
 ```
-api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"description":"web server"}'
+api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"group":"acme"}'
 ```
 
 The same is available on the Agents page of the module. The token holds the server address and the certificate authority, so the agent needs no other setting.
+
+### Customers
+
+One server often watches the servers of several customers. Give the customer when you create the token: the agents enroll in a Wazuh group named after it, created when missing. The Agents page shows the customer of each agent, each `NS8 - ...` dashboard has a Customer then an Agent picker, and the findings email is grouped by customer, then by agent.
+
+A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. Without a customer the agent goes in the `default` group.
+
+The customer is set at enrollment and cannot change after. To move a server to another customer, revoke its agent, then enroll it again with a token of the new customer and `--force`. It gets a new id, and its past events keep the old customer.
 
 ### Linux
 
@@ -105,6 +113,7 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 
 - `--token-file FILE`: read the token from a file instead of the environment.
 - `--name NAME`: agent name, the host name by default.
+- `--group GROUP`: customer of the server, see [Customers](#customers). The Agents page adds it to the command.
 - `--version VERSION`, `--package-url URL`: install another agent package.
 - `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
 - `--no-start`: configure the agent without starting it.
@@ -112,6 +121,10 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 - `--update`: update an enrolled agent to `--version`, without a token.
 
 The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
+
+### NS8 nodes and their modules
+
+On an NS8 node the script makes the agent run `/var/ossec/bin/ns8-journal` every 10 seconds instead of reading journald itself. The Wazuh agent sends a journal line as `program[pid]: message` only, without the user or the unit that tell which module wrote it: mail4 logs as dovecot, rspamd and postfix, piler7 and piler10 both as piler-app. ns8-journal reads the new lines with `journalctl -o json`, adds the module (the owner user for a rootless module, the unit name for a rootful one) and prints one JSON line each. A cursor in `/var/ossec/var/ns8-journal.cursor` makes each run start where the last one stopped, so nothing is lost or sent twice. The dashboards then have a Module picker. An agent installed before gets it with `--update`. On a host that is not an NS8 node, the agent keeps reading journald.
 
 ### Agent updates
 
@@ -131,7 +144,7 @@ An NS8 node is a Linux host like any other: run the same command as root on it. 
 
 ### Revoke an agent
 
-On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection. To bring it back, create a token and run the script again with `--force`.
+On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection, and its past events stay in the indexer. The agent service keeps running on the host until you uninstall it there. To bring it back, create a token and run the script again with `--force`. The server refuses a second agent with the same name, so revoke the old one first.
 
 The same with the API:
 
@@ -165,7 +178,50 @@ To watch something specific:
 - A log the agent does not read yet: add a `<localfile>` block in `/var/ossec/etc/ossec.conf` on the agent, then restart it. For a journald unit, filter on its name.
 - A file or directory to watch for changes: add it to the `<syscheck>` block (FIM) of the agent.
 
-The logs that no decoder recognizes are dropped, unless `index_unclassified_events` is true.
+Every journal line of an agent is kept, even when no decoder reads it in detail: the NS8 root decoder takes it with its program and its text, and the NS8 - Journal dashboard lists it. `index_unclassified_events` only adds the few logs that even that decoder refuses, in the `wazuh-events-v5-unclassified` index, seen in Explore > Discover. Leave it off: it is mostly noise.
+
+## Retention
+
+The module does not set it yet: the default policies of Wazuh apply. Findings stay 90 days and metrics 30 days. Events are not kept for a fixed time: their index rolls over at 20 GB or 200 million lines, then the old index is deleted one hour later. A fixed retention in days, one index per day and a warning when the disk fills are planned. For a legal keeping time, check the disk of the Wazuh node: two NS8 nodes write about 40 MB of events a day.
+
+## Dashboards
+
+The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashboards:
+
+| Dashboard | Content |
+|---|---|
+| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an NS8 module and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
+| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
+| NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
+| NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
+| NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
+| NS8 - System changes | users, groups, services and firewall changed on the hosts |
+| NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
+| NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
+| NS8 - Collaboration | failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost, by user, source and country. Mattermost logs only the accounts that exist, Webtop logs nothing |
+| NS8 - Web hosting | lamp, webserver, wordpress and dokuwiki sites from Traefik: requests by site, probed paths, scanning sources, server errors |
+| NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
+| NS8 - Proxmox | Proxmox VE hosts with an agent: web and API logins, tasks by type and user, failed tasks and backups, deleted guests |
+
+The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
+
+### Samba audit
+
+The NS8 - Directory dashboard reads the audit of the Samba domain controller: logins and their failures (LDAP, Kerberos, NTLM, SMB), group membership, password resets, created and deleted accounts, and password policy changes. The samba module does not log the logins by default, so turn the audit on once on the node that runs it. Replace `samba1` with the instance name:
+
+```
+runagent -m samba1 podman exec samba-dc sh -c 'echo "log level = 0 auth_json_audit:3 dsdb_json_audit:5 dsdb_password_json_audit:5 dsdb_group_json_audit:5" >> /etc/samba/include.conf'
+runagent -m samba1 systemctl --user restart samba-dc
+```
+
+`include.conf` is meant for local settings and is kept by the samba updates. The node needs a Wazuh agent. The address in the events is the one that reached the domain controller, a local or VPN address, so the dashboard shows no country. For a Windows login, the workstation name tells where it comes from.
+
+To turn the audit off, remove that line from `include.conf` and restart `samba-dc` the same way:
+
+```
+runagent -m samba1 podman exec samba-dc sed -i '/auth_json_audit/d' /etc/samba/include.conf
+runagent -m samba1 systemctl --user restart samba-dc
+```
 
 ## LDAP login
 

@@ -1,0 +1,33 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 Proxmox backup failed",
+      "description": "A Proxmox backup job ended with an error",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0011",
+    "enabled": true,
+    "status": "experimental",
+    "level": "medium",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.action": [
+          "task-ended"
+        ],
+        "event.code": [
+          "vzdump"
+        ],
+        "event.outcome": [
+          "failure"
+        ]
+      }
+    }
+  }
+}

@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"[AUTH] login-ok\")"
+        "_line": "contains(\"[AUTH] login-ok\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~> login-ok user=<user.name> source=<source.ip> <~>"
         ]
       },
@@ -46,6 +46,9 @@
           },
           {
             "event.outcome": "success"
+          },
+          {
+            "process.name": "api-server"
           }
         ]
       }

@@ -1,0 +1,31 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 Proxmox guest destroyed",
+      "description": "A virtual machine or a container was deleted on Proxmox",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0010",
+    "enabled": true,
+    "status": "experimental",
+    "level": "high",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.action": [
+          "task-started"
+        ],
+        "event.code": [
+          "qmdestroy",
+          "vzdestroy"
+        ]
+      }
+    }
+  }
+}
