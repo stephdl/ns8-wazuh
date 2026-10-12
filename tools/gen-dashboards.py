@@ -144,9 +144,11 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def controls(id, pattern):
+def controls(id, pattern, program=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
+    if program:
+        fields.append(("3", "process.name", "Program", "2"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
                             "indexPatternRefName": f"control_{i}_index_pattern",
                             "options": {"type": "terms", "multiselect": True, "dynamicOptions": True,
@@ -162,9 +164,9 @@ def controls(id, pattern):
                            for i in range(len(fields))]}
 
 
-def dashboard(id, title, description, panels, pattern=EVENTS):
+def dashboard(id, title, description, panels, pattern=EVENTS, program=False):
     """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
-    panels = [(controls(f"{id}-controls", pattern), 48, 5)] + panels
+    panels = [(controls(f"{id}-controls", pattern, program), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -433,3 +435,10 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
             ["wazuh.agent.name", "event.code", "service.name", "user.name"]), 48, 10),
     (vis("ns8-proxmox-map", "Failed logins map", APPS, f"{PVE_AUTH} and event.outcome:failure", geo_map()), 48, 14),
 ]))
+
+# One list of raw lines, like journalctl: pick the customer and the server, then read
+write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
+    "Log lines of every server, like journalctl: pick a customer, a server and a program, and search words with message:*word* in the search bar", [
+    (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
+            ["wazuh.agent.name", "process.name", "message"]), 48, 80),
+], program=True))
