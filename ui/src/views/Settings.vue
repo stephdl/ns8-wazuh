@@ -47,43 +47,6 @@
             >
             </cv-text-input>
             <NsToggle
-              v-if="isConfigured"
-              value="changeAdminPassword"
-              :label="$t('settings.change_admin_password')"
-              v-model="isChangePassword"
-              :disabled="stillLoading"
-              class="mg-bottom"
-            >
-              <template slot="text-left">{{
-                $t("settings.disabled")
-              }}</template>
-              <template slot="text-right">{{
-                $t("settings.enabled")
-              }}</template>
-            </NsToggle>
-            <NsPasswordInput
-              v-if="isPasswordActive"
-              :newPasswordLabel="$t('settings.admin_password')"
-              :confirmPasswordLabel="$t('settings.admin_password_confirm')"
-              v-model="adminPassword"
-              @passwordValidation="onAdminPasswordValidation"
-              :newPasswordHelperText="$t('settings.admin_password_rules')"
-              :newPasswordInvalidMessage="$t(error.admin_password)"
-              :confirmPasswordInvalidMessage="$t(error.admin_password_confirm)"
-              :passwordHideLabel="core.$t('password.hide_password')"
-              :passwordShowLabel="core.$t('password.show_password')"
-              :lengthLabel="core.$t('password.long_enough')"
-              :lowercaseLabel="core.$t('password.lowercase_letter')"
-              :uppercaseLabel="core.$t('password.uppercase_letter')"
-              :numberLabel="core.$t('password.number')"
-              :symbolLabel="core.$t('password.symbol')"
-              :equalLabel="core.$t('password.equal')"
-              :focus="focusPasswordField"
-              :minLength="12"
-              :disabled="stillLoading"
-              class="mg-bottom maxwidth"
-            />
-            <NsToggle
               value="letsEncrypt"
               :label="core.$t('apps_lets_encrypt.request_https_certificate')"
               v-model="isLetsEncryptEnabled"
@@ -130,6 +93,45 @@
                 />
               </cv-column>
             </cv-row>
+            <NsToggle
+              v-if="isConfigured"
+              key="changeAdminPassword"
+              value="changeAdminPassword"
+              :label="$t('settings.change_admin_password')"
+              v-model="isChangePassword"
+              :disabled="stillLoading"
+              class="mg-bottom"
+            >
+              <template slot="text-left">{{
+                $t("settings.disabled")
+              }}</template>
+              <template slot="text-right">{{
+                $t("settings.enabled")
+              }}</template>
+            </NsToggle>
+            <NsPasswordInput
+              v-if="isPasswordActive"
+              key="adminPassword"
+              :newPasswordLabel="$t('settings.admin_password')"
+              :confirmPasswordLabel="$t('settings.admin_password_confirm')"
+              v-model="adminPassword"
+              @passwordValidation="onAdminPasswordValidation"
+              :newPasswordHelperText="$t('settings.admin_password_rules')"
+              :newPasswordInvalidMessage="$t(error.admin_password)"
+              :confirmPasswordInvalidMessage="$t(error.admin_password_confirm)"
+              :passwordHideLabel="core.$t('password.hide_password')"
+              :passwordShowLabel="core.$t('password.show_password')"
+              :lengthLabel="core.$t('password.long_enough')"
+              :lowercaseLabel="core.$t('password.lowercase_letter')"
+              :uppercaseLabel="core.$t('password.uppercase_letter')"
+              :numberLabel="core.$t('password.number')"
+              :symbolLabel="core.$t('password.symbol')"
+              :equalLabel="core.$t('password.equal')"
+              :focus="focusPasswordField"
+              :minLength="12"
+              :disabled="stillLoading"
+              class="mg-bottom maxwidth"
+            />
             <NsComboBox
               v-model="ldapDomain"
               :options="domains"
@@ -456,6 +458,10 @@ export default {
       return this.configuredHost !== "";
     },
     isPasswordActive() {
+      // Wait for the configuration: before it loads, every module looks unconfigured
+      if (this.loading.getConfiguration) {
+        return false;
+      }
       return !this.isConfigured || this.isChangePassword;
     },
     isHostLocked() {
