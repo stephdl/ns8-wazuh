@@ -46,24 +46,6 @@
               ref="host"
             >
             </cv-text-input>
-            <NsTextInput
-              type="password"
-              v-model="adminPassword"
-              autocomplete="new-password"
-              :label="$t('settings.admin_password')"
-              :placeholder="
-                isConfigured
-                  ? $t('settings.unchanged_password_placeholder')
-                  : ''
-              "
-              :helper-text="$t('settings.admin_password_rules')"
-              :invalid-message="$t(error.admin_password)"
-              :passwordShowLabel="$t('settings.show')"
-              :passwordHideLabel="$t('settings.hide')"
-              :disabled="stillLoading"
-              class="mg-bottom maxwidth"
-              ref="admin_password"
-            />
             <NsToggle
               value="letsEncrypt"
               :label="core.$t('apps_lets_encrypt.request_https_certificate')"
@@ -111,6 +93,44 @@
                 />
               </cv-column>
             </cv-row>
+            <NsToggle
+              v-if="isConfigured"
+              key="changeAdminPassword"
+              value="changeAdminPassword"
+              :label="$t('settings.change_admin_password')"
+              v-model="isChangePassword"
+              :disabled="stillLoading"
+              class="mg-bottom"
+            >
+              <template slot="text-left">{{
+                $t("settings.disabled")
+              }}</template>
+              <template slot="text-right">{{
+                $t("settings.enabled")
+              }}</template>
+            </NsToggle>
+            <NsPasswordInput
+              v-if="isPasswordActive"
+              key="adminPassword"
+              :newPasswordLabel="$t('settings.admin_password')"
+              :confirmPasswordLabel="$t('settings.admin_password_confirm')"
+              v-model="adminPassword"
+              @passwordValidation="onAdminPasswordValidation"
+              :newPasswordInvalidMessage="$t(error.admin_password)"
+              :confirmPasswordInvalidMessage="$t(error.admin_password_confirm)"
+              :passwordHideLabel="core.$t('password.hide_password')"
+              :passwordShowLabel="core.$t('password.show_password')"
+              :lengthLabel="core.$t('password.long_enough')"
+              :lowercaseLabel="core.$t('password.lowercase_letter')"
+              :uppercaseLabel="core.$t('password.uppercase_letter')"
+              :numberLabel="core.$t('password.number')"
+              :symbolLabel="core.$t('password.symbol')"
+              :equalLabel="core.$t('password.equal')"
+              :focus="focusPasswordField"
+              :minLength="12"
+              :disabled="stillLoading"
+              class="mg-bottom maxwidth"
+            />
             <NsComboBox
               v-model="ldapDomain"
               :options="domains"
@@ -365,6 +385,9 @@ export default {
       configuredHost: "",
       agentsEnrolled: 0,
       adminPassword: "",
+      adminPasswordValidation: null,
+      focusPasswordField: { element: "" },
+      isChangePassword: false,
       isAdvancedOpen: false,
       isLetsEncryptEnabled: false,
       isLetsEncryptCurrentlyEnabled: false,
@@ -393,6 +416,7 @@ export default {
       },
       error: {
         admin_password: "",
+        admin_password_confirm: "",
         ldap_domain: "",
         ldap_admin_group: "",
         ldap_readonly_group: "",
@@ -411,6 +435,12 @@ export default {
   watch: {
     adminPassword() {
       this.error.admin_password = "";
+      this.error.admin_password_confirm = "";
+    },
+    isChangePassword() {
+      this.adminPassword = "";
+      this.error.admin_password = "";
+      this.error.admin_password_confirm = "";
     },
   },
   computed: {
@@ -425,6 +455,13 @@ export default {
     // The first configuration must choose the password, a later one may keep it
     isConfigured() {
       return this.configuredHost !== "";
+    },
+    isPasswordActive() {
+      // Wait for the configuration: before it loads, every module looks unconfigured
+      if (this.loading.getConfiguration) {
+        return false;
+      }
+      return !this.isConfigured || this.isChangePassword;
     },
     isHostLocked() {
       // null means the API did not answer: lock too, the backend refuses the change anyway
@@ -466,7 +503,7 @@ export default {
       if (!this.host || !this.host.includes(".")) {
         missing.push(this.$t("settings.wazuh_fqdn"));
       }
-      if (!this.adminPassword && !this.isConfigured) {
+      if (!this.adminPassword && this.isPasswordActive) {
         missing.push(this.$t("settings.admin_password"));
       }
       if (this.isDomainChosen && !this.ldapAdminGroup) {
@@ -507,6 +544,9 @@ export default {
     next();
   },
   methods: {
+    onAdminPasswordValidation(validation) {
+      this.adminPasswordValidation = validation;
+    },
     isEmail(value) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     },
@@ -697,12 +737,32 @@ export default {
         }
         isValidationOk = false;
       }
-      if (this.adminPassword && this.passwordError) {
-        this.error.admin_password = this.passwordError;
-        if (isValidationOk) {
-          this.focusElement("admin_password");
+      if (this.isPasswordActive) {
+        const v = this.adminPasswordValidation;
+        // The meter does not check the maximum length nor the allowed symbols
+        const passwordError =
+          v &&
+          v.isLengthOk &&
+          v.isLowercaseOk &&
+          v.isUppercaseOk &&
+          v.isNumberOk &&
+          v.isSymbolOk
+            ? this.passwordError
+            : "settings.admin_password_too_weak";
+        if (passwordError) {
+          this.error.admin_password = passwordError;
+          if (isValidationOk) {
+            this.focusPasswordField = { element: "newPassword" };
+          }
+          isValidationOk = false;
+        } else if (!v.isEqualOk) {
+          this.error.admin_password_confirm =
+            "settings.admin_password_mismatch";
+          if (isValidationOk) {
+            this.focusPasswordField = { element: "confirmPassword" };
+          }
+          isValidationOk = false;
         }
-        isValidationOk = false;
       }
       if (this.ldapDomain && this.ldapDomain !== "-" && !this.ldapAdminGroup) {
         this.error.ldap_admin_group = "common.required";
@@ -755,7 +815,11 @@ export default {
           // set i18n error message
           this.error[param] = this.$t("settings." + validationError.error);
           if (!focusAlreadySet) {
-            this.focusElement(param);
+            if (param === "admin_password") {
+              this.focusPasswordField = { element: "newPassword" };
+            } else {
+              this.focusElement(param);
+            }
             focusAlreadySet = true;
           }
         }
@@ -807,8 +871,8 @@ export default {
         notify_sender: this.isEmail(this.notifySender) ? this.notifySender : "",
         notify_min_level: this.notifyMinLevel,
       };
-      // The password is sent only when typed: nothing means keep the current one
-      if (this.adminPassword) {
+      // Without a new password the backend keeps the current one
+      if (this.isPasswordActive) {
         data.admin_password = this.adminPassword;
       }
       // Only send the token when typed, an empty one would remove the stored token
@@ -848,6 +912,7 @@ export default {
       this.loading.configureModule = false;
       // Do not keep the password in the page once it is applied
       this.adminPassword = "";
+      this.isChangePassword = false;
 
       // reload configuration
       this.getConfiguration();
