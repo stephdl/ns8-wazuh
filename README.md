@@ -178,7 +178,11 @@ To watch something specific:
 - A log the agent does not read yet: add a `<localfile>` block in `/var/ossec/etc/ossec.conf` on the agent, then restart it. For a journald unit, filter on its name.
 - A file or directory to watch for changes: add it to the `<syscheck>` block (FIM) of the agent.
 
-The logs that no decoder recognizes are dropped, unless `index_unclassified_events` is true.
+Every journal line of an agent is kept, even when no decoder reads it in detail: the NS8 root decoder takes it with its program and its text, and the NS8 - Journal dashboard lists it. `index_unclassified_events` only adds the few logs that even that decoder refuses, in the `wazuh-events-v5-unclassified` index, seen in Explore > Discover. Leave it off: it is mostly noise.
+
+## Retention
+
+The module does not set it yet: the default policies of Wazuh apply. Findings stay 90 days and metrics 30 days. Events are not kept for a fixed time: their index rolls over at 20 GB or 200 million lines, then the old index is deleted one hour later. A fixed retention in days, one index per day and a warning when the disk fills are planned. For a legal keeping time, check the disk of the Wazuh node: two NS8 nodes write about 40 MB of events a day.
 
 ## Dashboards
 
