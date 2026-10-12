@@ -25,5 +25,6 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "notify_recipients": [r for r in renv.get("NOTIFY_RECIPIENTS", "").split(",") if r],
     "notify_sender": renv.get("NOTIFY_SENDER", ""),
     "notify_min_level": renv.get("NOTIFY_MIN_LEVEL", "medium"),
+    "retention_days": int(renv.get("LOG_RETENTION_DAYS", "365")),
 })
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

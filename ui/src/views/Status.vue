@@ -19,6 +19,20 @@
         />
       </cv-column>
     </cv-row>
+    <cv-row v-if="isDiskAlmostFull">
+      <cv-column>
+        <NsInlineNotification
+          kind="warning"
+          :title="$t('status.disk_almost_full_title')"
+          :description="
+            $t('status.disk_almost_full_description', {
+              percent: health.indexer.disk_used_percent,
+            })
+          "
+          :showCloseButton="false"
+        />
+      </cv-column>
+    </cv-row>
     <cv-row v-if="error.getHealth">
       <cv-column>
         <NsInlineNotification
@@ -482,6 +496,12 @@ export default {
   },
   computed: {
     ...mapState(["instanceName", "instanceLabel", "core", "appName"]),
+    isDiskAlmostFull() {
+      // The indexer stops writing at 95%: warn early enough to act
+      return (
+        !!this.health.indexer && this.health.indexer.disk_used_percent >= 80
+      );
+    },
     indexerTitle() {
       return this.health.indexer
         ? this.$t("status.indexer_" + this.health.indexer.status)

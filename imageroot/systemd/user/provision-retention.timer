@@ -1,0 +1,15 @@
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+[Unit]
+Description=Apply the log retention again after the indexer rewrites its policies
+
+[Timer]
+# The indexer writes back the Wazuh policies at each start
+OnCalendar=hourly
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

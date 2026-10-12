@@ -73,6 +73,20 @@ except (RuntimeError, KeyError, TypeError, AttributeError) as error:
     # The dashboards do not depend on it: load them anyway
     print(f"Warning: the word search is not set up: {error}", file=sys.stderr)
 
+def set_default_settings():
+    """Show more lines in the log tables, unless the administrator already chose a value."""
+    current = dashboard_api("GET", "api/opensearch-dashboards/settings").get("settings", {})
+    # The default 500 lines run out quickly on the journal, 5000 stays fast
+    if current.get("discover:sampleSize", {}).get("userValue") is None:
+        checked(dashboard_api("POST", "api/opensearch-dashboards/settings",
+                              {"changes": {"discover:sampleSize": 5000}}), "sample size")
+
+
+try:
+    set_default_settings()
+except (RuntimeError, KeyError, TypeError, AttributeError) as error:
+    print(f"Warning: the dashboard settings are not set: {error}", file=sys.stderr)
+
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):
     objects = []
     with open(path) as f:

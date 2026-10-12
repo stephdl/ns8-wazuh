@@ -17,7 +17,8 @@
             ],
             "notify_sender": "",
             "notify_min_level": "medium",
-            "notify_enabled": true
+            "notify_enabled": true,
+            "retention_days": 365
         }
     ],
     "type": "object",
@@ -74,6 +75,13 @@
             "description": "New password of the dashboard administrator, 12 to 64 characters from A-Z a-z 0-9 . , _ + : @ % ^ = ~ - with at least one uppercase letter, one lowercase letter, one digit and one symbol. Omit it to keep the current one.",
             "minLength": 12,
             "maxLength": 64
+        },
+        "retention_days": {
+            "type": "integer",
+            "title": "Log retention",
+            "description": "Days the events and findings are kept at least. They are deleted index by index, so a log can stay up to about 30 days more, or a twelfth of the retention when it is longer than a year.",
+            "minimum": 30,
+            "maximum": 3650
         },
         "notify_enabled": {
             "type": "boolean",

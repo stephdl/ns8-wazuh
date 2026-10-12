@@ -193,6 +193,18 @@
                       $t("settings.enabled")
                     }}</template>
                   </NsToggle>
+                  <NsTextInput
+                    type="number"
+                    min="30"
+                    max="3650"
+                    v-model.number="retentionDays"
+                    :label="$t('settings.retention_days')"
+                    :helper-text="$t('settings.retention_days_helper')"
+                    :invalid-message="$t(error.retention_days)"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                    ref="retention_days"
+                  />
                   <cv-text-input
                     :label="$t('settings.export_url')"
                     placeholder="https://logs.example.org/wazuh"
@@ -399,6 +411,7 @@ export default {
       ldapReadonlyGroup: "",
       domains: [],
       indexUnclassifiedEvents: false,
+      retentionDays: 365,
       exportUrl: "",
       notifyEnabled: false,
       notifyRecipients: "",
@@ -420,6 +433,7 @@ export default {
         ldap_domain: "",
         ldap_admin_group: "",
         ldap_readonly_group: "",
+        retention_days: "",
         export_url: "",
         notify_recipients: "",
         notify_sender: "",
@@ -708,6 +722,7 @@ export default {
       this.ldapAdminGroup = config.ldap_admin_group;
       this.ldapReadonlyGroup = config.ldap_readonly_group || "";
       this.indexUnclassifiedEvents = config.index_unclassified_events;
+      this.retentionDays = config.retention_days;
       this.exportUrl = config.export_url;
       this.notifyEnabled = config.notify_enabled;
       this.notifyRecipients = config.notify_recipients.join("\n");
@@ -720,6 +735,7 @@ export default {
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
         config.index_unclassified_events ||
+        config.retention_days !== 365 ||
         config.export_url !== "" ||
         config.notify_enabled;
       this.loading.getConfiguration = false;
@@ -789,6 +805,18 @@ export default {
         this.error.notify_sender = "settings.notify_sender_invalid";
         if (isValidationOk) {
           this.focusElement("notify_sender");
+        }
+        isValidationOk = false;
+      }
+      if (
+        !Number.isInteger(this.retentionDays) ||
+        this.retentionDays < 30 ||
+        this.retentionDays > 3650
+      ) {
+        this.error.retention_days = "settings.retention_days_range";
+        if (isValidationOk) {
+          this.isAdvancedOpen = true;
+          this.focusElement("retention_days");
         }
         isValidationOk = false;
       }
@@ -862,6 +890,7 @@ export default {
         ldap_readonly_group:
           this.ldapDomain === "-" ? "" : this.ldapReadonlyGroup,
         index_unclassified_events: this.indexUnclassifiedEvents,
+        retention_days: this.retentionDays,
         export_url: this.exportUrl,
         notify_enabled: this.notifyEnabled,
         // While the emails are off the fields are hidden: keep only what the backend accepts

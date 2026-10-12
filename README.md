@@ -182,7 +182,13 @@ Every journal line of an agent is kept, even when no decoder reads it in detail:
 
 ## Retention
 
-The module does not set it yet: the default policies of Wazuh apply. Findings stay 90 days and metrics 30 days. Events are not kept for a fixed time: their index rolls over at 20 GB or 200 million lines, then the old index is deleted one hour later. A fixed retention in days, one index per day and a warning when the disk fills are planned. For a legal keeping time, check the disk of the Wazuh node: two NS8 nodes write about 40 MB of events a day.
+Events and findings are kept for 365 days by default. Change it in Settings > Advanced > Log retention, from 30 to 3650 days. Metrics stay 30 days.
+
+Each stream starts a new index every month, or sooner at 20 GB. An index is deleted once its newest log is older than the retention. So the deletion runs month by month: a log stays at least the chosen time, and at most about 30 days more. With 365 days, a log is kept between one year and about 13 months. Beyond a year, the indices cover a twelfth of the retention each, so the number of indices stays under the limit of a single node: with 10 years, a log can stay about 10 months more. The module writes this in the `stream-events-policy` and `stream-findings-policy` policies of the indexer at each configuration and update, and every hour because the indexer writes back the Wazuh policies when it starts. It moves the existing indices to it. A policy changed by hand is overwritten.
+
+Plan the disk before raising the retention. Two NS8 nodes write about 40 MB of events a day, so count about 20 MB a day per NS8 node, and more for a busy mail or web server. For 365 days, plan about 8 GB per NS8 node, plus the findings and 20% of free space. Check the real rate after a few days, from the size of the `wazuh-events-v5-*` indices.
+
+The Status page warns once the disk of the indexer is 80% full. At 95% the indexer stops writing: the new logs are lost until space is freed. Lower the retention or add disk space before that.
 
 ## Dashboards
 
