@@ -8,9 +8,11 @@
 set -e
 exec 1>&2
 
-# A new version brings new decoders and rules, and the ids of the rules change at each promotion.
+# A new version brings new decoders, rules and dashboards, and the ids of the rules change at each promotion.
 # Nothing to do on a module that was never configured.
 [ -n "${TRAEFIK_HOST:-}" ] || exit 0
 
 runagent provision-content
 runagent provision-detector
+# A dashboard that does not load must not block the configuration
+runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"

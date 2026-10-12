@@ -8,6 +8,8 @@
 set -e
 exec 1>&2
 
-# Load the NS8 decoders and rules once the indexer is healthy, then run the rules on the events
+# Load the NS8 decoders and rules once the indexer is healthy, run the rules on the events, then load the dashboards
 runagent provision-content
 runagent provision-detector
+# A dashboard that does not load must not block the configuration
+runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"

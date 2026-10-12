@@ -103,6 +103,27 @@ def manager_api(method, path, body=None):
         raise RuntimeError("the Wazuh API did not answer with JSON")
 
 
+def dashboard_container():
+    return os.environ.get("DASHBOARD_CONTAINER", "wazuh-dashboard")
+
+
+def dashboard_api(method, path, body=None):
+    """Call the Wazuh dashboard API, which listens inside the pod only."""
+    config = f'user = "admin:{curl_quote(admin_password())}"\n'
+    config += f'request = "{method}"\nurl = "http://localhost:5601/{path}"\n'
+    config += 'header = "osd-xsrf: true"\nheader = "Content-Type: application/json"\n'
+    if body is not None:
+        config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
+    proc = subprocess.run(["podman", "exec", "-i", dashboard_container(), "curl", "-s", "-K", "-"],
+                          input=config, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed: {proc.stderr}")
+    try:
+        return json.loads(proc.stdout)
+    except ValueError:
+        raise RuntimeError(f"not a JSON answer: {proc.stdout[:200]}")
+
+
 def count_agents():
     """Return the number of enrolled agents, the manager excluded, or None when the API does not answer."""
     try:

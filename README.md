@@ -167,6 +167,20 @@ To watch something specific:
 
 The logs that no decoder recognizes are dropped, unless `index_unclassified_events` is true.
 
+## Dashboards
+
+The module adds five dashboards to the Wazuh dashboard, under Explore > Dashboards:
+
+| Dashboard | Content |
+|---|---|
+| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
+| NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
+| NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
+| NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
+| NS8 - System changes | users, groups, services and firewall changed on the hosts |
+
+The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
+
 ## LDAP login
 
 The user domain is optional. When it is set, the indexer checks the logins against it through the NS8 LDAP proxy, and the module gives the same rights on the indexer and on the Wazuh API, which the dashboard calls on behalf of the user:
