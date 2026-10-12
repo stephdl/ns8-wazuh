@@ -213,6 +213,18 @@ Two ways, none done yet:
 
 Once the lines reach Wazuh: a decoder for the `|` separated record, a rule per deletion, and a rule for mass activity by one user.
 
+**Certificate expiry.** On an NS8 node, Traefik holds every certificate the node serves. Its state directory has `acme/acme.json` for Let's Encrypt and `custom_certificates/*.crt` for the uploaded ones. Each node runs one Traefik instance (`traefik1`, `traefik2`...), found with `runagent -l`, and `runagent -m <traefik>` runs in that directory, so no `/home` path is needed. Traefik asks Let's Encrypt for a renewal 30 days before expiry, so a certificate with less than 14 days left means the renewal fails. Nothing renews an uploaded certificate.
+
+The plan reuses the `ns8-journal` way:
+- `install-agent.sh` writes `/var/ossec/bin/ns8-certs`, only on an NS8 node, and adds a `<localfile>` command with the alias `ns8-certs` and a frequency of one day. It also runs at each start of the agent.
+- The script reads the certificates of the Traefik of the node and runs `openssl x509` on each one. It never prints a private key. It writes one JSON line per certificate: Traefik module, source (`acme` or `custom`), domain and other names, issuer, expiry date, days left and a state, `ok`, `expiring` or `expired`. The threshold is 14 days for Let's Encrypt and 30 days for an uploaded certificate. The self-signed default certificate is left out.
+- A decoder maps the line to the ECS `tls.server.x509.*` fields, the Traefik module to `orchestrator.namespace`, and the state to `event.action`.
+- Two rules: `NS8 certificate expiring` (medium) and `NS8 certificate expired` (high). The script decides the state, so the rules only compare strings, Sigma has no date check. The finding comes back every day until the certificate is fixed, and the findings email reminds it.
+- An `NS8 - Certificates` dashboard: the latest expiry per domain and node, the findings over time, the Customer and Agent pickers.
+- An enrolled agent gets it with `install-agent.sh --update`. A host that is not an NS8 node gets nothing. The certificate of the agent listener of the module is already on the Status page.
+
+Test with a short certificate uploaded through the `upload-certificate` action of Traefik.
+
 
 - LDAP and `securityadmin.sh` in practice in the rc1 image. The 5.0 documentation does not cover LDAP.
 - Rootless: uid 101 permissions, `memlock`. `vm.max_map_count` is a host setting that a rootless module cannot change.
