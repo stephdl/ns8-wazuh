@@ -1,0 +1,64 @@
+{
+  "resource": {
+    "name": "decoder/ns8-postfix-sasl-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Postfix SASL failure",
+      "description": "Failed SMTP authentications reported by Postfix",
+      "author": "NethServer",
+      "module": "postfix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"postfix/\")"
+      },
+      {
+        "event.original": "contains(\"SASL \")"
+      },
+      {
+        "event.original": "contains(\"authentication failed\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>warning: <~>[<source.ip>]: SASL <~> authentication failed: <~>, sasl_username=<user.name>",
+          "<~>warning: <~>[<source.ip>]: SASL <~> authentication failed<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "postfix"
+          }
+        ]
+      }
+    ]
+  }
+}

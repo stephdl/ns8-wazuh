@@ -1,0 +1,52 @@
+{
+  "resource": {
+    "name": "decoder/ns8-rspamd-result/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Rspamd result",
+      "description": "Spam score and action decided by Rspamd for each message",
+      "author": "NethServer",
+      "module": "rspamd",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"rspamd_task_write_log\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>qid: \\<<email.local_id>>, ip: <source.ip>, from: \\<<email.from.address>>, \\(default: <~> \\(<event.action>\\): [<event.risk_score>/<~>",
+          "<~>qid: \\<<email.local_id>>, ip: <source.ip>, from: \\<>, \\(default: <~> \\(<event.action>\\): [<event.risk_score>/<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "email"
+            ]
+          },
+          {
+            "event.type": [
+              "info"
+            ]
+          },
+          {
+            "process.name": "rspamd"
+          }
+        ]
+      }
+    ]
+  }
+}
