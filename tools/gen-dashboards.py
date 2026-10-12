@@ -354,10 +354,10 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
 ]))
 
-COLLAB = "process.name:(nextcloud or synapse or ejabberd) and event.category:authentication"
+COLLAB = "process.name:(nextcloud or synapse or ejabberd or sogo or roundcube) and event.category:authentication"
 COLLAB_FAIL = f"{COLLAB} and event.outcome:failure"
 write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collaboration",
-    "Failed logins on Nextcloud, Matrix and Ejabberd. Webtop and Mattermost do not log them", [
+    "Failed logins on Roundcube, SOGo, Nextcloud, Matrix and Ejabberd. Webtop and Mattermost do not log them", [
     (vis("ns8-collaboration-count", "Failed logins by application", APPS, COLLAB_FAIL,
          metric(group=terms("2", "process.name", "group", size=5))), 48, 8),
     (vis("ns8-collaboration-timeline", "Failed logins over time", APPS, COLLAB_FAIL,

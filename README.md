@@ -189,7 +189,7 @@ The module adds eight dashboards to the Wazuh dashboard, under Explore > Dashboa
 | NS8 - System changes | users, groups, services and firewall changed on the hosts |
 | NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
 | NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
-| NS8 - Collaboration | failed logins on Nextcloud, Matrix and Ejabberd, by user, source and country. Webtop and Mattermost do not log them |
+| NS8 - Collaboration | failed logins on Roundcube, SOGo, Nextcloud, Matrix and Ejabberd, by user, source and country. Webtop and Mattermost do not log them |
 
 ### Samba audit
 
