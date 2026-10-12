@@ -48,9 +48,22 @@
           },
           {
             "service.id": "$_nj.unit"
-          },
+          }
+        ]
+      },
+      {
+        "check": "exists($_nj.ns8_journal) AND NOT string_equal($_nj.pid, '')",
+        "map": [
           {
             "_line": "concat($_nj.program, '[', $_nj.pid, ']: ', $_nj.message)"
+          }
+        ]
+      },
+      {
+        "check": "exists($_nj.ns8_journal) AND string_equal($_nj.pid, '')",
+        "map": [
+          {
+            "_line": "concat($_nj.program, ': ', $_nj.message)"
           }
         ]
       },

@@ -28,7 +28,10 @@ if data.get("description"):
 
 # An agent that declares a group missing on the manager is refused at enrollment
 group = data.get("group", "")
-if group and group != "default":
+# The default group is where an agent without customer goes: no --group needed
+if group == "default":
+    group = ""
+if group:
     existing = manager_api("GET", f"groups?groups_list={group}")
     if not existing.get("data", {}).get("affected_items"):
         created = manager_api("POST", "groups", {"group_id": group})

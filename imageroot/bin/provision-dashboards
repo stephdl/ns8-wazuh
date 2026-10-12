@@ -15,15 +15,20 @@ import os
 import sys
 import time
 
+import wazuh_api
 from wazuh_api import api, dashboard_api
+
+wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 
 
 def wait_ready():
-    for _ in range(60):
+    # The callers only warn on a failure: five minutes covers a restart without stalling a configuration
+    for _ in range(30):
         try:
-            if dashboard_api("GET", "api/status")["status"]["overall"]["state"] == "green":
+            # Yellow means a plugin is degraded, the saved objects API works
+            if dashboard_api("GET", "api/status")["status"]["overall"]["state"] in ("green", "yellow"):
                 return
         except (RuntimeError, KeyError, TypeError):
             pass
@@ -31,16 +36,24 @@ def wait_ready():
     raise SystemExit("the dashboard is not ready")
 
 
+def checked(answer, what):
+    if isinstance(answer, dict) and "error" in answer:
+        raise RuntimeError(f"{what}: {answer['error']}")
+    return answer
+
+
 def search_words_in_message():
     """A word typed alone in the search bar matches the log text, whatever its case."""
     # message is a keyword, searched as typed: a text copy of it is lowercased and split into words
     message = {"type": "keyword", "ignore_above": 4096, "fields": {"text": {"type": "text"}}}
     extra = {"message.text", "process.name"}
-    api("PUT", "wazuh-events-v5-*/_mapping", {"properties": {"message": message}})
+    checked(api("PUT", "wazuh-events-v5-*/_mapping", {"properties": {"message": message}}), "message mapping")
     current = api("GET", "wazuh-events-v5-*/_settings/index.query.default_field")
-    fields = {f for v in current.values() for f in v["settings"]["index"]["query"]["default_field"]}
+    fields = {f for v in current.values()
+              for f in v.get("settings", {}).get("index", {}).get("query", {}).get("default_field", [])}
     if not extra <= fields:
-        api("PUT", "wazuh-events-v5-*/_settings", {"index": {"query": {"default_field": sorted(fields | extra)}}})
+        checked(api("PUT", "wazuh-events-v5-*/_settings", {"index": {"query": {"default_field": sorted(fields | extra)}}}),
+                "search fields")
     # The templates too, so the next index of each data stream gets them
     for item in api("GET", "_index_template/wazuh-events-v5-*").get("index_templates", []):
         template = item["index_template"]
@@ -51,10 +64,14 @@ def search_words_in_message():
             continue
         query["default_field"] = sorted(set(query.get("default_field", [])) | extra)
         properties["message"] = message
-        api("PUT", f"_index_template/{item['name']}", template)
+        checked(api("PUT", f"_index_template/{item['name']}", template), item["name"])
 
 wait_ready()
-search_words_in_message()
+try:
+    search_words_in_message()
+except (RuntimeError, KeyError, TypeError, AttributeError) as error:
+    # The dashboards do not depend on it: load them anyway
+    print(f"Warning: the word search is not set up: {error}", file=sys.stderr)
 
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):
     objects = []

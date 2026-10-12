@@ -277,18 +277,26 @@ def main():
 main()
 NS8JOURNAL
     chmod 750 "${INSTALL_DIR}/bin/ns8-journal"
-    if grep -q "<log_format>journald</log_format>" "${CONFIG}"; then
-        python3 - "${CONFIG}" <<'NS8CONF'
+    # Any journald block, whatever the order of its children, becomes the command block
+    python3 - "${CONFIG}" <<'NS8CONF' || die "cannot set ns8-journal in ${CONFIG}"
 import re, sys
 path = sys.argv[1]
 text = open(path).read()
-block = re.compile(r"[ \t]*<localfile>\s*<log_format>journald</log_format>\s*<location>journald</location>\s*</localfile>")
 command = ("  <localfile>\n    <log_format>command</log_format>\n"
            "    <command>/var/ossec/bin/ns8-journal</command>\n    <alias>ns8-journal</alias>\n"
            "    <frequency>10</frequency>\n  </localfile>")
-open(path, "w").write(block.sub(command, text, count=1))
+block = re.compile(r"[ \t]*<localfile>(?:(?!</localfile>).)*?<log_format>\s*journald\s*</log_format>(?:(?!</localfile>).)*?</localfile>",
+                   re.S)
+text, count = block.subn("", text)
+if "<command>/var/ossec/bin/ns8-journal</command>" not in text:
+    if "</ossec_config>" not in text:
+        sys.exit(1)
+    head, sep, tail = text.rpartition("</ossec_config>")
+    text = head + command + "\n" + sep + tail
+open(path, "w").write(text)
 NS8CONF
-    fi
+    grep -q "<command>/var/ossec/bin/ns8-journal</command>" "${CONFIG}" || die "ns8-journal is not in ${CONFIG}"
+    ! grep -q "<log_format>journald</log_format>" "${CONFIG}" || die "a journald block is left in ${CONFIG}"
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the ns8-journal setting, see ${CONFIG}"
     say "NS8 node: the agent reads the journal through ns8-journal, with the module of each line."
 }

@@ -201,9 +201,12 @@ def email(cursor):
     if total:
         # One block per customer and agent, one line per rule with a count, instead of one line per finding
         lines = [f"{total} new findings.", ""]
-        for customer in sorted({c for c, _, _ in counts}):
+        customers = sorted({c for c, _, _ in counts})
+        for customer in customers:
             if customer:
                 lines += [f"Customer {customer}", ""]
+            elif len(customers) > 1:
+                lines += ["No customer", ""]
             for agent_name in sorted({a for c, a, _ in counts if c == customer}):
                 lines.append(agent_name)
                 rules = [(n, r) for (c, a, r), n in counts.items() if c == customer and a == agent_name]

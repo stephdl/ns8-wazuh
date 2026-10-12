@@ -46,14 +46,19 @@ def _is_memory_refusal(answer):
     return isinstance(error, dict) and error.get("type") == "circuit_breaking_exception"
 
 
+# Right after a restart the indexer refuses requests while its memory is full. The provisioning
+# scripts set it to wait: the other callers must not hang on an indexer that stays short of memory.
+MEMORY_RETRY_SECONDS = 0
+
+
 def api(method, path, body=None, admin_cert=False):
-    # Right after a restart the indexer refuses requests while its memory is full: wait and retry
-    for _ in range(12):
+    waited = 0
+    while True:
         answer = _api(method, path, body, admin_cert)
-        if not _is_memory_refusal(answer):
+        if not _is_memory_refusal(answer) or waited >= MEMORY_RETRY_SECONDS:
             return answer
         time.sleep(10)
-    return answer
+        waited += 10
 
 
 def _api(method, path, body=None, admin_cert=False):

@@ -13,7 +13,10 @@
 import sys
 import time
 
+import wazuh_api
 from wazuh_api import api
+
+wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 SA = "_plugins/_security_analytics"
 NAME = "ns8"
