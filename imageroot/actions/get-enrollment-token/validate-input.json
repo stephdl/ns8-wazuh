@@ -23,6 +23,18 @@
             "type": "string",
             "title": "Description",
             "description": "Free text to recognize the token"
+        },
+        "group": {
+            "type": "string",
+            "title": "Customer group",
+            "description": "Wazuh agent group of the customer, created when missing. The install command declares it at enrollment",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "not": {
+                "enum": [
+                    ".",
+                    ".."
+                ]
+            }
         }
     }
 }

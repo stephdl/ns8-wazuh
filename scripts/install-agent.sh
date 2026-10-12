@@ -30,6 +30,7 @@ INSTALL_DIR=/var/ossec
 CONFIG="${INSTALL_DIR}/etc/ossec.conf"
 TOKEN="${WAZUH_ENROLLMENT_TOKEN:-}"
 AGENT_NAME="${WAZUH_AGENT_NAME:-}"
+AGENT_GROUP="${WAZUH_AGENT_GROUP:-}"
 PACKAGE_URL=""
 SHA256=""
 START=1
@@ -49,6 +50,7 @@ The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
   --token TOKEN        Enrollment token (visible in the process list, prefer the variable)
   --token-file FILE    Read the enrollment token from FILE
   --name NAME          Agent name (default: the host name)
+  --group GROUP        Agent group, the customer of this host (default: default)
   --version VERSION    Agent version to install (default: 5.0.0-rc1)
   --package-url URL    Download this package instead of the default one
   --sha256 HASH        Expected SHA-256 of the package, needed to check a deb
@@ -64,6 +66,7 @@ while [ $# -gt 0 ]; do
         --token) TOKEN="${2:?--token needs a value}"; shift 2 ;;
         --token-file) TOKEN="$(tr -d '[:space:]' < "${2:?--token-file needs a file}")"; shift 2 ;;
         --name) AGENT_NAME="${2:?--name needs a value}"; shift 2 ;;
+        --group) AGENT_GROUP="${2:?--group needs a value}"; shift 2 ;;
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
         --package-url) PACKAGE_URL="${2:?--package-url needs a value}"; shift 2 ;;
         --sha256) SHA256="${2:?--sha256 needs a value}"; shift 2 ;;
@@ -93,6 +96,9 @@ fi
 # The agent name goes into the XML configuration
 case "${AGENT_NAME}" in
     *[!A-Za-z0-9._-]*) die "the agent name may only hold letters, digits, dots, dashes and underscores" ;;
+esac
+case "${AGENT_GROUP}" in
+    *[!A-Za-z0-9._-]*|.|..) die "the agent group may only hold letters, digits, dots, dashes and underscores" ;;
 esac
 
 arch="$(uname -m)"
@@ -222,10 +228,13 @@ if ! grep -q "<endpoint>${address}</endpoint>" "${CONFIG}"; then
     die "cannot write the server address in ${CONFIG}"
 fi
 
-if [ -n "${AGENT_NAME}" ]; then
-    # The name is read from the enrollment block, an agent_name next to the manager is refused
+if [ -n "${AGENT_NAME}" ] || [ -n "${AGENT_GROUP}" ]; then
+    # The name and the group are read from the enrollment block, the manager stores the group at enrollment
+    enrollment="<enrollment>"
+    [ -z "${AGENT_NAME}" ] || enrollment="${enrollment}\n      <agent_name>${AGENT_NAME}</agent_name>"
+    [ -z "${AGENT_GROUP}" ] || enrollment="${enrollment}\n      <groups>${AGENT_GROUP}</groups>"
     sed -i '/<enrollment>/,/<\/enrollment>/d' "${CONFIG}"
-    sed -i "0,/<manager>/ s#<manager>#<enrollment>\n      <agent_name>${AGENT_NAME}</agent_name>\n    </enrollment>\n    <manager>#" "${CONFIG}"
+    sed -i "0,/<manager>/ s#<manager>#${enrollment}\n    </enrollment>\n    <manager>#" "${CONFIG}"
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the configuration, see ${CONFIG}"
 fi
 

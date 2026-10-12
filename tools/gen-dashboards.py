@@ -144,8 +144,27 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def dashboard(id, title, description, panels):
-    """panels: list of (object, w, h). Laid out left to right on a 48 columns grid."""
+def controls(id, pattern):
+    """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
+    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
+    params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
+                            "indexPatternRefName": f"control_{i}_index_pattern",
+                            "options": {"type": "terms", "multiselect": True, "dynamicOptions": True,
+                                        "size": 100, "order": "desc"}}
+                           for i, (cid, field, label, parent) in enumerate(fields)],
+              "updateFiltersOnChange": True, "useTimeFilter": True, "pinFilters": False}
+    return {"id": id, "type": "visualization",
+            "attributes": {"title": "Customer and agent", "description": "", "version": 1, "uiStateJSON": "{}",
+                           "visState": json.dumps({"title": "Customer and agent", "type": "input_control_vis",
+                                                   "params": params, "aggs": []}),
+                           "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
+            "references": [{"name": f"control_{i}_index_pattern", "type": "index-pattern", "id": pattern}
+                           for i in range(len(fields))]}
+
+
+def dashboard(id, title, description, panels, pattern=EVENTS):
+    """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
+    panels = [(controls(f"{id}-controls", pattern), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -270,4 +289,39 @@ write("50-system-changes.ndjson", dashboard("ns8-system-changes", "NS8 - System 
     (search("ns8-system-changes-list", "NS8 - System changes", SYSTEM, CHANGES,
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "service.name",
              "process.name", "user.name"]), 48, 16),
+]))
+
+MAIL = "process.name:(postfix or rspamd)"
+DELIVERY = "process.name:postfix and event.action:(sent or bounced or deferred or expired)"
+REJECTED = "event.action:mail-rejected"
+SPAM = "process.name:rspamd"
+SASL = "process.name:postfix and event.action:logon-failed"
+write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
+    "Postfix and Rspamd of the ns8-mail module: deliveries, rejections, spam, viruses and SMTP login failures", [
+    (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
+         metric(group=terms("2", "event.action", "group", size=5))), 24, 8),
+    (vis("ns8-mail-rejected-count", "Rejected messages", APPS, REJECTED,
+         metric(extra_metrics=[{"id": "2", "enabled": True, "type": "cardinality", "schema": "metric",
+                                "params": {"field": "source.ip", "customLabel": "Distinct sources"}}])), 24, 8),
+    (vis("ns8-mail-timeline", "Mail flow over time", APPS, f"{DELIVERY} or {REJECTED}",
+         over_time(terms("3", "event.action", "group", size=6), kind="histogram")), 48, 10),
+    (vis("ns8-mail-spam-actions", "Spam filter decisions", APPS, SPAM,
+         pie(terms("2", "event.action", "segment", size=6))), 16, 14),
+    (vis("ns8-mail-reject-reasons", "Rejection reasons", APPS, REJECTED,
+         table(terms("2", "event.reason", "bucket", size=30, label="Reason"),
+               terms("3", "event.code", "bucket", size=3, label="Code"))), 32, 14),
+    (vis("ns8-mail-senders", "Top senders", APPS, SPAM,
+         table(terms("2", "email.from.address", "bucket", size=30, label="Sender"))), 16, 14),
+    (vis("ns8-mail-recipients", "Top recipients", APPS, "process.name:postfix and event.action:sent",
+         table(terms("2", "email.to.address", "bucket", size=30, label="Recipient"))), 16, 14),
+    (vis("ns8-mail-bounces", "Bounced and deferred", APPS, "process.name:postfix and event.action:(bounced or deferred)",
+         table(terms("2", "email.to.address", "bucket", size=30, label="Recipient"),
+               terms("3", "event.action", "bucket", size=2, label="Status"))), 16, 14),
+    (vis("ns8-mail-sasl-sources", "SMTP login failures", APPS, SASL,
+         table(terms("2", "source.ip", "bucket", size=30, label="Source IP"),
+               terms("3", "user.name", "bucket", size=3, label="User", missing=True),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+    (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
+    (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
+            ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))

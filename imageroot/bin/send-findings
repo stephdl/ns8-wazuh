@@ -193,16 +193,22 @@ def email(cursor):
     for hits, ts, ids in pages(ts, ids, [{"terms": {"wazuh.rule.level": levels}}], NOISE):
         for hit in hits:
             source = hit["_source"]["wazuh"]
-            counts[(source.get("agent", {}).get("name", "?"), source.get("rule", {}).get("title", "?"))] += 1
+            wazuh_agent = source.get("agent", {})
+            # The customer is the group the agent enrolled in, "default" means none
+            customer = ", ".join(g for g in wazuh_agent.get("groups") or [] if g != "default")
+            counts[(customer, wazuh_agent.get("name", "?"), source.get("rule", {}).get("title", "?"))] += 1
         total += len(hits)
     if total:
-        # One block per agent, one line per rule with a count, instead of one line per finding
+        # One block per customer and agent, one line per rule with a count, instead of one line per finding
         lines = [f"{total} new findings.", ""]
-        for agent_name in sorted({a for a, _ in counts}):
-            lines.append(agent_name)
-            rules = [(n, r) for (a, r), n in counts.items() if a == agent_name]
-            lines += [f"  {n} x {r}" for n, r in sorted(rules, key=lambda x: (-x[0], x[1]))]
-            lines.append("")
+        for customer in sorted({c for c, _, _ in counts}):
+            if customer:
+                lines += [f"Customer {customer}", ""]
+            for agent_name in sorted({a for c, a, _ in counts if c == customer}):
+                lines.append(agent_name)
+                rules = [(n, r) for (c, a, r), n in counts.items() if c == customer and a == agent_name]
+                lines += [f"  {n} x {r}" for n, r in sorted(rules, key=lambda x: (-x[0], x[1]))]
+                lines.append("")
         lines.append(f"Open the dashboard: https://{host}/")
         send_mail(smtp, sender, recipients, f"Wazuh: {total} new findings on {host}", "\n".join(lines))
         log(f"email sent, {total} findings")

@@ -34,6 +34,10 @@
         "expires": {
             "type": "string",
             "description": "Expiration date, ISO 8601"
+        },
+        "group": {
+            "type": "string",
+            "description": "Agent group to pass to the install script, empty for the default group"
         }
     }
 }

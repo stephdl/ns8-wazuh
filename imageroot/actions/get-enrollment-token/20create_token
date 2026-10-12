@@ -26,9 +26,19 @@ body = {
 if data.get("description"):
     body["description"] = data["description"]
 
+# An agent that declares a group missing on the manager is refused at enrollment
+group = data.get("group", "")
+if group and group != "default":
+    existing = manager_api("GET", f"groups?groups_list={group}")
+    if not existing.get("data", {}).get("affected_items"):
+        created = manager_api("POST", "groups", {"group_id": group})
+        if created.get("error", 1) != 0:
+            print(agent.SD_ERR + f"group {group} refused: {created.get('detail') or created.get('message')}", file=sys.stderr)
+            sys.exit(2)
+
 response = manager_api("POST", "agents/enrollment-tokens", body)
 if response.get("error", 1) != 0:
     print(agent.SD_ERR + f"enrollment token refused: {response.get('detail')}", file=sys.stderr)
     sys.exit(2)
 
-json.dump(response["data"], fp=sys.stdout)
+json.dump(dict(response["data"], group=group), fp=sys.stdout)

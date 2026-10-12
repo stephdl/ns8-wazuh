@@ -88,10 +88,18 @@ Read the settings back with `api-cli run module/wazuh1/get-configuration`.
 Create an enrollment token. It allows enrollment during one day, for up to `max_uses` agents (1 to 100). Enrolled agents stay connected after it expires.
 
 ```
-api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"description":"web server"}'
+api-cli run module/wazuh1/get-enrollment-token --data '{"max_uses":1,"group":"acme"}'
 ```
 
 The same is available on the Agents page of the module. The token holds the server address and the certificate authority, so the agent needs no other setting.
+
+### Customers
+
+One server often watches the servers of several customers. Give the customer when you create the token: the agents enroll in a Wazuh group named after it, created when missing. The Agents page shows the customer of each agent, each `NS8 - ...` dashboard has a Customer then an Agent picker, and the findings email is grouped by customer, then by agent.
+
+A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. Without a customer the agent goes in the `default` group.
+
+The customer is set at enrollment and cannot change after. To move a server to another customer, revoke its agent, then enroll it again with a token of the new customer and `--force`. It gets a new id, and its past events keep the old customer.
 
 ### Linux
 
@@ -105,6 +113,7 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 
 - `--token-file FILE`: read the token from a file instead of the environment.
 - `--name NAME`: agent name, the host name by default.
+- `--group GROUP`: customer of the server, see [Customers](#customers). The Agents page adds it to the command.
 - `--version VERSION`, `--package-url URL`: install another agent package.
 - `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
 - `--no-start`: configure the agent without starting it.
@@ -131,7 +140,7 @@ An NS8 node is a Linux host like any other: run the same command as root on it. 
 
 ### Revoke an agent
 
-On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection. To bring it back, create a token and run the script again with `--force`.
+On the Agents page, Revoke deletes the agent from the server. It is refused at its next connection, and its past events stay in the indexer. The agent service keeps running on the host until you uninstall it there. To bring it back, create a token and run the script again with `--force`. The server refuses a second agent with the same name, so revoke the old one first.
 
 The same with the API:
 

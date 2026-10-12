@@ -144,7 +144,13 @@
     "max_uses": "Maximum uses",
     "max_uses_helper": "Servers that can use this token, 1 to 100.",
     "max_uses_invalid": "Must be a number between 1 and 100",
-    "description": "Description",
+    "customer": "Customer",
+    "customer_helper": "Optional. Groups the servers of one customer in the list and the dashboards.",
+    "customer_helper_known": "Optional. Known customers: {customers}",
+    "agent_name": "Agent name",
+    "agent_name_placeholder": "mail.example.com",
+    "agent_name_helper": "Optional. The host name of the server when empty.",
+    "name_invalid": "Only letters, digits, dots, dashes and underscores",
     "create_token": "Create a token",
     "token_ready": "Token ready",
     "token_expires": "Valid until {date}",
@@ -195,6 +201,7 @@
     "outdated": "Outdated",
     "update_command": "Update command",
     "update_title": "Update the agent",
-    "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed."
+    "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed.",
+    "col_customer": "Customer"
   }
 }
