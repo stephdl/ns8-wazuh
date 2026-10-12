@@ -149,7 +149,7 @@ def controls(id, pattern, program=False):
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1"),
               ("4", "orchestrator.namespace", "Module", "2")]
     if program:
-        fields.append(("3", "process.name", "Program", "2"))
+        fields.append(("3", "process.name", "Program", "4"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
                             "indexPatternRefName": f"control_{i}_index_pattern",
                             "options": {"type": "terms", "multiselect": True, "dynamicOptions": True,
