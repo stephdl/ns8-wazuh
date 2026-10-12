@@ -175,7 +175,7 @@ Also in #5: customers (see Per customer view), the dashboards loaded at each con
 To do: download the install script of the module version instead of `main`, so a new option such as `--group` works before the merge.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
-- Proxmox VE, next: Debian based, so the install script works, and the Wazuh `linux` and `system-auth` integrations already cover SSH, sudo, packages and FIM. The Wazuh CTI has no Proxmox integration. To add: web and API logins from `pvedaemon` (`authentication failure; rhost= user=`), tasks from their UPID (VM start, stop, create, delete, migrate, `vzdump` backup) with VM, user and result, rules for a deleted VM and a failed backup, and an NS8 - Proxmox dashboard. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
+- Proxmox VE, done in #5: the Wazuh 5 CTI has no Proxmox integration, so the decoders are ported from the Wazuh 4 one (`0440-proxmox-ve_decoders.xml`). Web and API logins, tasks from their UPID with type, guest, user and result, rules for a deleted guest and a failed backup, an NS8 - Proxmox dashboard. Tested on sample lines only, check on a real Proxmox VE 9. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
 - OPNsense: FreeBSD based. OPNsense has an `os-wazuh-agent` plugin, but a Wazuh 5 agent for FreeBSD is not checked. Otherwise its firewall and login logs come by syslog.
 - NethSecurity (OpenWrt): no Wazuh agent package exists for OpenWrt, so its logs come by syslog. Firewall drops, VPN logins, web interface logins.
 
