@@ -172,6 +172,12 @@ Left out, and why:
 
 Also in #5: customers (see Per customer view), the dashboards loaded at each configuration, update and restore, and a retry when the indexer is short of memory right after a restart.
 
+**Journal and module of each line, done in #5.** The NS8 - Journal dashboard lists every log line like `journalctl`, with pickers for customer, server, NS8 module and program. A word typed alone in the search bar searches the text, whatever its case (a lowercased `message.text` copy, searched by default). The Wazuh agent journald reader sends only `program[pid]: message`, it drops the user and the unit, and it cannot send JSON (`read_journald.c` always calls the syslog dump, Wazuh 4 too). So on an NS8 node `install-agent.sh` makes the agent run `/var/ossec/bin/ns8-journal` every 10 s (`log_format command`): it reads `journalctl -o json` with a cursor and adds the module, from the owner user for a rootless module and from the unit name for a rootful one. No service, nothing stored but the cursor. The root decoder reads both forms and puts the module in `orchestrator.namespace`, the unit in `service.id`. To check: no line lost or doubled during a burst or an agent restart. To ask upstream: a JSON output for the journald reader, the dump already exists in the agent (`entry_as_json`).
+
+**Retention, next.** The module sets none today: findings 90 days, metrics 30 days, events deleted one hour after their index rolls over at 20 GB or 200 million lines, so their keeping time is unknown. Wanted: keep the logs one year for legal reasons, on the Wazuh node, which already sits outside the watched clusters, and in the NS8 backup. To do: a retention setting in days (365 by default) applied to the ISM policies, one index per day so deletion goes day by day, a warning before the disk fills (a full indexer refuses new logs), and a disk estimate in the README (about 40 MB a day for two NS8 nodes on the test cluster).
+
+**Unclassified logs.** Tested: every journal line is kept by the NS8 root decoder, even without a decoder of its own. `index_unclassified_events` only adds the few logs that decoder refuses. Leave it off.
+
 To do: download the install script of the module version instead of `main`, so a new option such as `--group` works before the merge.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
