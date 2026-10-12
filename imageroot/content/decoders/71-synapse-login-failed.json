@@ -1,0 +1,57 @@
+{
+  "resource": {
+    "name": "decoder/ns8-synapse-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Matrix failed login",
+      "description": "Wrong passwords on the Matrix Synapse server",
+      "author": "NethServer",
+      "module": "matrix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"Attempted to login as @\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>Attempted to login as @<user.name>:<user.domain> but<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "synapse"
+          }
+        ]
+      }
+    ]
+  }
+}

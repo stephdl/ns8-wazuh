@@ -353,3 +353,21 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
     (search("ns8-directory-changes-list", "NS8 - Directory changes", APPS, SAMBA_IAM,
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
 ]))
+
+COLLAB = "process.name:(nextcloud or synapse or ejabberd) and event.category:authentication"
+COLLAB_FAIL = f"{COLLAB} and event.outcome:failure"
+write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collaboration",
+    "Failed logins on Nextcloud, Matrix and Ejabberd. Webtop and Mattermost do not log them", [
+    (vis("ns8-collaboration-count", "Failed logins by application", APPS, COLLAB_FAIL,
+         metric(group=terms("2", "process.name", "group", size=5))), 48, 8),
+    (vis("ns8-collaboration-timeline", "Failed logins over time", APPS, COLLAB_FAIL,
+         over_time(terms("3", "process.name", "group", size=5), kind="histogram")), 48, 10),
+    (vis("ns8-collaboration-users", "Failed logins by user", APPS, COLLAB_FAIL,
+         table(terms("2", "user.name", "bucket", size=50, label="User"),
+               terms("3", "process.name", "bucket", size=3, label="Application"))), 24, 14),
+    (vis("ns8-collaboration-sources", "Failed logins by source", APPS, COLLAB_FAIL,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("4", "process.name", "bucket", size=3, label="Application"))), 24, 14),
+    (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
+]))

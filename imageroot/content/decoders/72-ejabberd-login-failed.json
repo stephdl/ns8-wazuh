@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-ejabberd-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Ejabberd failed login",
+      "description": "Wrong passwords on the Ejabberd XMPP server",
+      "author": "NethServer",
+      "module": "ejabberd",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"Failed c2s \")"
+      },
+      {
+        "event.original": "contains(\"authentication for \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>Failed c2s <~> authentication for <user.name>@<user.domain> from ::ffff:<source.ip>: <event.reason>",
+          "<~>Failed c2s <~> authentication for <user.name>@<user.domain> from <source.ip>: <event.reason>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "ejabberd"
+          }
+        ]
+      }
+    ]
+  }
+}
