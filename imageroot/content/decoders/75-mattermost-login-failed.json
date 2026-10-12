@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-mattermost-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Mattermost failed login",
+      "description": "Wrong passwords on an existing Mattermost account",
+      "author": "NethServer",
+      "module": "mattermost",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"A user tried to sign in\")"
+      },
+      {
+        "event.original": "contains(\"password was incorrect\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~> ip_addr=<source.ip> <~> username=<user.name>",
+          "<~> ip_addr=<source.ip> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "mattermost"
+          }
+        ]
+      }
+    ]
+  }
+}
