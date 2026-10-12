@@ -156,17 +156,26 @@ Known gaps:
 
 Checked on the test node with rc1. Multi-tenancy is off, so the saved objects are global and every user sees them. The dashboard already creates index patterns whose id is their title (`wazuh-events-v5-applications*`, `wazuh-findings-v5*`): our objects point to them, no pattern of our own. GeoIP works out of the box: the custom space policy has the `geo` enrichment and the manager ships GeoLite2 City and ASN. A public source IP gets `source.geo.*` and `source.as.*`, a private one gets nothing. The agent status is not in the indexer, only in the manager API: Fleet shows the last event per agent instead, the Endpoints page keeps the real status.
 
-**Every NS8 module.** The agent reads the whole host journal, so the log of each module container already reaches the manager. What is missing per module is decoders, rules and a panel. The dashboards are grouped by family, one pull request each, in this order:
-1. Mail: Postfix (relay denied, SASL failures, top senders and recipients, volume), Dovecot (done), Rspamd (spam and rejects), ClamAV (viruses found), imapsync failures.
-2. Directory: Samba AD (Kerberos and NTLM failures, locked accounts, user and group changes), OpenLDAP and ldapproxy binds, LAM changes.
-3. Webmail, collaboration and chat: Roundcube, SOGo, Webtop, Nextcloud, Collabora, Passbolt, Mattermost, Matrix (Synapse), Ejabberd. Logins and failures, Nextcloud admin actions and shares.
-4. Web hosting and telephony: LAMP, webserver, WordPress, DokuWiki access logs (status, paths, scanners, wp-login brute force). NethVoice and nethvoice-proxy (SIP auth failures, toll fraud attempts).
-5. Later: MariaDB and PostgreSQL auth failures, BackupPC failed backups, n8n, Paperless, Grafana, Piler, nethsecurity-controller.
+**Every NS8 module.** The agent reads the whole host journal, so the log of each module container already reaches the manager. What is missing per module is decoders, rules and a panel. Status of pull request #5, tested on the test cluster:
+1. Mail, done: Postfix SASL failures, rejections and deliveries, Rspamd results. Rules for a virus and a denied relay. ClamAV is read through the Postfix rejection, its own lines do not reach the indexer.
+2. Directory, done: the Samba JSON audit, logins with account, source and workstation, group and password changes, directory objects, password policy changes. The samba module logs no login by default: the README gives one line for `include.conf`. Not tested: the locked account rule, the test domain has no lockout policy.
+3. Collaboration, done: failed logins of Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost (existing accounts only).
+4. Web hosting, done: the Traefik router name gives the site, a rule flags scans of typical attack paths.
+5. Telephony, done from the ns8-crowdsec scenarios (#182, #184, #212): Kamailio SIP failures, refused CTI and reports logins. Tested on sample lines only, check on a real NethVoice.
 
-The Logins dashboard then aggregates every `event.category: authentication` across the modules. Each family needs real log lines first: some modules log to a file inside their volume and not to journald, check that before writing the decoders.
+Left out, and why:
+- Webtop: a failed login answers HTTP 200 like a good one, and nothing is logged.
+- Passbolt: the login uses a GPG key, not a password.
+- OpenLDAP and ldapproxy binds: nothing reaches journald.
+- Samba file access: in the `samba_audit` table only, a script on the samba node could read it (see Samba audit below).
+- Later: MariaDB and PostgreSQL auth failures, BackupPC failed backups, n8n, Paperless, Grafana, Piler, nethsecurity-controller.
+
+Also in #5: customers (see Per customer view), the dashboards loaded at each configuration, update and restore, and a retry when the indexer is short of memory right after a restart.
+
+To do: download the install script of the module version instead of `main`, so a new option such as `--group` works before the merge.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
-- Proxmox VE: Debian based, so the install script works. Logins to the web interface and the API (`pvedaemon`, `pveproxy`), VM and container tasks, backup jobs. Check whether the Wazuh CTI already has a Proxmox integration.
+- Proxmox VE, next: Debian based, so the install script works, and the Wazuh `linux` and `system-auth` integrations already cover SSH, sudo, packages and FIM. The Wazuh CTI has no Proxmox integration. To add: web and API logins from `pvedaemon` (`authentication failure; rhost= user=`), tasks from their UPID (VM start, stop, create, delete, migrate, `vzdump` backup) with VM, user and result, rules for a deleted VM and a failed backup, and an NS8 - Proxmox dashboard. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
 - OPNsense: FreeBSD based. OPNsense has an `os-wazuh-agent` plugin, but a Wazuh 5 agent for FreeBSD is not checked. Otherwise its firewall and login logs come by syslog.
 - NethSecurity (OpenWrt): no Wazuh agent package exists for OpenWrt, so its logs come by syslog. Firewall drops, VPN logins, web interface logins.
 
