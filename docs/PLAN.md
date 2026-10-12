@@ -174,6 +174,10 @@ Syslog needs a new input in the module: a port opened on the node, and a check t
 
 Each one is named `NS8 - ...` with a fixed id, so an update replaces it: an administrator copies it before changing it. They live in the `.kibana` index, so the backup snapshot keeps them. The field names may change between `5.0.0-rc1` and `5.0.0`: check them at the version change.
 
+**Per customer view.** One server often watches several customers of an integrator. An agent is enrolled in a Wazuh group named after its customer (`wazuh.agent.groups`). Each NS8 dashboard has a control to pick a customer, then an agent, and the findings email is grouped by customer, then by agent. Only the integrator reads the dashboards and the emails, so one global view and one global notification are enough.
+
+Not planned unless a customer asks: isolation, where a customer logs in and sees only its agents (document level security on `wazuh.agent.groups` in the indexer roles), and email recipients per customer. A customer who needs isolation can get its own wazuh module instead.
+
 **Remote agent update.** The Wazuh API can upgrade an agent through its own connection with a signed WPK package (`PUT /agents/upgrade`), without SSH. No WPK is published for 5.0.0-rc1. To look at once 5.0.0 is out, as a button next to the update command.
 
 **Agent as an NS8 module.** It would need a privileged rootfull container with the host mounted to read the journal, the packages and the files, and Wazuh does not support that layout. The install script stays the way to deploy agents unless a customer asks for a module.
