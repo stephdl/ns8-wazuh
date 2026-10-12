@@ -194,6 +194,8 @@ The module adds eleven dashboards to the Wazuh dashboard, under Explore > Dashbo
 | NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
 | NS8 - Proxmox | Proxmox VE hosts with an agent: web and API logins, tasks by type and user, failed tasks and backups, deleted guests |
 
+The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
+
 ### Samba audit
 
 The NS8 - Directory dashboard reads the audit of the Samba domain controller: logins and their failures (LDAP, Kerberos, NTLM, SMB), group membership, password resets, created and deleted accounts, and password policy changes. The samba module does not log the logins by default, so turn the audit on once on the node that runs it. Replace `samba1` with the instance name:
@@ -205,7 +207,12 @@ runagent -m samba1 systemctl --user restart samba-dc
 
 `include.conf` is meant for local settings and is kept by the samba updates. The node needs a Wazuh agent. The address in the events is the one that reached the domain controller, a local or VPN address, so the dashboard shows no country. For a Windows login, the workstation name tells where it comes from.
 
-The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
+To turn the audit off, remove that line from `include.conf` and restart `samba-dc` the same way:
+
+```
+runagent -m samba1 podman exec samba-dc sed -i '/auth_json_audit/d' /etc/samba/include.conf
+runagent -m samba1 systemctl --user restart samba-dc
+```
 
 ## LDAP login
 
