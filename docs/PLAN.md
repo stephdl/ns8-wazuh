@@ -144,15 +144,26 @@ Known gaps:
 - Let's Encrypt for the dashboard, with a real host name.
 - Remote agent update with a WPK package, once 5.0.0 is out (see below).
 - Slack, Microsoft Teams and Mattermost channels (see below).
-- Generic NS8 dashboards shipped with the module (see below).
+- Generic NS8 dashboards shipped with the module, then one family of NS8 modules at a time (see below).
 - Move from `5.0.0-rc1` to `5.0.0` through the Renovate pull request. Check the agent package name and the staging repository of the install script then: the final packages will likely move to the stable Wazuh repository.
 
-**Generic NS8 dashboards.** The dashboard imports saved objects (ndjson) through `POST /api/saved_objects/_import?overwrite=true`. The module could ship them in `imageroot/content/dashboards/` and load them at each configuration and update, like the decoders and rules. Useful to any NS8 customer:
-- Logins: Dovecot and api-server successes and failures, by user, source IP and country.
-- Web: Traefik requests by status code, top source IPs and paths, bursts of 4xx and 5xx.
+**Generic NS8 dashboards.** The dashboard imports saved objects (ndjson) through `POST /api/saved_objects/_import?overwrite=true`. The module ships them in `imageroot/content/dashboards/` and loads them at each configuration and update, like the decoders and rules. Useful to any NS8 customer:
+- Logins: Dovecot and api-server successes and failures, by user, source IP and country, with a map.
+- Web: Traefik requests by status code, top source IPs, paths and countries, bursts of 4xx and 5xx.
 - CrowdSec: triggered scenarios and banned IPs.
-- Fleet: findings by level and agent over time, disconnected agents.
+- Fleet: findings by level, agent, rule and MITRE tactic over time, last event per agent.
 - System changes: users created or deleted, services stopped, firewall changes.
+
+Checked on the test node with rc1. Multi-tenancy is off, so the saved objects are global and every user sees them. The dashboard already creates index patterns whose id is their title (`wazuh-events-v5-applications*`, `wazuh-findings-v5*`): our objects point to them, no pattern of our own. GeoIP works out of the box: the custom space policy has the `geo` enrichment and the manager ships GeoLite2 City and ASN. A public source IP gets `source.geo.*` and `source.as.*`, a private one gets nothing. The agent status is not in the indexer, only in the manager API: Fleet shows the last event per agent instead, the Endpoints page keeps the real status.
+
+**Every NS8 module.** The agent reads the whole host journal, so the log of each module container already reaches the manager. What is missing per module is decoders, rules and a panel. The dashboards are grouped by family, one pull request each, in this order:
+1. Mail: Postfix (relay denied, SASL failures, top senders and recipients, volume), Dovecot (done), Rspamd (spam and rejects), ClamAV (viruses found), imapsync failures.
+2. Directory: Samba AD (Kerberos and NTLM failures, locked accounts, user and group changes), OpenLDAP and ldapproxy binds, LAM changes.
+3. Webmail, collaboration and chat: Roundcube, SOGo, Webtop, Nextcloud, Collabora, Passbolt, Mattermost, Matrix (Synapse), Ejabberd. Logins and failures, Nextcloud admin actions and shares.
+4. Web hosting and telephony: LAMP, webserver, WordPress, DokuWiki access logs (status, paths, scanners, wp-login brute force). NethVoice and nethvoice-proxy (SIP auth failures, toll fraud attempts).
+5. Later: MariaDB and PostgreSQL auth failures, BackupPC failed backups, n8n, Paperless, Grafana, Piler, nethsecurity-controller.
+
+The Logins dashboard then aggregates every `event.category: authentication` across the modules. Each family needs real log lines first: some modules log to a file inside their volume and not to journald, check that before writing the decoders.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
 - Proxmox VE: Debian based, so the install script works. Logins to the web interface and the API (`pvedaemon`, `pveproxy`), VM and container tasks, backup jobs. Check whether the Wazuh CTI already has a Proxmox integration.
