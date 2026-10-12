@@ -24,8 +24,8 @@ wazuh_api.MEMORY_RETRY_SECONDS = 120
 # One index per stream and per month: 16 streams stay far below the shard limit of a single node
 ROLLOVER_AGE = "30d"
 POLICIES = {
-    "stream-events-policy": ".ds-wazuh-events-v5-*",
-    "stream-findings-policy": ".ds-wazuh-findings-v5-*",
+    "stream-events-policy": "wazuh-events-v5-*",
+    "stream-findings-policy": "wazuh-findings-v5-*",
 }
 
 
@@ -65,7 +65,10 @@ def retention_policy(policy, delete_after):
 
 def apply_to_existing(policy_id, pattern, seq_no):
     """Attach the current version of the policy to the indices that miss it."""
-    explain = api("GET", f"_plugins/_ism/explain/{pattern}?expand_wildcards=all")
+    # The data stream name expands to its hidden backing indices
+    explain = api("GET", f"_plugins/_ism/explain/{pattern}")
+    if "error" in explain:
+        raise SystemExit(f"{policy_id}: {explain['error']}")
     updated = 0
     for name, info in explain.items():
         if not isinstance(info, dict):
