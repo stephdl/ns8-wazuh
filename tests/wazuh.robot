@@ -58,6 +58,7 @@ Check if wazuh configuration reads back
     Should Be Equal    ${config}[host]    ${TEST_HOST}
     Should Be Equal    ${config}[ldap_domain]    ${EMPTY}
     Should Be Equal    ${config}[notify_enabled]    ${False}
+    Should Be Equal As Integers    ${config}[retention_days]    365
     Should Be Equal As Integers    ${config}[agents_enrolled]    0
 
 Check if the three services are running
@@ -104,6 +105,19 @@ Check if a saved setting does not restart the services
     Use the install node
     ${after} =    Execute Command    runagent -m ${module_id} podman inspect -f '{{.State.StartedAt}}' wazuh-manager
     Should Be Equal    ${before}    ${after}
+
+Check if the log retention is set in the indexer
+    Run action    configure-module
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"retention_days":400}
+    ${config} =    Run action    get-configuration
+    Should Be Equal As Integers    ${config}[retention_days]    400
+    Use the install node
+    FOR    ${policy}    IN    stream-events-policy    stream-findings-policy
+        ${output} =    Execute Command
+        ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' https://localhost:9200/_plugins/_ism/policies/${policy}
+        Should Contain    ${output}    "min_rollover_age":"400d"
+        Should Contain    ${output}    "min_index_age":"30d"
+    END
 
 Check if an agent on the same node can enroll
     Use the install node

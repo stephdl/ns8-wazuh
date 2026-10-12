@@ -14,5 +14,6 @@ exec 1>&2
 
 runagent provision-content
 runagent provision-detector
+runagent provision-retention
 # A dashboard that does not load must not block the configuration
 runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"
