@@ -197,10 +197,14 @@
                       class="mg-bottom"
                       ref="max_uses"
                     />
-                    <NsTextInput
-                      v-model.trim="customer"
-                      :label="$t('agents.customer')"
-                      :helper-text="customerHelperText"
+                    <NsComboBox
+                      v-model="customer"
+                      :options="customerOptions"
+                      acceptUserInput
+                      :userInputLabel="$t('agents.new_customer')"
+                      :title="$t('agents.customer')"
+                      :label="$t('agents.choose_customer')"
+                      :helper-text="$t('agents.customer_helper')"
                       :invalid-message="$t(error.group)"
                       :disabled="loading.getEnrollmentToken"
                       class="mg-bottom"
@@ -416,13 +420,12 @@ export default {
         ),
       ].sort();
     },
-    customerHelperText() {
-      // Listing the known customers avoids a typo creating a second one
-      return this.customers.length
-        ? this.$t("agents.customer_helper_known", {
-            customers: this.customers.join(", "),
-          })
-        : this.$t("agents.customer_helper");
+    customerOptions() {
+      return this.customers.map((customer) => ({
+        name: customer,
+        label: customer,
+        value: customer,
+      }));
     },
     // The token goes through the environment so it does not show in the process list
     installCommand() {
@@ -616,6 +619,7 @@ export default {
       }
       // Same characters as Wazuh accepts for a group and the install script for a name
       const namePattern = /^[A-Za-z0-9._-]{1,128}$/;
+      this.customer = (this.customer || "").trim();
       if (
         this.customer &&
         (!namePattern.test(this.customer) || /^\.\.?$/.test(this.customer))
