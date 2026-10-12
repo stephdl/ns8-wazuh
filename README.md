@@ -178,7 +178,7 @@ The logs that no decoder recognizes are dropped, unless `index_unclassified_even
 
 ## Dashboards
 
-The module adds nine dashboards to the Wazuh dashboard, under Explore > Dashboards:
+The module adds ten dashboards to the Wazuh dashboard, under Explore > Dashboards:
 
 | Dashboard | Content |
 |---|---|
@@ -191,6 +191,7 @@ The module adds nine dashboards to the Wazuh dashboard, under Explore > Dashboar
 | NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
 | NS8 - Collaboration | failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost, by user, source and country. Mattermost logs only the accounts that exist, Webtop logs nothing |
 | NS8 - Web hosting | lamp, webserver, wordpress and dokuwiki sites from Traefik: requests by site, probed paths, scanning sources, server errors |
+| NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
 
 ### Samba audit
 

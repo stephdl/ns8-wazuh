@@ -391,3 +391,20 @@ write("90-web-hosting.ndjson", dashboard("ns8-web-hosting", "NS8 - Web hosting",
          table(terms("2", "service.name", "bucket", size=20, label="Site"),
                terms("3", "url.path", "bucket", size=5, label="Path"))), 48, 12),
 ]))
+
+PHONE = "process.name:(kamailio or nethvoice) and event.outcome:failure"
+SIP = "process.name:kamailio and event.outcome:failure"
+write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
+    "NethVoice: SIP authentication failures on the proxy, failed logins on the CTI and the reports", [
+    (vis("ns8-telephony-count", "Failures by service", APPS, PHONE,
+         metric(group=terms("2", "service.name", "group", size=5))), 16, 8),
+    (vis("ns8-telephony-timeline", "Failures over time", APPS, PHONE,
+         over_time(terms("3", "service.name", "group", size=5), kind="histogram")), 32, 8),
+    (vis("ns8-telephony-sip-sources", "SIP failures by source", APPS, SIP,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+    (vis("ns8-telephony-sip-users", "SIP failures by extension", APPS, SIP,
+         table(terms("2", "user.name", "bucket", size=50, label="Extension"),
+               terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
+    (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
+]))

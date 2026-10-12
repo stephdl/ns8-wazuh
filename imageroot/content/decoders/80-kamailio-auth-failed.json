@@ -1,0 +1,64 @@
+{
+  "resource": {
+    "name": "decoder/ns8-kamailio-auth-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Kamailio SIP authentication failure",
+      "description": "Wrong SIP credentials on the NethVoice proxy, the sign of a SIP brute force",
+      "author": "NethServer",
+      "module": "nethvoice-proxy",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh",
+        "https://github.com/NethServer/ns8-crowdsec/pull/182"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "contains(\"[SECURITY-AUTHFAIL]\")"
+      },
+      {
+        "event.original": "contains(\"event=auth_failure\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "<~>event=auth_failure method=<~> status=<event.code> src_ip=<source.ip> user=<user.name> callid=<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "process.name": "kamailio"
+          },
+          {
+            "service.name": "SIP"
+          }
+        ]
+      }
+    ]
+  }
+}
