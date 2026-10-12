@@ -47,6 +47,9 @@
           },
           {
             "event.outcome": "failure"
+          },
+          {
+            "process.name": "dovecot"
           }
         ]
       }

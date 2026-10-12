@@ -40,6 +40,9 @@
             "event.type": [
               "access"
             ]
+          },
+          {
+            "process.name": "traefik"
           }
         ]
       }

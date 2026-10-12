@@ -46,6 +46,9 @@
           },
           {
             "event.outcome": "success"
+          },
+          {
+            "process.name": "api-server"
           }
         ]
       }
