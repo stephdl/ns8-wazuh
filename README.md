@@ -182,7 +182,7 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 
 | Dashboard | Content |
 |---|---|
-| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server and a program, type a word in the search bar, such as `*crowdsec*` |
+| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
 | NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
 | NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
 | NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |

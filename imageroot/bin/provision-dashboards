@@ -32,20 +32,26 @@ def wait_ready():
 
 
 def search_words_in_message():
-    """A word typed alone in the search bar matches the log text, not only the agent fields."""
-    extra = {"message", "process.name"}
+    """A word typed alone in the search bar matches the log text, whatever its case."""
+    # message is a keyword, searched as typed: a text copy of it is lowercased and split into words
+    message = {"type": "keyword", "ignore_above": 4096, "fields": {"text": {"type": "text"}}}
+    extra = {"message.text", "process.name"}
+    api("PUT", "wazuh-events-v5-*/_mapping", {"properties": {"message": message}})
     current = api("GET", "wazuh-events-v5-*/_settings/index.query.default_field")
     fields = {f for v in current.values() for f in v["settings"]["index"]["query"]["default_field"]}
     if not extra <= fields:
         api("PUT", "wazuh-events-v5-*/_settings", {"index": {"query": {"default_field": sorted(fields | extra)}}})
-    # The templates too, so the next index of each data stream gets it
+    # The templates too, so the next index of each data stream gets them
     for item in api("GET", "_index_template/wazuh-events-v5-*").get("index_templates", []):
         template = item["index_template"]
-        query = template.setdefault("template", {}).setdefault("settings", {}).setdefault("index", {}).setdefault("query", {})
-        if not extra <= set(query.get("default_field", [])):
-            query["default_field"] = sorted(set(query.get("default_field", [])) | extra)
-            api("PUT", f"_index_template/{item['name']}", template)
-
+        body = template.setdefault("template", {})
+        query = body.setdefault("settings", {}).setdefault("index", {}).setdefault("query", {})
+        properties = body.setdefault("mappings", {}).setdefault("properties", {})
+        if extra <= set(query.get("default_field", [])) and properties.get("message") == message:
+            continue
+        query["default_field"] = sorted(set(query.get("default_field", [])) | extra)
+        properties["message"] = message
+        api("PUT", f"_index_template/{item['name']}", template)
 
 wait_ready()
 search_words_in_message()
