@@ -8,6 +8,7 @@
 import json
 import os
 import subprocess
+import time
 
 _password = None
 
@@ -40,7 +41,22 @@ def curl_quote(value):
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def _is_memory_refusal(answer):
+    error = answer.get("error") if isinstance(answer, dict) else None
+    return isinstance(error, dict) and error.get("type") == "circuit_breaking_exception"
+
+
 def api(method, path, body=None, admin_cert=False):
+    # Right after a restart the indexer refuses requests while its memory is full: wait and retry
+    for _ in range(12):
+        answer = _api(method, path, body, admin_cert)
+        if not _is_memory_refusal(answer):
+            return answer
+        time.sleep(10)
+    return answer
+
+
+def _api(method, path, body=None, admin_cert=False):
     # The curl options go through stdin, so the password never appears in a process list.
     # Restoring protected indices needs the admin certificate: the password is not enough.
     if admin_cert:
