@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"IMAP Error: Login failed for \")"
+        "_line": "contains(\"IMAP Error: Login failed for \")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>Login failed for <user.name> against <~> \\(X-Real-IP: <source.ip>,<~>",
           "<~>Login failed for <user.name> against <~> from <source.ip>. <~>"
         ]

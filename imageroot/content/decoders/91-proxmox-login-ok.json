@@ -22,15 +22,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"pvedaemon[\")"
+        "_line": "contains(\"pvedaemon[\")"
       },
       {
-        "event.original": "contains(\"successful auth for user '\")"
+        "_line": "contains(\"successful auth for user '\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>successful auth for user '<user.name>@<_realm>'<~>",
           "<~>successful auth for user '<user.name>@<_realm>'"
         ]

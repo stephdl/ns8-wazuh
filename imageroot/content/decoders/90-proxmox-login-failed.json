@@ -22,15 +22,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"pvedaemon[\")"
+        "_line": "contains(\"pvedaemon[\")"
       },
       {
-        "event.original": "contains(\"authentication failure; rhost=\")"
+        "_line": "contains(\"authentication failure; rhost=\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>rhost=::ffff:<source.ip> user=<user.name>@<user.domain> msg=<event.reason>",
           "<~>rhost=<source.ip> user=<user.name>@<user.domain> msg=<event.reason>"
         ]

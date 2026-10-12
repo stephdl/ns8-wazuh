@@ -146,7 +146,8 @@ def search(id, title, pattern, query, columns):
 
 def controls(id, pattern, program=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
-    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
+    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1"),
+              ("4", "orchestrator.namespace", "Module", "2")]
     if program:
         fields.append(("3", "process.name", "Program", "2"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
@@ -438,7 +439,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
-    "Log lines of every server, like journalctl: pick a customer, a server and a program, and type a word in the search bar, such as crowdsec, any case", [
+    "Log lines of every server, like journalctl: pick a customer, a server, an NS8 module and a program, and type a word in the search bar, such as crowdsec, any case", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
-            ["wazuh.agent.name", "process.name", "message"]), 48, 80),
+            ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
 ], program=True))

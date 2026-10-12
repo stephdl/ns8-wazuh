@@ -20,18 +20,18 @@
     },
     "check": [
       {
-        "event.original": "contains(\"postfix/\")"
+        "_line": "contains(\"postfix/\")"
       },
       {
-        "event.original": "contains(\"SASL \")"
+        "_line": "contains(\"SASL \")"
       },
       {
-        "event.original": "contains(\"authentication failed\")"
+        "_line": "contains(\"authentication failed\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>warning: <~>[<source.ip>]: SASL <~> authentication failed: <~>, sasl_username=<user.name>",
           "<~>warning: <~>[<source.ip>]: SASL <~> authentication failed<~>"
         ]

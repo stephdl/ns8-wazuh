@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"rspamd_task_write_log\")"
+        "_line": "contains(\"rspamd_task_write_log\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>qid: \\<<email.local_id>>, ip: <source.ip>, from: \\<<email.from.address>>, \\(default: <~> \\(<event.action>\\): [<event.risk_score>/<~>",
           "<~>qid: \\<<email.local_id>>, ip: <source.ip>, from: \\<>, \\(default: <~> \\(<event.action>\\): [<event.risk_score>/<~>"
         ]

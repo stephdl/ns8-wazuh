@@ -21,27 +21,27 @@
     },
     "check": [
       {
-        "event.original": "contains(\"nethvoice\")"
+        "_line": "contains(\"nethvoice\")"
       },
       {
-        "event.original": "contains(\"[GIN] \")"
+        "_line": "contains(\"[GIN] \")"
       },
       {
-        "event.original": "contains(\"| 401 |\")"
+        "_line": "contains(\"| 401 |\")"
       },
       {
-        "event.original": "contains(\"POST\")"
+        "_line": "contains(\"POST\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>[GIN] <~> | <event.code> |<~>| <~>",
           "<~>"
         ]
       },
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>| <~> |<~>| <_gin_ip> | <~>"
         ]
       },

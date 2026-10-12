@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"postfix/\")"
+        "_line": "contains(\"postfix/\")"
       },
       {
-        "event.original": "contains(\" status=\")"
+        "_line": "contains(\" status=\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>: <email.local_id>: to=\\<<email.to.address>>, <~>dsn=<event.code>, status=<event.action> <~>"
         ]
       },

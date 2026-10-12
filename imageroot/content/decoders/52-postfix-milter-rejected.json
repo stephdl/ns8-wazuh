@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"postfix/\")"
+        "_line": "contains(\"postfix/\")"
       },
       {
-        "event.original": "contains(\"milter-reject: \")"
+        "_line": "contains(\"milter-reject: \")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>: milter-reject: <~> from <~>[<source.ip>]: <event.code> <event.reason>; from=\\<<email.from.address>> to=\\<<email.to.address>> <~>",
           "<~>: milter-reject: <~> from <~>[<source.ip>]: <event.code> <event.reason>; from=\\<> to=\\<<email.to.address>> <~>"
         ]

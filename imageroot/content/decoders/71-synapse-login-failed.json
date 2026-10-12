@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"Attempted to login as @\")"
+        "_line": "contains(\"Attempted to login as @\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>Attempted to login as @<user.name>:<user.domain> but<~>"
         ]
       },

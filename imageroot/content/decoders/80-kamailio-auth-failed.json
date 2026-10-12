@@ -21,15 +21,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"[SECURITY-AUTHFAIL]\")"
+        "_line": "contains(\"[SECURITY-AUTHFAIL]\")"
       },
       {
-        "event.original": "contains(\"event=auth_failure\")"
+        "_line": "contains(\"event=auth_failure\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>event=auth_failure method=<~> status=<event.code> src_ip=<source.ip> user=<user.name> callid=<~>"
         ]
       },

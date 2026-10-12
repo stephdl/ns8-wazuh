@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"SOGoRootPage Login from '\")"
+        "_line": "contains(\"SOGoRootPage Login from '\")"
       },
       {
-        "event.original": "contains(\"might not have worked\")"
+        "_line": "contains(\"might not have worked\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>SOGoRootPage Login from '<source.ip>, <~>' for user '<user.name>' might not have worked<~>",
           "<~>SOGoRootPage Login from '<source.ip>' for user '<user.name>' might not have worked<~>"
         ]

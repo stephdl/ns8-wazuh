@@ -22,12 +22,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"> starting task UPID:\")"
+        "_line": "contains(\"> starting task UPID:\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>:<~>",
           "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>:",
           "<~>starting task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>"

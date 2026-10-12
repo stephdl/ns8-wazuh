@@ -122,6 +122,10 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 
 The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
 
+### NS8 nodes and their modules
+
+On an NS8 node the script makes the agent run `/var/ossec/bin/ns8-journal` every 10 seconds instead of reading journald itself. The Wazuh agent sends a journal line as `program[pid]: message` only, without the user or the unit that tell which module wrote it: mail4 logs as dovecot, rspamd and postfix, piler7 and piler10 both as piler-app. ns8-journal reads the new lines with `journalctl -o json`, adds the module (the owner user for a rootless module, the unit name for a rootful one) and prints one JSON line each. A cursor in `/var/ossec/var/ns8-journal.cursor` makes each run start where the last one stopped, so nothing is lost or sent twice. The dashboards then have a Module picker. An agent installed before gets it with `--update`. On a host that is not an NS8 node, the agent keeps reading journald.
+
 ### Agent updates
 
 The script installs one package file, it does not add the Wazuh repository. So the agent is not updated with the system packages. This is on purpose: an agent must not be newer than its server, and Wazuh 5 is a release candidate.
@@ -182,7 +186,7 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 
 | Dashboard | Content |
 |---|---|
-| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
+| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an NS8 module and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
 | NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
 | NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
 | NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |

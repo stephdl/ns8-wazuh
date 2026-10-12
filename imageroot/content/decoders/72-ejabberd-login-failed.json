@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"Failed c2s \")"
+        "_line": "contains(\"Failed c2s \")"
       },
       {
-        "event.original": "contains(\"authentication for \")"
+        "_line": "contains(\"authentication for \")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>Failed c2s <~> authentication for <user.name>@<user.domain> from ::ffff:<source.ip>: <event.reason>",
           "<~>Failed c2s <~> authentication for <user.name>@<user.domain> from <source.ip>: <event.reason>"
         ]

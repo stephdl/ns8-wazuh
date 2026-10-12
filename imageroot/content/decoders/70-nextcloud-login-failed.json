@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"Login failed: '\")"
+        "_line": "contains(\"Login failed: '\")"
       },
       {
-        "event.original": "contains(\"Remote IP: '\")"
+        "_line": "contains(\"Remote IP: '\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>Login failed: '<user.name>' \\(Remote IP: '<source.ip>'\\)<~>"
         ]
       },

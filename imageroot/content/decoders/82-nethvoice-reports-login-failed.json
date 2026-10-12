@@ -21,24 +21,24 @@
     },
     "check": [
       {
-        "event.original": "contains(\"reports-api\")"
+        "_line": "contains(\"reports-api\")"
       },
       {
-        "event.original": "contains(\"[GIN] \")"
+        "_line": "contains(\"[GIN] \")"
       },
       {
-        "event.original": "contains(\"/login\")"
+        "_line": "contains(\"/login\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>[GIN] <~> | <event.code> |<~>| <~>",
           "<~>"
         ]
       },
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>| <~> |<~>| <_gin_ip> | <~>"
         ]
       },

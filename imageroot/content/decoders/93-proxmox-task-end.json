@@ -22,12 +22,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\"> end task UPID:\")"
+        "_line": "contains(\"> end task UPID:\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>end task UPID:<~>:<~>:<~>:<~>:<event.code>:<_vmid>:<user.name>@<user.domain>: <event.reason>"
         ]
       },

@@ -20,12 +20,12 @@
     },
     "check": [
       {
-        "event.original": "contains(\" - - [\")"
+        "_line": "contains(\" - - [\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<~>\" <~> \"<service.name>@<~>\" <~>",
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
         ]

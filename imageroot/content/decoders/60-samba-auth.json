@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"{\\\"timestamp\\\": \\\"\")"
+        "_line": "contains(\"{\\\"timestamp\\\": \\\"\")"
       },
       {
-        "event.original": "contains(\"\\\"type\\\": \\\"Authentication\\\"\")"
+        "_line": "contains(\"\\\"type\\\": \\\"Authentication\\\"\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~>]: <_samba_raw>"
         ]
       },

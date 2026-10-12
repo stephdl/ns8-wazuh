@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Print the journal lines written since the last run, one JSON object per line, with the NS8 module
+# that wrote each of them. The Wazuh agent runs it every few seconds: its own journald reader sends
+# only "program[pid]: message" and drops the user and the unit that tell the module apart.
+
+import json
+import os
+import pwd
+import subprocess
+import sys
+
+CURSOR = "/var/ossec/var/ns8-journal.cursor"
+FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
+# Rootful modules and the core keep their state there, named after their id
+ROOTFUL_DIR = "/var/lib/nethserver"
+# A message longer than this is cut, the agent refuses lines over 64 KB
+MAX_MESSAGE = 16384
+
+_owners = {}
+
+
+def text(value):
+    # journald gives a byte array when the message is not valid UTF-8
+    if isinstance(value, list):
+        return bytes(value).decode("utf-8", "replace")
+    return value or ""
+
+
+def rootless_module(uid):
+    """Return the module id of a rootless module user, or an empty string."""
+    if uid not in _owners:
+        try:
+            user = pwd.getpwuid(int(uid))
+            _owners[uid] = user.pw_name if os.path.isdir(os.path.join(user.pw_dir, ".config", "state")) else ""
+        except (KeyError, ValueError):
+            _owners[uid] = ""
+    return _owners[uid]
+
+
+def rootful_module(unit):
+    """Return the module id found in a system unit name, or an empty string."""
+    name = unit.rsplit(".", 1)[0]
+    # agent@mail4.service runs the actions of mail4, crowdsec13-upgrade-hub.service belongs to crowdsec13
+    candidates = [name.split("@", 1)[1]] if "@" in name else [name, name.split("-", 1)[0]]
+    for candidate in candidates:
+        if candidate and os.path.isdir(os.path.join(ROOTFUL_DIR, candidate)):
+            return candidate
+    # The agent of a rootless module runs as root too
+    if "@" in name and rootless_module_by_name(candidates[0]):
+        return candidates[0]
+    return ""
+
+
+def rootless_module_by_name(name):
+    try:
+        return rootless_module(str(pwd.getpwnam(name).pw_uid))
+    except KeyError:
+        return ""
+
+
+def main():
+    # The first run starts from now: the history is already on the server, or not wanted
+    start = [] if os.path.exists(CURSOR) else ["-n", "0"]
+    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", f"--output-fields={FIELDS}",
+                             f"--cursor-file={CURSOR}"] + start, stdout=subprocess.PIPE, text=True)
+    for line in proc.stdout:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        owner = entry.get("_SYSTEMD_OWNER_UID", "0")
+        unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
+        module = rootless_module(owner) if owner != "0" else ""
+        if not module:
+            module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
+        event = {
+            "ns8_journal": 1,
+            "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
+            "pid": text(entry.get("_PID")),
+            "module": module,
+            "unit": text(unit),
+            "message": text(entry.get("MESSAGE")).rstrip("\n")[:MAX_MESSAGE],
+        }
+        print(json.dumps(event, separators=(",", ":"), ensure_ascii=False), flush=False)
+    sys.stdout.flush()
+    proc.wait()
+
+
+main()

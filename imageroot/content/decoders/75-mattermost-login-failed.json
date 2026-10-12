@@ -20,15 +20,15 @@
     },
     "check": [
       {
-        "event.original": "contains(\"A user tried to sign in\")"
+        "_line": "contains(\"A user tried to sign in\")"
       },
       {
-        "event.original": "contains(\"password was incorrect\")"
+        "_line": "contains(\"password was incorrect\")"
       }
     ],
     "normalize": [
       {
-        "parse|event.original": [
+        "parse|_line": [
           "<~> ip_addr=<source.ip> <~> username=<user.name>",
           "<~> ip_addr=<source.ip> <~>"
         ]
