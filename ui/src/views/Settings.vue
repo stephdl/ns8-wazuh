@@ -116,7 +116,6 @@
               :confirmPasswordLabel="$t('settings.admin_password_confirm')"
               v-model="adminPassword"
               @passwordValidation="onAdminPasswordValidation"
-              :newPasswordHelperText="$t('settings.admin_password_rules')"
               :newPasswordInvalidMessage="$t(error.admin_password)"
               :confirmPasswordInvalidMessage="$t(error.admin_password_confirm)"
               :passwordHideLabel="core.$t('password.hide_password')"
