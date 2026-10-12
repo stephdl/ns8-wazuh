@@ -184,7 +184,7 @@ Every journal line of an agent is kept, even when no decoder reads it in detail:
 
 Events and findings are kept for 365 days by default. Change it in Settings > Advanced > Log retention, from 30 to 3650 days. Metrics stay 30 days.
 
-Each stream starts a new index every month, or sooner at 20 GB. An index is deleted once its newest log is older than the retention. So the deletion runs month by month: a log stays at least the chosen time, and at most about 30 days more. With 365 days, a log is kept between one year and about 13 months. The module writes this in the `stream-events-policy` and `stream-findings-policy` policies of the indexer, at each configuration and update, and moves the existing indices to it. A policy changed by hand is overwritten.
+Each stream starts a new index every month, or sooner at 20 GB. An index is deleted once its newest log is older than the retention. So the deletion runs month by month: a log stays at least the chosen time, and at most about 30 days more. With 365 days, a log is kept between one year and about 13 months. The module writes this in the `stream-events-policy` and `stream-findings-policy` policies of the indexer at each configuration and update, and every hour because the indexer writes back the Wazuh policies when it starts. It moves the existing indices to it. A policy changed by hand is overwritten.
 
 Plan the disk before raising the retention. Two NS8 nodes write about 40 MB of events a day, so count about 20 MB a day per NS8 node, and more for a busy mail or web server. For 365 days, plan about 8 GB per NS8 node, plus the findings and 20% of free space. Check the real rate after a few days, from the size of the `wazuh-events-v5-*` indices.
 

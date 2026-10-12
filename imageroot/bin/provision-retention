@@ -9,7 +9,9 @@
 # The Wazuh ISM policies roll over at 20 GB only, so a small server never deletes anything,
 # and they delete events one hour after the rollover. Here each stream rolls over every month,
 # and an index is deleted once its newest line is older than the retention.
-# Wazuh creates its policies only when they are missing, so our version stays after a restart.
+# Wazuh writes its policies again at each start of the indexer, once the cluster is green:
+# a timer runs this script every hour. Each index keeps its own copy of the policy, so only
+# the indices created in between start with the Wazuh conditions, and they are attached again here.
 
 import copy
 import os
@@ -63,10 +65,10 @@ def retention_policy(policy, delete_after):
     return {"policy": {key: policy[key] for key in keys if policy.get(key) is not None}}
 
 
-def apply_to_existing(policy_id, pattern, seq_no):
-    """Attach the current version of the policy to the indices that miss it."""
+def apply_to_existing(policy_id, pattern, states):
+    """Attach the current policy to the indices that miss it or follow other conditions."""
     # The data stream name expands to its hidden backing indices
-    explain = api("GET", f"_plugins/_ism/explain/{pattern}")
+    explain = api("GET", f"_plugins/_ism/explain/{pattern}?show_policy=true")
     if "error" in explain:
         raise SystemExit(f"{policy_id}: {explain['error']}")
     updated = 0
@@ -75,8 +77,8 @@ def apply_to_existing(policy_id, pattern, seq_no):
             continue
         managed_by = info.get("index.plugins.index_state_management.policy_id")
         if managed_by == policy_id:
-            # No version yet: the index is starting and reads the current policy
-            if info.get("policy_seq_no") in (seq_no, None):
+            # Without a copy of the policy yet, the index is starting and reads the current one
+            if "policy" not in info or info["policy"]["states"] == states:
                 continue
             # A change of policy waits for the end of the current action, and a rollover that is not
             # due never ends: the index is attached again so it starts with the new conditions.
@@ -100,12 +102,10 @@ for policy_id, pattern in POLICIES.items():
     if "policy" not in current:
         raise SystemExit(f"{policy_id}: {current.get('error', current)}")
     wanted = retention_policy(current["policy"], f"{days}d")
-    seq_no = current["_seq_no"]
     if wanted["policy"] != {key: current["policy"].get(key) for key in wanted["policy"]}:
         answer = api("PUT", f"_plugins/_ism/policies/{policy_id}"
                      f"?if_seq_no={current['_seq_no']}&if_primary_term={current['_primary_term']}", wanted)
         if "_seq_no" not in answer:
             raise SystemExit(f"{policy_id}: {answer.get('error', answer)}")
-        seq_no = answer["_seq_no"]
         log(f"{policy_id}: deletion {days} days after the monthly rollover")
-    apply_to_existing(policy_id, pattern, seq_no)
+    apply_to_existing(policy_id, pattern, wanted["policy"]["states"])
