@@ -22,11 +22,11 @@ def count(label=None):
             "params": {"customLabel": label} if label else {}}
 
 
-def terms(id, field, schema, size=10, label=None, missing=False):
+def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-"):
     return {"id": id, "enabled": True, "type": "terms", "schema": schema,
             "params": {"field": field, "size": size, "order": "desc", "orderBy": "1",
                        "otherBucket": False, "otherBucketLabel": "Other",
-                       "missingBucket": missing, "missingBucketLabel": "-",
+                       "missingBucket": missing, "missingBucketLabel": missing_label,
                        **({"customLabel": label} if label else {})}}
 
 
@@ -205,7 +205,8 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     (vis("ns8-logins-timeline", "Logins over time", EVENTS, AUTH,
          over_time(terms("3", "event.outcome", "group", size=3), kind="histogram")), 32, 8),
     (vis("ns8-logins-services", "Logins by service", EVENTS, AUTH,
-         bars(terms("2", "service.type", "segment", size=10, missing=True),
+         # The logins of the standard Wazuh integrations (PAM, sudo, ssh) have no service type
+         bars(terms("2", "service.type", "segment", size=10, missing=True, missing_label="system"),
               series=terms("3", "event.outcome", "group", size=3))), 16, 12),
     (vis("ns8-logins-failed-users", "Failed logins by user", EVENTS, FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"))), 16, 12),
@@ -219,23 +220,39 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
 ]))
 
-WEB = "event.category:web"
+# The apache and nginx of the lamp and webserver sites log the same requests again, without the route
+WEB = "event.category:web and process.name:traefik"
+WEB_ERRORS = f"{WEB} and http.response.status_code >= 400"
+PROBES = (f"{WEB} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
+          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
 write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
-    "HTTP requests received by the NS8 reverse proxy", [
+    "HTTP requests received by the NS8 reverse proxy, by site (Traefik route): traffic, errors and scanners", [
     (vis("ns8-web-timeline", "Requests over time", APPS, WEB, over_time(status_ranges(), kind="histogram")), 32, 10),
     (vis("ns8-web-status", "Status codes", APPS, WEB,
          pie(terms("2", "http.response.status_code", "segment", size=10))), 16, 10),
-    (vis("ns8-web-errors", "Client and server errors", APPS, f"{WEB} and http.response.status_code >= 400",
-         over_time(terms("3", "http.response.status_code", "group", size=10), kind="line")), 48, 10),
-    (vis("ns8-web-paths", "Top paths in error", APPS, f"{WEB} and http.response.status_code >= 400",
+    (vis("ns8-hosting-sites", "Requests by site", APPS, WEB,
+         bars(terms("2", "service.name", "segment", size=20, missing=True, missing_label="no route"),
+              series=status_ranges("3"))), 24, 14),
+    (vis("ns8-web-errors", "Client and server errors", APPS, WEB_ERRORS,
+         over_time(terms("3", "http.response.status_code", "group", size=10), kind="line")), 24, 14),
+    (vis("ns8-web-paths", "Top paths in error", APPS, WEB_ERRORS,
          table(terms("2", "url.path", "bucket", size=50, label="Path"),
                terms("3", "http.response.status_code", "bucket", size=3, label="Status"))), 24, 14),
+    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{WEB} and http.response.status_code >= 500",
+         table(terms("2", "service.name", "bucket", size=20, label="Site", missing=True, missing_label="no route"),
+               terms("3", "url.path", "bucket", size=5, label="Path"))), 24, 14),
+    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
+         table(terms("2", "url.path", "bucket", size=50, label="Path"),
+               terms("3", "service.name", "bucket", size=3, label="Site", missing=True, missing_label="no route"))), 24, 14),
+    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
     (vis("ns8-web-sources", "Top sources", APPS, WEB,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
     (vis("ns8-web-countries", "Requests by country", APPS, WEB,
-         pie(terms("2", "source.geo.country_name", "segment", size=10))), 16, 14),
-    (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 32, 14),
+         pie(terms("2", "source.geo.country_name", "segment", size=10))), 24, 14),
+    (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 48, 14),
 ]))
 
 CROWDSEC = "event.action:crowdsec-alert"
@@ -355,26 +372,6 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
          bars(terms("2", "event.action", "segment", size=10))), 24, 12),
     (search("ns8-directory-changes-list", "NS8 - Directory changes", APPS, SAMBA_IAM,
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
-]))
-
-HOSTING = "event.category:web and service.name:(lamp* or webserver* or wordpress* or dokuwiki*)"
-PROBES = (f"{HOSTING} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
-          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
-write("90-web-hosting.ndjson", dashboard("ns8-web-hosting", "NS8 - Web hosting",
-    "Sites of the lamp, webserver, wordpress and dokuwiki modules, read from Traefik: traffic, errors and scanners", [
-    (vis("ns8-hosting-sites", "Requests by site", APPS, HOSTING,
-         bars(terms("2", "service.name", "segment", size=20), series=status_ranges("3"))), 24, 12),
-    (vis("ns8-hosting-timeline", "Requests over time", APPS, HOSTING,
-         over_time(terms("3", "service.name", "group", size=10), kind="histogram")), 24, 12),
-    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
-         table(terms("2", "url.path", "bucket", size=50, label="Path"),
-               terms("3", "service.name", "bucket", size=3, label="Site"))), 24, 14),
-    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
-         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
-    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{HOSTING} and http.response.status_code >= 500",
-         table(terms("2", "service.name", "bucket", size=20, label="Site"),
-               terms("3", "url.path", "bucket", size=5, label="Path"))), 48, 12),
 ]))
 
 PHONE = "service.type:(kamailio or nethvoice) and event.outcome:failure"
