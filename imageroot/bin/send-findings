@@ -37,6 +37,11 @@ LEVELS = ["informational", "low", "medium", "high", "critical"]
 # Expected on an NS8 node: each rootless module has its own systemd session, and the log collector
 # restarts with it. Kept in the dashboard, left out of the email. Module users and firewall changes stay in:
 # installing or removing a module is rare enough to be worth a line.
+# Oneshot services run by a timer log a start and a stop at each run.
+TIMER_UNITS = ["promtail", "systemd-hostnamed", "dnf-makecache", "backup-timers", "phonehome", "logrotate",
+               "mlocate-updatedb", "man-db-cache-update", "refresh-volume-metrics", "password-warning",
+               "ns8-cluster-updater", "sssd-kcm"]
+
 NOISE = [
     {"prefix": {"wazuh.rule.title": "System service stopped - user@"}},
     {"prefix": {"wazuh.rule.title": "System service started - user@"}},
@@ -44,13 +49,21 @@ NOISE = [
     {"prefix": {"wazuh.rule.title": "System service started - fix-xdg-state@"}},
     {"prefix": {"wazuh.rule.title": "System service deleted - user"}},
     {"prefix": {"wazuh.rule.title": "System service deleted - fix-xdg-state@"}},
-    {"terms": {"wazuh.rule.title": [
-        "System service stopped - promtail", "System service started - promtail",
-        "System service stopped - systemd-hostnamed", "System service started - systemd-hostnamed",
-        "System service stopped - dnf-makecache", "System service started - dnf-makecache",
-        "System service stopped - backup-timers", "System service started - backup-timers",
-    ]}},
+    {"terms": {"wazuh.rule.title": [f"System service {state} - {unit}"
+                                    for unit in TIMER_UNITS for state in ("started", "stopped")]}},
+    # Numbered after the module: backup12, crowdsec13-upgrade-hub
+    {"wildcard": {"wazuh.rule.title": "System service st*ed - backup*"}},
+    {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-export-alerts"}},
+    {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-upgrade-hub"}},
+    # Transient units of systemd-run
+    {"wildcard": {"wazuh.rule.title": "System service st*ed - run-r*"}},
+    # The CrowdSec bouncer adds each banned address to its nftables set. Other firewall changes stay in.
+    {"bool": {"filter": [{"term": {"wazuh.rule.title": "Firewall rule modified"}},
+                         {"prefix": {"process.name": "crowdsec-firew"}}]}},
+    # The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them
+    {"prefix": {"wazuh.rule.title": "Wazuh VD - "}},
 ]
+
 
 
 def log(message):
