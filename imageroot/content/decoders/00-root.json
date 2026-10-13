@@ -90,6 +90,14 @@
           "<~> <~> <~> <~> <process.name>: <message>",
           "<~>"
         ]
+      },
+      {
+        "check": "NOT exists($orchestrator.namespace)",
+        "map": [
+          {
+            "orchestrator.namespace": "host"
+          }
+        ]
       }
     ]
   }
