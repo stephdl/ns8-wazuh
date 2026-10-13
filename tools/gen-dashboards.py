@@ -205,7 +205,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     (vis("ns8-logins-timeline", "Logins over time", EVENTS, AUTH,
          over_time(terms("3", "event.outcome", "group", size=3), kind="histogram")), 32, 8),
     (vis("ns8-logins-services", "Logins by service", EVENTS, AUTH,
-         bars(terms("2", "process.name", "segment", size=10, missing=True),
+         bars(terms("2", "service.type", "segment", size=10, missing=True),
               series=terms("3", "event.outcome", "group", size=3))), 16, 12),
     (vis("ns8-logins-failed-users", "Failed logins by user", EVENTS, FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"))), 16, 12),
@@ -355,24 +355,6 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
          bars(terms("2", "event.action", "segment", size=10))), 24, 12),
     (search("ns8-directory-changes-list", "NS8 - Directory changes", APPS, SAMBA_IAM,
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
-]))
-
-COLLAB = "service.type:(nextcloud or synapse or ejabberd or sogo or roundcube or mattermost) and event.category:authentication"
-COLLAB_FAIL = f"{COLLAB} and event.outcome:failure"
-write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collaboration",
-    "Failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost. Webtop does not log them", [
-    (vis("ns8-collaboration-count", "Failed logins by application", APPS, COLLAB_FAIL,
-         metric(group=terms("2", "service.type", "group", size=5))), 48, 8),
-    (vis("ns8-collaboration-timeline", "Failed logins over time", APPS, COLLAB_FAIL,
-         over_time(terms("3", "service.type", "group", size=5), kind="histogram")), 48, 10),
-    (vis("ns8-collaboration-users", "Failed logins by user", APPS, COLLAB_FAIL,
-         table(terms("2", "user.name", "bucket", size=50, label="User"),
-               terms("3", "service.type", "bucket", size=3, label="Service"))), 24, 14),
-    (vis("ns8-collaboration-sources", "Failed logins by source", APPS, COLLAB_FAIL,
-         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("4", "service.type", "bucket", size=3, label="Service"))), 24, 14),
-    (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
 ]))
 
 HOSTING = "event.category:web and service.name:(lamp* or webserver* or wordpress* or dokuwiki*)"

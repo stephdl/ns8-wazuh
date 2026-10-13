@@ -197,14 +197,13 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 | Dashboard | Content |
 |---|---|
 | NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an application and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
-| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
+| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures. Click a service, such as sogo or nextcloud, to see only its logins |
 | NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
 | NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
 | NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
 | NS8 - System changes | users, groups, services and firewall changed on the hosts |
 | NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
 | NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
-| NS8 - Collaboration | failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost, by user, source and country. Mattermost logs only the accounts that exist, Webtop logs nothing |
 | NS8 - Web hosting | lamp, webserver, wordpress and dokuwiki sites from Traefik: requests by site, probed paths, scanning sources, server errors |
 | NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
 | NS8 - Proxmox | Proxmox VE hosts with an agent: web and API logins, tasks by type and user, failed tasks and backups, deleted guests |
