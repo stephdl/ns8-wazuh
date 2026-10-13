@@ -159,8 +159,8 @@ Checked on the test node with rc1. Multi-tenancy is off, so the saved objects ar
 **Every NS8 module.** The agent reads the whole host journal, so the log of each module container already reaches the manager. What is missing per module is decoders, rules and a panel. Done in pull request #5, merged, tested on the test cluster:
 1. Mail, done: Postfix SASL failures, rejections and deliveries, Rspamd results. Rules for a virus and a denied relay. ClamAV is read through the Postfix rejection, its own lines do not reach the indexer.
 2. Directory, done: the Samba JSON audit, logins with account, source and workstation, group and password changes, directory objects, password policy changes. The samba module logs no login by default: the README gives one line for `include.conf`. Not tested: the locked account rule, the test domain has no lockout policy.
-3. Collaboration, done: failed logins of Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost (existing accounts only).
-4. Web hosting, done: the Traefik router name gives the site, a rule flags scans of typical attack paths.
+3. Collaboration, done: failed logins of Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost (existing accounts only). Its dashboard was removed in #11, the logins show in NS8 - Logins, by service.
+4. Web hosting, done: the Traefik router name gives the site, a rule flags scans of typical attack paths. Its dashboard was merged into NS8 - Web in #11.
 5. Telephony, done from the ns8-crowdsec scenarios (#182, #184, #212): Kamailio SIP failures, refused CTI and reports logins. Tested on sample lines only, check on a real NethVoice.
 
 Left out, and why:
@@ -182,7 +182,19 @@ Also in #5: customers (see Per customer view), the dashboards loaded at each con
 
 **Findings email, done in #9 and #10.** On a test node, one week at the default level (medium) gave 1212 findings, and the real alerts got lost. Left out of the email, kept in the dashboards and the export: the start and stop of the oneshot services run by timers (logrotate, the NS8 backups, the CrowdSec hub update and alert export, systemd-run units, and more), the vulnerability findings, which come back at each scan, and the firewall changes of the CrowdSec bouncer, one at each ban. `NS8 CrowdSec scenario triggered` went from medium to low, the address is already banned. The same week now gives 173 findings. Under each agent, the findings of the same kind share one line with their count, and the services, accounts, files or CVEs they are about are listed below it, 10 at most. Still noisy and left as is: an AppArmor profile that keeps denying a service (462 findings in a week for cupsd on a Proxmox host) must be fixed on the host. A file under `/boot` changed by a kernel update stays in the email, a change outside an update is a real signal.
 
-Ideas not done: a threshold per rule, for example mail the authentication failures only above N per user or address (CrowdSec already bans). The Discover table pages stay at 50 lines, the size is fixed in its code, while `discover:sampleSize` loads 5000 lines since #6.
+**Dashboards, done in #11 and #12.** NS8 - Collaboration only listed failed logins and was empty most of the time: removed, NS8 - Logins shows them by `service.type`, a click on a service filters on it. NS8 - Web hosting was NS8 - Web filtered on the lamp, webserver, wordpress and dokuwiki routes: merged into NS8 - Web, which now counts the Traefik lines only and splits the requests by site (route). The Application picker lists every application of the agent whatever the dashboard shows, so it stays only on Journal, Logins and Telephony (several NethVoice can run on one node). The dashboard descriptions are one short sentence. The maps color each country by count with its name on hover, instead of circles that gave coordinates, and the source tables have a City column. The module never deletes a dashboard: an existing install keeps the removed ones until an administrator deletes them in Saved objects.
+
+**Refused or left as is.**
+- A threshold per rule, for example mail the authentication failures only above N per user or address: CrowdSec already bans.
+- The Discover table pages stay at 50 lines, the size is fixed in its code. `discover:sampleSize` loads 5000 lines since #6.
+- A Site picker on NS8 - Web: `service.name` also holds systemd units and module names, so the picker would list values that empty the dashboard. It would need the route in a field of its own, such as `service.target.name`. Left out, a click on a site in Requests by site filters already.
+- The apache and nginx lines of the lamp and webserver sites look like Traefik access lines, some arrive with the program `traefik` and show as `no route` in NS8 - Web, next to the scanners that hit the IP address. Left as is.
+- A city on the map: needs the Maps application and a document layer, not generated like the dashboards, slow with many points.
+- Renaming the `ns8` integration: it is the content package that read the line, not the host, and every decoder, rule and the detector depend on it.
+- Active responses: CrowdSec already bans, a second source of blocking risks cutting a real customer on a false positive.
+- The Program picker stays disabled for the lines of the standard Wazuh integrations (auditd, linux), which have no application: an AppArmor denial shows with its program in the `linux` integration but cannot be picked.
+
+**Tests to add.** The Robot tests still match the module, none checks what was added since #6. Planned: the retention is kept when `configure-module` leaves it out; the NS8 dashboards are loaded and the removed ones are not; `discover:sampleSize` is 5000; the `ns8` detector holds every NS8 rule; end to end on the CI agent, a fake Dovecot failure written with `logger -t dovecot` reaches the index with `service.type: dovecot`, the application `system` and a `NS8 authentication failure` finding. Not tested: the email (no smarthost in CI) and the rendering of the maps.
 
 **Unclassified logs.** Tested: every journal line is kept by the NS8 root decoder, even without a decoder of its own. `index_unclassified_events` only adds the few logs that decoder refuses. Leave it off.
 
@@ -190,7 +202,7 @@ To do: download the install script of the module version instead of `main`, so a
 
 **Agents to update after #5.** On each NS8 node, run the install script again with `--update`: the agent switches to `ns8-journal` and its lines get their module. Done on the two test nodes, r1-node1 and debian13. To check on them: no line lost or doubled during a burst or an agent restart, and the old journald reader stops sending after the restart.
 
-**Next.** A test on a real NethVoice and a real Proxmox VE 9, and the locked domain account rule on a domain with a lockout policy.
+**Next.** The Robot tests above. A test on a real NethVoice and a real Proxmox VE 9, and the locked domain account rule on a domain with a lockout policy. The certificate expiry watch below.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
 - Proxmox VE, done in #5 (merged): the Wazuh 5 CTI has no Proxmox integration, so the decoders are ported from the Wazuh 4 one (`0440-proxmox-ve_decoders.xml`). Web and API logins, tasks from their UPID with type, guest, user and result, rules for a deleted guest and a failed backup, an NS8 - Proxmox dashboard. Tested on sample lines only, check on a real Proxmox VE 9. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
