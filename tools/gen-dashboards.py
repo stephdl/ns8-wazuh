@@ -144,10 +144,12 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def controls(id, pattern, program=False):
+def controls(id, pattern, apps=False, program=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
-    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1"),
-              ("4", "orchestrator.namespace", "Application", "2")]
+    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
+    # The picker lists every application of the agent, whatever the dashboard shows: only where several can match
+    if apps:
+        fields.append(("4", "orchestrator.namespace", "Application", "2"))
     if program:
         fields.append(("3", "process.name", "Program", "4"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
@@ -165,9 +167,9 @@ def controls(id, pattern, program=False):
                            for i in range(len(fields))]}
 
 
-def dashboard(id, title, description, panels, pattern=EVENTS, program=False):
+def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False):
     """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
-    panels = [(controls(f"{id}-controls", pattern, program), 48, 5)] + panels
+    panels = [(controls(f"{id}-controls", pattern, apps, program), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -218,7 +220,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 32, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
-]))
+], apps=True))
 
 # The apache and nginx of the lamp and webserver sites log the same requests again, without the route
 WEB = "event.category:web and process.name:traefik"
@@ -389,7 +391,7 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
          table(terms("2", "user.name", "bucket", size=50, label="Extension"),
                terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
     (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
-]))
+], apps=True))
 
 PVE = "service.type:proxmox"
 PVE_AUTH = f"{PVE} and event.category:authentication"
@@ -421,4 +423,4 @@ write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
     "Log lines of every server, like journalctl: pick a customer, a server, an application (system for the host itself) and a program, and type a word in the search bar, such as crowdsec, any case", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
             ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
-], program=True))
+], apps=True, program=True))
