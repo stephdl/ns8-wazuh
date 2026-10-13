@@ -49,7 +49,7 @@
             "event.action": "task-started"
           },
           {
-            "process.name": "proxmox"
+            "service.type": "proxmox"
           },
           {
             "service.name": "$_vmid"

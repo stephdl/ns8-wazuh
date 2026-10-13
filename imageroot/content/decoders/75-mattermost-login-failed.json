@@ -52,7 +52,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "mattermost"
+            "service.type": "mattermost"
           }
         ]
       }

@@ -72,7 +72,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "nethvoice"
+            "service.type": "nethvoice"
           },
           {
             "service.name": "Reports"

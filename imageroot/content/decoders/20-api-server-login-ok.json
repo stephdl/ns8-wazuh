@@ -48,7 +48,7 @@
             "event.outcome": "success"
           },
           {
-            "process.name": "api-server"
+            "service.type": "api-server"
           }
         ]
       }

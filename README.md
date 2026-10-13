@@ -178,7 +178,7 @@ To watch something specific:
 - A log the agent does not read yet: add a `<localfile>` block in `/var/ossec/etc/ossec.conf` on the agent, then restart it. For a journald unit, filter on its name.
 - A file or directory to watch for changes: add it to the `<syscheck>` block (FIM) of the agent.
 
-Every journal line of an agent is kept, even when no decoder reads it in detail: the NS8 root decoder takes it with its program and its text, and the NS8 - Journal dashboard lists it. `index_unclassified_events` only adds the few logs that even that decoder refuses, in the `wazuh-events-v5-unclassified` index, seen in Explore > Discover. Leave it off: it is mostly noise.
+Every journal line of an agent is kept, even when no decoder reads it in detail: the NS8 root decoder takes it with its program and its text, and the NS8 - Journal dashboard lists it. The decoders keep the program name of the line, as `journalctl` shows it (`pvedaemon`, `postfix/smtpd`, `samba-dc`), and put the family they recognize in `service.type` (`proxmox`, `postfix`, `samba`, `web` for the access logs). The dashboards filter on `service.type`. `index_unclassified_events` only adds the few logs that even that decoder refuses, in the `wazuh-events-v5-unclassified` index, seen in Explore > Discover. Leave it off: it is mostly noise.
 
 ## Retention
 
@@ -196,7 +196,7 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 
 | Dashboard | Content |
 |---|---|
-| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an NS8 module and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
+| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an application and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
 | NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
 | NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
 | NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
