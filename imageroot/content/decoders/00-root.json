@@ -84,7 +84,18 @@
         ]
       },
       {
-        "check": "NOT exists($_nj.ns8_journal)",
+        "check": "NOT exists($_nj.ns8_journal) AND starts_with($event.original, 'type=')",
+        "map": [
+          {
+            "process.name": "auditd"
+          },
+          {
+            "message": "$event.original"
+          }
+        ]
+      },
+      {
+        "check": "NOT exists($_nj.ns8_journal) AND NOT starts_with($event.original, 'type=')",
         "parse|event.original": [
           "<~> <~> <~> <~> <process.name>[<~>]: <message>",
           "<~> <~> <~> <~> <process.name>: <message>",
@@ -95,7 +106,7 @@
         "check": "NOT exists($orchestrator.namespace)",
         "map": [
           {
-            "orchestrator.namespace": "host"
+            "orchestrator.namespace": "system"
           }
         ]
       }

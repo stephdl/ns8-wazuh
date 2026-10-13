@@ -147,7 +147,7 @@ def search(id, title, pattern, query, columns):
 def controls(id, pattern, program=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1"),
-              ("4", "orchestrator.namespace", "Module", "2")]
+              ("4", "orchestrator.namespace", "Application", "2")]
     if program:
         fields.append(("3", "process.name", "Program", "4"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
@@ -367,11 +367,11 @@ write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collabora
          over_time(terms("3", "process.name", "group", size=5), kind="histogram")), 48, 10),
     (vis("ns8-collaboration-users", "Failed logins by user", APPS, COLLAB_FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"),
-               terms("3", "process.name", "bucket", size=3, label="Application"))), 24, 14),
+               terms("3", "process.name", "bucket", size=3, label="Program"))), 24, 14),
     (vis("ns8-collaboration-sources", "Failed logins by source", APPS, COLLAB_FAIL,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("4", "process.name", "bucket", size=3, label="Application"))), 24, 14),
+               terms("4", "process.name", "bucket", size=3, label="Program"))), 24, 14),
     (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
 ]))
 
@@ -439,7 +439,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
-    "Log lines of every server, like journalctl: pick a customer, a server, an NS8 module and a program, and type a word in the search bar, such as crowdsec, any case", [
+    "Log lines of every server, like journalctl: pick a customer, a server, an application (system for the host itself) and a program, and type a word in the search bar, such as crowdsec, any case", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
             ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
 ], program=True))
