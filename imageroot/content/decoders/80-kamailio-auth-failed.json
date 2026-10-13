@@ -52,7 +52,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "kamailio"
+            "service.type": "kamailio"
           },
           {
             "service.name": "SIP"

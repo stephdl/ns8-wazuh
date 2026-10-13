@@ -55,7 +55,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "postfix"
+            "service.type": "postfix"
           }
         ]
       }

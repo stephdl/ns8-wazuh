@@ -41,7 +41,7 @@
             "_samba": "parse_json($_samba_raw)"
           },
           {
-            "process.name": "samba"
+            "service.type": "samba"
           }
         ]
       },

@@ -43,7 +43,7 @@
             ]
           },
           {
-            "process.name": "traefik"
+            "service.type": "web"
           }
         ]
       }

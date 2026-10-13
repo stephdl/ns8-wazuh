@@ -294,11 +294,11 @@ write("50-system-changes.ndjson", dashboard("ns8-system-changes", "NS8 - System 
              "process.name", "user.name"]), 48, 16),
 ]))
 
-MAIL = "process.name:(postfix or rspamd)"
-DELIVERY = "process.name:postfix and event.action:(sent or bounced or deferred or expired)"
+MAIL = "service.type:(postfix or rspamd)"
+DELIVERY = "service.type:postfix and event.action:(sent or bounced or deferred or expired)"
 REJECTED = "event.action:mail-rejected"
-SPAM = "process.name:rspamd"
-SASL = "process.name:postfix and event.action:logon-failed"
+SPAM = "service.type:rspamd"
+SASL = "service.type:postfix and event.action:logon-failed"
 write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     "Postfix and Rspamd of the ns8-mail module: deliveries, rejections, spam, viruses and SMTP login failures", [
     (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
@@ -315,9 +315,9 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
                terms("3", "event.code", "bucket", size=3, label="Code"))), 32, 14),
     (vis("ns8-mail-senders", "Top senders", APPS, SPAM,
          table(terms("2", "email.from.address", "bucket", size=30, label="Sender"))), 16, 14),
-    (vis("ns8-mail-recipients", "Top recipients", APPS, "process.name:postfix and event.action:sent",
+    (vis("ns8-mail-recipients", "Top recipients", APPS, "service.type:postfix and event.action:sent",
          table(terms("2", "email.to.address", "bucket", size=30, label="Recipient"))), 16, 14),
-    (vis("ns8-mail-bounces", "Bounced and deferred", APPS, "process.name:postfix and event.action:(bounced or deferred)",
+    (vis("ns8-mail-bounces", "Bounced and deferred", APPS, "service.type:postfix and event.action:(bounced or deferred)",
          table(terms("2", "email.to.address", "bucket", size=30, label="Recipient"),
                terms("3", "event.action", "bucket", size=2, label="Status"))), 16, 14),
     (vis("ns8-mail-sasl-sources", "SMTP login failures", APPS, SASL,
@@ -329,9 +329,9 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))
 
-SAMBA_AUTH = "process.name:samba and event.category:authentication"
+SAMBA_AUTH = "service.type:samba and event.category:authentication"
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
-SAMBA_IAM = "process.name:samba and event.category:iam and not event.action:primary-group-set"
+SAMBA_IAM = "service.type:samba and event.category:iam and not event.action:primary-group-set"
 write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
     "Samba domain controller of the ns8-samba module: logins, failures, locked accounts and account changes. "
     "Needs the Samba audit, see the README", [
@@ -357,21 +357,21 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
 ]))
 
-COLLAB = "process.name:(nextcloud or synapse or ejabberd or sogo or roundcube or mattermost) and event.category:authentication"
+COLLAB = "service.type:(nextcloud or synapse or ejabberd or sogo or roundcube or mattermost) and event.category:authentication"
 COLLAB_FAIL = f"{COLLAB} and event.outcome:failure"
 write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collaboration",
     "Failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost. Webtop does not log them", [
     (vis("ns8-collaboration-count", "Failed logins by application", APPS, COLLAB_FAIL,
-         metric(group=terms("2", "process.name", "group", size=5))), 48, 8),
+         metric(group=terms("2", "service.type", "group", size=5))), 48, 8),
     (vis("ns8-collaboration-timeline", "Failed logins over time", APPS, COLLAB_FAIL,
-         over_time(terms("3", "process.name", "group", size=5), kind="histogram")), 48, 10),
+         over_time(terms("3", "service.type", "group", size=5), kind="histogram")), 48, 10),
     (vis("ns8-collaboration-users", "Failed logins by user", APPS, COLLAB_FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"),
-               terms("3", "process.name", "bucket", size=3, label="Program"))), 24, 14),
+               terms("3", "service.type", "bucket", size=3, label="Service"))), 24, 14),
     (vis("ns8-collaboration-sources", "Failed logins by source", APPS, COLLAB_FAIL,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("4", "process.name", "bucket", size=3, label="Program"))), 24, 14),
+               terms("4", "service.type", "bucket", size=3, label="Service"))), 24, 14),
     (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
 ]))
 
@@ -395,8 +395,8 @@ write("90-web-hosting.ndjson", dashboard("ns8-web-hosting", "NS8 - Web hosting",
                terms("3", "url.path", "bucket", size=5, label="Path"))), 48, 12),
 ]))
 
-PHONE = "process.name:(kamailio or nethvoice) and event.outcome:failure"
-SIP = "process.name:kamailio and event.outcome:failure"
+PHONE = "service.type:(kamailio or nethvoice) and event.outcome:failure"
+SIP = "service.type:kamailio and event.outcome:failure"
 write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
     "NethVoice: SIP authentication failures on the proxy, failed logins on the CTI and the reports", [
     (vis("ns8-telephony-count", "Failures by service", APPS, PHONE,
@@ -412,7 +412,7 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
     (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
 ]))
 
-PVE = "process.name:proxmox"
+PVE = "service.type:proxmox"
 PVE_AUTH = f"{PVE} and event.category:authentication"
 PVE_TASK = f"{PVE} and event.action:task-started"
 write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",

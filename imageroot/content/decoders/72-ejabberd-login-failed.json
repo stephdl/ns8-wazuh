@@ -52,7 +52,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "ejabberd"
+            "service.type": "ejabberd"
           }
         ]
       }

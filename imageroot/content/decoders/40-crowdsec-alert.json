@@ -45,7 +45,7 @@
             "event.action": "crowdsec-alert"
           },
           {
-            "process.name": "crowdsec"
+            "service.type": "crowdsec"
           }
         ]
       }

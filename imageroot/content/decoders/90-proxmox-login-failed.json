@@ -54,7 +54,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "proxmox"
+            "service.type": "proxmox"
           },
           {
             "service.name": "Proxmox"

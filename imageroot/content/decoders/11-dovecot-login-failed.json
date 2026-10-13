@@ -49,7 +49,7 @@
             "event.outcome": "failure"
           },
           {
-            "process.name": "dovecot"
+            "service.type": "dovecot"
           }
         ]
       }
