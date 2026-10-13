@@ -207,7 +207,9 @@ def write(name, objects):
             f.write(json.dumps(o, separators=(",", ":")) + "\n")
 
 
-AUTH = "event.category:authentication"
+# The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
+AUTH = ("event.category:authentication"
+        " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")")
 FAIL = f"{AUTH} and event.outcome:failure"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     "Successful and failed logins on every service and server", [
@@ -216,8 +218,8 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     (vis("ns8-logins-timeline", "Logins over time", EVENTS, AUTH,
          over_time(terms("3", "event.outcome", "group", size=3), kind="histogram")), 32, 8),
     (vis("ns8-logins-services", "Logins by service", EVENTS, AUTH,
-         # The logins of the standard Wazuh integrations (PAM, sudo, ssh) have no service type
-         bars(terms("2", "service.type", "segment", size=10, missing=True, missing_label="system"),
+         # The logins of the standard Wazuh integrations have no service type: mostly ssh to the server
+         bars(terms("2", "service.type", "segment", size=10, missing=True, missing_label="ssh / host"),
               series=terms("3", "event.outcome", "group", size=3))), 16, 12),
     (vis("ns8-logins-failed-users", "Failed logins by user", EVENTS, FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"))), 16, 12),
