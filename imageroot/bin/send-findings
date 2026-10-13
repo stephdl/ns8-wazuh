@@ -57,6 +57,9 @@ NOISE = [
     {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-upgrade-hub"}},
     # Transient units of systemd-run
     {"wildcard": {"wazuh.rule.title": "System service st*ed - run-r*"}},
+    # The CrowdSec bouncer adds each banned address to its nftables set. Other firewall changes stay in.
+    {"bool": {"filter": [{"term": {"wazuh.rule.title": "Firewall rule modified"}},
+                         {"prefix": {"process.name": "crowdsec-firew"}}]}},
     # The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them
     {"prefix": {"wazuh.rule.title": "Wazuh VD - "}},
 ]

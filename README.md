@@ -266,7 +266,7 @@ r1-node1
   1 x Group deleted - kuma13
 ```
 
-Some events are normal on an NS8 node and stay out of the email: the systemd sessions of the rootless modules (`user@`, `fix-xdg-state@`) and the services that a timer starts and stops at each run: `promtail`, `systemd-hostnamed`, `dnf-makecache`, `logrotate`, `phonehome`, the backups, the CrowdSec hub update and alert export, and a few more. The vulnerabilities stay out too: the scan finds the same CVE again at each run, and the Vulnerability Detection page lists them. They stay in the dashboard and in the export. Module users created or deleted and firewall changes are mailed, because installing or removing a module is rare.
+Some events are normal on an NS8 node and stay out of the email: the systemd sessions of the rootless modules (`user@`, `fix-xdg-state@`) and the services that a timer starts and stops at each run: `promtail`, `systemd-hostnamed`, `dnf-makecache`, `logrotate`, `phonehome`, the backups, the CrowdSec hub update and alert export, and a few more. The vulnerabilities stay out too: the scan finds the same CVE again at each run, and the Vulnerability Detection page lists them. They stay in the dashboard and in the export. Module users created or deleted and firewall changes are mailed, because installing or removing a module is rare. The firewall changes of the CrowdSec bouncer, one at each ban, stay out.
 
 Some smarthosts refuse the default sender `wazuh@` followed by the host name. Set `notify_sender` to an address they accept.
 
