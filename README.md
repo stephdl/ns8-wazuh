@@ -124,7 +124,7 @@ The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name
 
 ### NS8 nodes and their modules
 
-On an NS8 node the script makes the agent run `/var/ossec/bin/ns8-journal` every 10 seconds instead of reading journald itself. The Wazuh agent sends a journal line as `program[pid]: message` only, without the user or the unit that tell which module wrote it: mail4 logs as dovecot, rspamd and postfix, piler7 and piler10 both as piler-app. ns8-journal reads the new lines with `journalctl -o json`, adds the module (the owner user for a rootless module, the unit name for a rootful one) and prints one JSON line each. A cursor in `/var/ossec/var/ns8-journal.cursor` makes each run start where the last one stopped, so nothing is lost or sent twice. The dashboards then have an Application picker, with the NS8 modules. An agent installed before gets it with `--update`. On a host that is not an NS8 node, the agent keeps reading journald. A line without a module, from the host system of an NS8 node or from any other server, gets the application `system`, so the Program picker works on it too. Raw audit lines get the program `auditd`.
+On an NS8 node the script makes the agent run `/var/ossec/bin/ns8-journal` every 10 seconds instead of reading journald itself. The Wazuh agent sends a journal line as `program[pid]: message` only, without the user or the unit that tell which module wrote it: mail4 logs as dovecot, rspamd and postfix, piler7 and piler10 both as piler-app. ns8-journal reads the new lines with `journalctl -o json`, adds the module (the owner user for a rootless module, the unit name for a rootful one) and prints one JSON line each. A cursor in `/var/ossec/var/ns8-journal.cursor` makes each run start where the last one stopped, so nothing is lost or sent twice. The Journal, Logins and Telephony dashboards then have an Application picker, with the NS8 modules. The other dashboards show one kind of service, so the picker would list applications that match nothing there. An agent installed before gets it with `--update`. On a host that is not an NS8 node, the agent keeps reading journald. A line without a module, from the host system of an NS8 node or from any other server, gets the application `system`, so the Program picker works on it too. Raw audit lines get the program `auditd`.
 
 ### Agent updates
 
@@ -196,18 +196,16 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 
 | Dashboard | Content |
 |---|---|
-| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an application and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
-| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures |
-| NS8 - Web | Traefik requests by status, paths in error, top sources and countries, with a map |
-| NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
-| NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
-| NS8 - System changes | users, groups, services and firewall changed on the hosts |
-| NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
-| NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
-| NS8 - Collaboration | failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost, by user, source and country. Mattermost logs only the accounts that exist, Webtop logs nothing |
-| NS8 - Web hosting | lamp, webserver, wordpress and dokuwiki sites from Traefik: requests by site, probed paths, scanning sources, server errors |
-| NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
-| NS8 - Proxmox | Proxmox VE hosts with an agent: web and API logins, tasks by type and user, failed tasks and backups, deleted guests |
+| NS8 - Journal | every log line, like `journalctl`. Pick a server, an application and a program, or type a word in the search bar, any case |
+| NS8 - Logins | successful and failed logins on every service and server, with a map of the failures. Click a service, such as sogo, to see only its logins |
+| NS8 - Web | web traffic of every site: status codes, errors, probed paths and scanners, with a map |
+| NS8 - CrowdSec | attacks blocked by CrowdSec and where they come from, with a map |
+| NS8 - Fleet | alerts of every server by level, rule and MITRE tactic, and when each server last reported |
+| NS8 - System changes | accounts, groups, services and firewall rules changed on the servers |
+| NS8 - Mail | sent and rejected mail, spam, viruses and failed mail logins |
+| NS8 - Directory | Samba domain logins, failures by account and workstation, account and group changes. Needs the Samba audit below |
+| NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
+| NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |
 
 The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 

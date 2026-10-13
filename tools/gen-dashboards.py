@@ -14,7 +14,7 @@ EVENTS = "wazuh-events-v5*"
 APPS = "wazuh-events-v5-applications*"
 SYSTEM = "wazuh-events-v5-system-activity*"
 FINDINGS = "wazuh-findings-v5*"
-MANAGED = "Managed by the NS8 module and replaced at each update: clone it before changing it."
+MANAGED = "Replaced at each update: clone it before changing it."
 
 
 def count(label=None):
@@ -22,11 +22,11 @@ def count(label=None):
             "params": {"customLabel": label} if label else {}}
 
 
-def terms(id, field, schema, size=10, label=None, missing=False):
+def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-"):
     return {"id": id, "enabled": True, "type": "terms", "schema": schema,
             "params": {"field": field, "size": size, "order": "desc", "orderBy": "1",
                        "otherBucket": False, "otherBucketLabel": "Other",
-                       "missingBucket": missing, "missingBucketLabel": "-",
+                       "missingBucket": missing, "missingBucketLabel": missing_label,
                        **({"customLabel": label} if label else {})}}
 
 
@@ -144,10 +144,12 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def controls(id, pattern, program=False):
+def controls(id, pattern, apps=False, program=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
-    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1"),
-              ("4", "orchestrator.namespace", "Application", "2")]
+    fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
+    # The picker lists every application of the agent, whatever the dashboard shows: only where several can match
+    if apps:
+        fields.append(("4", "orchestrator.namespace", "Application", "2"))
     if program:
         fields.append(("3", "process.name", "Program", "4"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
@@ -165,9 +167,9 @@ def controls(id, pattern, program=False):
                            for i in range(len(fields))]}
 
 
-def dashboard(id, title, description, panels, pattern=EVENTS, program=False):
+def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False):
     """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
-    panels = [(controls(f"{id}-controls", pattern, program), 48, 5)] + panels
+    panels = [(controls(f"{id}-controls", pattern, apps, program), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -199,13 +201,14 @@ def write(name, objects):
 AUTH = "event.category:authentication"
 FAIL = f"{AUTH} and event.outcome:failure"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
-    "Logins to NS8 services and to the hosts, by outcome, user, source and country", [
+    "Successful and failed logins on every service and server", [
     (vis("ns8-logins-outcome", "Logins by outcome", EVENTS, AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-logins-timeline", "Logins over time", EVENTS, AUTH,
          over_time(terms("3", "event.outcome", "group", size=3), kind="histogram")), 32, 8),
     (vis("ns8-logins-services", "Logins by service", EVENTS, AUTH,
-         bars(terms("2", "process.name", "segment", size=10, missing=True),
+         # The logins of the standard Wazuh integrations (PAM, sudo, ssh) have no service type
+         bars(terms("2", "service.type", "segment", size=10, missing=True, missing_label="system"),
               series=terms("3", "event.outcome", "group", size=3))), 16, 12),
     (vis("ns8-logins-failed-users", "Failed logins by user", EVENTS, FAIL,
          table(terms("2", "user.name", "bucket", size=50, label="User"))), 16, 12),
@@ -217,30 +220,46 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 32, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
-]))
+], apps=True))
 
-WEB = "event.category:web"
+# The apache and nginx of the lamp and webserver sites log the same requests again, without the route
+WEB = "event.category:web and process.name:traefik"
+WEB_ERRORS = f"{WEB} and http.response.status_code >= 400"
+PROBES = (f"{WEB} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
+          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
 write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
-    "HTTP requests received by the NS8 reverse proxy", [
+    "Web traffic of every site: errors and scanners", [
     (vis("ns8-web-timeline", "Requests over time", APPS, WEB, over_time(status_ranges(), kind="histogram")), 32, 10),
     (vis("ns8-web-status", "Status codes", APPS, WEB,
          pie(terms("2", "http.response.status_code", "segment", size=10))), 16, 10),
-    (vis("ns8-web-errors", "Client and server errors", APPS, f"{WEB} and http.response.status_code >= 400",
-         over_time(terms("3", "http.response.status_code", "group", size=10), kind="line")), 48, 10),
-    (vis("ns8-web-paths", "Top paths in error", APPS, f"{WEB} and http.response.status_code >= 400",
+    (vis("ns8-hosting-sites", "Requests by site", APPS, WEB,
+         bars(terms("2", "service.name", "segment", size=20, missing=True, missing_label="no route"),
+              series=status_ranges("3"))), 24, 14),
+    (vis("ns8-web-errors", "Client and server errors", APPS, WEB_ERRORS,
+         over_time(terms("3", "http.response.status_code", "group", size=10), kind="line")), 24, 14),
+    (vis("ns8-web-paths", "Top paths in error", APPS, WEB_ERRORS,
          table(terms("2", "url.path", "bucket", size=50, label="Path"),
                terms("3", "http.response.status_code", "bucket", size=3, label="Status"))), 24, 14),
+    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{WEB} and http.response.status_code >= 500",
+         table(terms("2", "service.name", "bucket", size=20, label="Site", missing=True, missing_label="no route"),
+               terms("3", "url.path", "bucket", size=5, label="Path"))), 24, 14),
+    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
+         table(terms("2", "url.path", "bucket", size=50, label="Path"),
+               terms("3", "service.name", "bucket", size=3, label="Site", missing=True, missing_label="no route"))), 24, 14),
+    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
     (vis("ns8-web-sources", "Top sources", APPS, WEB,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
     (vis("ns8-web-countries", "Requests by country", APPS, WEB,
-         pie(terms("2", "source.geo.country_name", "segment", size=10))), 16, 14),
-    (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 32, 14),
+         pie(terms("2", "source.geo.country_name", "segment", size=10))), 24, 14),
+    (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 48, 14),
 ]))
 
 CROWDSEC = "event.action:crowdsec-alert"
 write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
-    "Scenarios triggered by CrowdSec and the IP addresses behind them", [
+    "Attacks blocked by CrowdSec, and where they come from", [
     (vis("ns8-crowdsec-total", "Alerts", APPS, CROWDSEC,
          metric(extra_metrics=[{"id": "2", "enabled": True, "type": "cardinality", "schema": "metric",
                                 "params": {"field": "source.ip", "customLabel": "Distinct IPs"}}])), 16, 8),
@@ -257,7 +276,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
 
 NOT_INFO = "not wazuh.rule.level:informational"
 write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
-    "Findings of every agent, and when each agent sent its last event", [
+    "Alerts of every server, and when each one last reported", [
     (vis("ns8-fleet-levels", "Findings over time", FINDINGS, "",
          over_time(terms("3", "wazuh.rule.level", "group", size=5), kind="histogram")), 32, 10),
     (vis("ns8-fleet-level-count", "Findings by level", FINDINGS, "",
@@ -282,7 +301,7 @@ CHANGES = ("event.action:(user-created or user-deleted or user-modified or group
            # The CrowdSec bouncer rewrites its nftables set at every ban
            " and not process.name:crowdsec-firew*")
 write("50-system-changes.ndjson", dashboard("ns8-system-changes", "NS8 - System changes",
-    "Accounts, services and firewall changed on the hosts", [
+    "Accounts, services and firewall rules changed on the servers", [
     (vis("ns8-system-changes-count", "Changes by type", SYSTEM, CHANGES,
          metric(group=terms("2", "event.action", "group", size=10))), 48, 8),
     (vis("ns8-system-changes-timeline", "Changes over time", SYSTEM, CHANGES,
@@ -300,7 +319,7 @@ REJECTED = "event.action:mail-rejected"
 SPAM = "service.type:rspamd"
 SASL = "service.type:postfix and event.action:logon-failed"
 write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
-    "Postfix and Rspamd of the ns8-mail module: deliveries, rejections, spam, viruses and SMTP login failures", [
+    "Sent and rejected mail, spam, viruses and failed mail logins", [
     (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
          metric(group=terms("2", "event.action", "group", size=5))), 24, 8),
     (vis("ns8-mail-rejected-count", "Rejected messages", APPS, REJECTED,
@@ -333,8 +352,7 @@ SAMBA_AUTH = "service.type:samba and event.category:authentication"
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
 SAMBA_IAM = "service.type:samba and event.category:iam and not event.action:primary-group-set"
 write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
-    "Samba domain controller of the ns8-samba module: logins, failures, locked accounts and account changes. "
-    "Needs the Samba audit, see the README", [
+    "Domain logins and account changes on Samba. Needs the Samba audit, see the README", [
     (vis("ns8-directory-outcome", "Domain logins by outcome", APPS, SAMBA_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-directory-timeline", "Domain logins over time", APPS, SAMBA_AUTH,
@@ -357,48 +375,10 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
             ["wazuh.agent.name", "event.action", "user.target.name", "group.name", "event.reason"]), 48, 16),
 ]))
 
-COLLAB = "service.type:(nextcloud or synapse or ejabberd or sogo or roundcube or mattermost) and event.category:authentication"
-COLLAB_FAIL = f"{COLLAB} and event.outcome:failure"
-write("80-collaboration.ndjson", dashboard("ns8-collaboration", "NS8 - Collaboration",
-    "Failed logins on Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost. Webtop does not log them", [
-    (vis("ns8-collaboration-count", "Failed logins by application", APPS, COLLAB_FAIL,
-         metric(group=terms("2", "service.type", "group", size=5))), 48, 8),
-    (vis("ns8-collaboration-timeline", "Failed logins over time", APPS, COLLAB_FAIL,
-         over_time(terms("3", "service.type", "group", size=5), kind="histogram")), 48, 10),
-    (vis("ns8-collaboration-users", "Failed logins by user", APPS, COLLAB_FAIL,
-         table(terms("2", "user.name", "bucket", size=50, label="User"),
-               terms("3", "service.type", "bucket", size=3, label="Service"))), 24, 14),
-    (vis("ns8-collaboration-sources", "Failed logins by source", APPS, COLLAB_FAIL,
-         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("4", "service.type", "bucket", size=3, label="Service"))), 24, 14),
-    (vis("ns8-collaboration-map", "Failed logins map", APPS, COLLAB_FAIL, geo_map()), 48, 14),
-]))
-
-HOSTING = "event.category:web and service.name:(lamp* or webserver* or wordpress* or dokuwiki*)"
-PROBES = (f"{HOSTING} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
-          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
-write("90-web-hosting.ndjson", dashboard("ns8-web-hosting", "NS8 - Web hosting",
-    "Sites of the lamp, webserver, wordpress and dokuwiki modules, read from Traefik: traffic, errors and scanners", [
-    (vis("ns8-hosting-sites", "Requests by site", APPS, HOSTING,
-         bars(terms("2", "service.name", "segment", size=20), series=status_ranges("3"))), 24, 12),
-    (vis("ns8-hosting-timeline", "Requests over time", APPS, HOSTING,
-         over_time(terms("3", "service.name", "group", size=10), kind="histogram")), 24, 12),
-    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
-         table(terms("2", "url.path", "bucket", size=50, label="Path"),
-               terms("3", "service.name", "bucket", size=3, label="Site"))), 24, 14),
-    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
-         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
-    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{HOSTING} and http.response.status_code >= 500",
-         table(terms("2", "service.name", "bucket", size=20, label="Site"),
-               terms("3", "url.path", "bucket", size=5, label="Path"))), 48, 12),
-]))
-
 PHONE = "service.type:(kamailio or nethvoice) and event.outcome:failure"
 SIP = "service.type:kamailio and event.outcome:failure"
 write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
-    "NethVoice: SIP authentication failures on the proxy, failed logins on the CTI and the reports", [
+    "Failed phone and NethVoice logins, and where they come from", [
     (vis("ns8-telephony-count", "Failures by service", APPS, PHONE,
          metric(group=terms("2", "service.name", "group", size=5))), 16, 8),
     (vis("ns8-telephony-timeline", "Failures over time", APPS, PHONE,
@@ -410,13 +390,13 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
          table(terms("2", "user.name", "bucket", size=50, label="Extension"),
                terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
     (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
-]))
+], apps=True))
 
 PVE = "service.type:proxmox"
 PVE_AUTH = f"{PVE} and event.category:authentication"
 PVE_TASK = f"{PVE} and event.action:task-started"
 write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
-    "Proxmox VE hosts with a Wazuh agent: web and API logins, tasks on the guests, failed backups", [
+    "Logins, virtual machine tasks and failed backups on Proxmox", [
     (vis("ns8-proxmox-logins", "Logins by outcome", APPS, PVE_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-proxmox-tasks-timeline", "Tasks over time", APPS, PVE_TASK,
@@ -439,7 +419,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
-    "Log lines of every server, like journalctl: pick a customer, a server, an application (system for the host itself) and a program, and type a word in the search bar, such as crowdsec, any case", [
+    "Every log line, like journalctl. Pick a server, an application and a program, or search a word", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
             ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
-], program=True))
+], apps=True, program=True))
