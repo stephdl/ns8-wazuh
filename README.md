@@ -196,16 +196,16 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 
 | Dashboard | Content |
 |---|---|
-| NS8 - Journal | every log line, like `journalctl`: pick a customer, a server, an application and a program, type a word in the search bar, such as `crowdsec`, any case. Lines indexed before this version need `message:*crowdsec*` |
-| NS8 - Logins | logins by outcome, service, user, source IP and country, with a map of the failures. Click a service, such as sogo or nextcloud, to see only its logins |
-| NS8 - Web | Traefik requests by site (route), status, paths in error, server errors by site, probed paths and scanning sources, top sources and countries, with a map. The apache and nginx of the lamp and webserver sites log the same requests again: they stay in the Journal |
-| NS8 - CrowdSec | triggered scenarios and the IP addresses behind them, with a map |
-| NS8 - Fleet | findings by level, agent, rule and MITRE tactic, last event of each agent |
-| NS8 - System changes | users, groups, services and firewall changed on the hosts |
-| NS8 - Mail | Postfix deliveries, rejections, viruses and SMTP login failures, Rspamd decisions |
-| NS8 - Directory | Samba logins, failures by account, source and workstation, account and group changes |
-| NS8 - Telephony | NethVoice SIP authentication failures by source and extension, failed CTI and reports logins |
-| NS8 - Proxmox | Proxmox VE hosts with an agent: web and API logins, tasks by type and user, failed tasks and backups, deleted guests |
+| NS8 - Journal | every log line, like `journalctl`. Pick a server, an application and a program, or type a word in the search bar, any case |
+| NS8 - Logins | successful and failed logins on every service and server, with a map of the failures. Click a service, such as sogo, to see only its logins |
+| NS8 - Web | web traffic of every site: status codes, errors, probed paths and scanners, with a map |
+| NS8 - CrowdSec | attacks blocked by CrowdSec and where they come from, with a map |
+| NS8 - Fleet | alerts of every server by level, rule and MITRE tactic, and when each server last reported |
+| NS8 - System changes | accounts, groups, services and firewall rules changed on the servers |
+| NS8 - Mail | sent and rejected mail, spam, viruses and failed mail logins |
+| NS8 - Directory | Samba domain logins, failures by account and workstation, account and group changes. Needs the Samba audit below |
+| NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
+| NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |
 
 The country comes from the GeoIP database of the manager, so it shows for public IP addresses only. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 

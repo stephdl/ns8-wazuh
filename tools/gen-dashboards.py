@@ -14,7 +14,7 @@ EVENTS = "wazuh-events-v5*"
 APPS = "wazuh-events-v5-applications*"
 SYSTEM = "wazuh-events-v5-system-activity*"
 FINDINGS = "wazuh-findings-v5*"
-MANAGED = "Managed by the NS8 module and replaced at each update: clone it before changing it."
+MANAGED = "Replaced at each update: clone it before changing it."
 
 
 def count(label=None):
@@ -201,7 +201,7 @@ def write(name, objects):
 AUTH = "event.category:authentication"
 FAIL = f"{AUTH} and event.outcome:failure"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
-    "Logins to NS8 services and to the hosts, by outcome, user, source and country", [
+    "Successful and failed logins on every service and server", [
     (vis("ns8-logins-outcome", "Logins by outcome", EVENTS, AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-logins-timeline", "Logins over time", EVENTS, AUTH,
@@ -228,7 +228,7 @@ WEB_ERRORS = f"{WEB} and http.response.status_code >= 400"
 PROBES = (f"{WEB} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
           "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
 write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
-    "HTTP requests received by the NS8 reverse proxy, by site (Traefik route): traffic, errors and scanners", [
+    "Web traffic of every site: errors and scanners", [
     (vis("ns8-web-timeline", "Requests over time", APPS, WEB, over_time(status_ranges(), kind="histogram")), 32, 10),
     (vis("ns8-web-status", "Status codes", APPS, WEB,
          pie(terms("2", "http.response.status_code", "segment", size=10))), 16, 10),
@@ -259,7 +259,7 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
 
 CROWDSEC = "event.action:crowdsec-alert"
 write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
-    "Scenarios triggered by CrowdSec and the IP addresses behind them", [
+    "Attacks blocked by CrowdSec, and where they come from", [
     (vis("ns8-crowdsec-total", "Alerts", APPS, CROWDSEC,
          metric(extra_metrics=[{"id": "2", "enabled": True, "type": "cardinality", "schema": "metric",
                                 "params": {"field": "source.ip", "customLabel": "Distinct IPs"}}])), 16, 8),
@@ -276,7 +276,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
 
 NOT_INFO = "not wazuh.rule.level:informational"
 write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
-    "Findings of every agent, and when each agent sent its last event", [
+    "Alerts of every server, and when each one last reported", [
     (vis("ns8-fleet-levels", "Findings over time", FINDINGS, "",
          over_time(terms("3", "wazuh.rule.level", "group", size=5), kind="histogram")), 32, 10),
     (vis("ns8-fleet-level-count", "Findings by level", FINDINGS, "",
@@ -301,7 +301,7 @@ CHANGES = ("event.action:(user-created or user-deleted or user-modified or group
            # The CrowdSec bouncer rewrites its nftables set at every ban
            " and not process.name:crowdsec-firew*")
 write("50-system-changes.ndjson", dashboard("ns8-system-changes", "NS8 - System changes",
-    "Accounts, services and firewall changed on the hosts", [
+    "Accounts, services and firewall rules changed on the servers", [
     (vis("ns8-system-changes-count", "Changes by type", SYSTEM, CHANGES,
          metric(group=terms("2", "event.action", "group", size=10))), 48, 8),
     (vis("ns8-system-changes-timeline", "Changes over time", SYSTEM, CHANGES,
@@ -319,7 +319,7 @@ REJECTED = "event.action:mail-rejected"
 SPAM = "service.type:rspamd"
 SASL = "service.type:postfix and event.action:logon-failed"
 write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
-    "Postfix and Rspamd of the ns8-mail module: deliveries, rejections, spam, viruses and SMTP login failures", [
+    "Sent and rejected mail, spam, viruses and failed mail logins", [
     (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
          metric(group=terms("2", "event.action", "group", size=5))), 24, 8),
     (vis("ns8-mail-rejected-count", "Rejected messages", APPS, REJECTED,
@@ -352,8 +352,7 @@ SAMBA_AUTH = "service.type:samba and event.category:authentication"
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
 SAMBA_IAM = "service.type:samba and event.category:iam and not event.action:primary-group-set"
 write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
-    "Samba domain controller of the ns8-samba module: logins, failures, locked accounts and account changes. "
-    "Needs the Samba audit, see the README", [
+    "Domain logins and account changes on Samba. Needs the Samba audit, see the README", [
     (vis("ns8-directory-outcome", "Domain logins by outcome", APPS, SAMBA_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-directory-timeline", "Domain logins over time", APPS, SAMBA_AUTH,
@@ -379,7 +378,7 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
 PHONE = "service.type:(kamailio or nethvoice) and event.outcome:failure"
 SIP = "service.type:kamailio and event.outcome:failure"
 write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
-    "NethVoice: SIP authentication failures on the proxy, failed logins on the CTI and the reports", [
+    "Failed phone and NethVoice logins, and where they come from", [
     (vis("ns8-telephony-count", "Failures by service", APPS, PHONE,
          metric(group=terms("2", "service.name", "group", size=5))), 16, 8),
     (vis("ns8-telephony-timeline", "Failures over time", APPS, PHONE,
@@ -397,7 +396,7 @@ PVE = "service.type:proxmox"
 PVE_AUTH = f"{PVE} and event.category:authentication"
 PVE_TASK = f"{PVE} and event.action:task-started"
 write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
-    "Proxmox VE hosts with a Wazuh agent: web and API logins, tasks on the guests, failed backups", [
+    "Logins, virtual machine tasks and failed backups on Proxmox", [
     (vis("ns8-proxmox-logins", "Logins by outcome", APPS, PVE_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-proxmox-tasks-timeline", "Tasks over time", APPS, PVE_TASK,
@@ -420,7 +419,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
-    "Log lines of every server, like journalctl: pick a customer, a server, an application (system for the host itself) and a program, and type a word in the search bar, such as crowdsec, any case", [
+    "Every log line, like journalctl. Pick a server, an application and a program, or search a word", [
     (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
             ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
 ], apps=True, program=True))
