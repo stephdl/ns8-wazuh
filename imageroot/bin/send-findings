@@ -64,6 +64,9 @@ NOISE = [
                          {"prefix": {"process.name": "crowdsec-firew"}}]}},
     # The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them
     {"prefix": {"wazuh.rule.title": "Wazuh VD - "}},
+    # The hourly anacron line of Debian and Proxmox, run by cron as root
+    {"term": {"wazuh.rule.title": "Sudo command targeting a persistence path - if [ -x /etc/init.d/anacron ] && "
+                                  "! [ -d /run/systemd/system ]; then exec /usr/sbin/invoke-rc.d anacron start >/dev/null; fi"}},
 ]
 
 
