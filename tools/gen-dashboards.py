@@ -99,15 +99,24 @@ def metric(group=None, extra_metrics=()):
     return "metric", params, aggs
 
 
-def geo_map(field="source.geo.location"):
-    params = {"colorSchema": "Yellow to Red", "mapType": "Scaled Circle Markers", "isDesaturated": True,
-              "addTooltip": True, "heatClusterSize": 1.5, "legendPosition": "bottomright",
-              "mapZoom": 2, "mapCenter": [20, 0],
+# The world countries layer of the OpenSearch maps service, as the region map editor saves it
+WORLD_COUNTRIES = {"name": "World Countries", "origin": "elastic_maps_service", "id": "world_countries",
+                   "layerId": "elastic_maps_service.World Countries", "isEMS": True,
+                   "attribution": "Made with NaturalEarth", "format": {"type": "geojson"},
+                   "fields": [{"type": "id", "name": "iso2", "description": "ISO 3166-1 alpha-2 Code"},
+                              {"type": "id", "name": "iso3", "description": "ISO 3166-1 alpha-3 Code"},
+                              {"type": "name", "name": "name", "description": "Name"}]}
+
+
+def geo_map():
+    """Countries colored by count: the tooltip gives the country name, a circle map only its coordinates."""
+    params = {"addTooltip": True, "colorSchema": "Yellow to Red", "isDisplayWarning": False, "legendPosition": "bottomright",
+              "mapZoom": 2, "mapCenter": [20, 0], "outlineWeight": 1, "showAllShapes": True, "emsHotLink": "",
+              "layerChosenByUser": "default", "selectedLayer": WORLD_COUNTRIES,
+              "selectedJoinField": WORLD_COUNTRIES["fields"][0],
               "wms": {"enabled": False, "options": {"format": "image/png", "transparent": True}}}
-    aggs = [count(), {"id": "2", "enabled": True, "type": "geohash_grid", "schema": "segment",
-                      "params": {"field": field, "autoPrecision": True, "precision": 2,
-                                 "useGeocentroid": True, "isFilteredByCollar": True}}]
-    return "tile_map", params, aggs
+    aggs = [count(), terms("2", "source.geo.country_iso_code", "segment", size=200)]
+    return "region_map", params, aggs
 
 
 def status_ranges(id="3"):
@@ -128,7 +137,7 @@ def index_ref(pattern):
 
 def vis(id, title, pattern, query, spec):
     kind, params, aggs = spec
-    params = dict(params, type=params.get("type", kind)) if kind not in ("table", "tile_map") else params
+    params = dict(params, type=params.get("type", kind)) if kind not in ("table", "region_map") else params
     return {"id": id, "type": "visualization",
             "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
                            "visState": json.dumps({"title": title, "type": kind, "params": params, "aggs": aggs}),
@@ -214,7 +223,8 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
          table(terms("2", "user.name", "bucket", size=50, label="User"))), 16, 12),
     (vis("ns8-logins-failed-sources", "Failed logins by source", EVENTS, FAIL,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 16, 12),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 16, 12),
     (vis("ns8-logins-countries", "Logins by country", EVENTS, AUTH,
          pie(terms("2", "source.geo.country_name", "segment", size=10))), 16, 14),
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 32, 14),
@@ -248,10 +258,12 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
                terms("3", "service.name", "bucket", size=3, label="Site", missing=True, missing_label="no route"))), 24, 14),
     (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
     (vis("ns8-web-sources", "Top sources", APPS, WEB,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
     (vis("ns8-web-countries", "Requests by country", APPS, WEB,
          pie(terms("2", "source.geo.country_name", "segment", size=10))), 24, 14),
     (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 48, 14),
@@ -270,6 +282,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
     (vis("ns8-crowdsec-sources", "Top IPs", APPS, CROWDSEC,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True),
                terms("4", "event.reason", "bucket", size=3, label="Scenario"))), 32, 14),
     (vis("ns8-crowdsec-map", "Alerts map", APPS, CROWDSEC, geo_map()), 48, 14),
 ]))
@@ -342,7 +355,8 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     (vis("ns8-mail-sasl-sources", "SMTP login failures", APPS, SASL,
          table(terms("2", "source.ip", "bucket", size=30, label="Source IP"),
                terms("3", "user.name", "bucket", size=3, label="User", missing=True),
-               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
     (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
@@ -385,7 +399,8 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
          over_time(terms("3", "service.name", "group", size=5), kind="histogram")), 32, 8),
     (vis("ns8-telephony-sip-sources", "SIP failures by source", APPS, SIP,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
     (vis("ns8-telephony-sip-users", "SIP failures by extension", APPS, SIP,
          table(terms("2", "user.name", "bucket", size=50, label="Extension"),
                terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
@@ -404,7 +419,8 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
     (vis("ns8-proxmox-failed-sources", "Failed logins by source", APPS, f"{PVE_AUTH} and event.outcome:failure",
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "user.name", "bucket", size=3, label="User"),
-               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True))), 24, 14),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
     (vis("ns8-proxmox-tasks-by-user", "Tasks by type and user", APPS, PVE_TASK,
          table(terms("2", "event.code", "bucket", size=30, label="Task"),
                terms("3", "user.name", "bucket", size=5, label="User"))), 24, 14),
