@@ -15,9 +15,11 @@
 import fcntl
 import json
 import os
+import re
 import smtplib
 import ssl
 import sys
+import textwrap
 import urllib.request
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -187,6 +189,49 @@ def send_mail(smtp, sender, recipients, subject, text):
         client.send_message(message)
 
 
+# The Wazuh titles end with what they are about: "System service stopped - backup12",
+# "User account wztest-a deleted". Grouped on the rest, the details listed below it.
+ACCOUNT_TITLE = re.compile(r"^(New user account|User account|Group) (\S*) ?(created|deleted|modified)$")
+VULNERABILITY_TITLE = re.compile(r"^(Wazuh VD) - Vulnerability (\S+) (detected|remediated)$")
+DETAILS_SHOWN = 10
+DETAIL_LENGTH = 60
+
+
+def split_title(title):
+    """Return the title without its subject, and the subject, empty when there is none."""
+    match = ACCOUNT_TITLE.match(title) or VULNERABILITY_TITLE.match(title)
+    if match:
+        return f"{match.group(1)} {match.group(3)}", match.group(2)
+    if " - " in title:
+        # "Wazuh FIM - File deleted - /boot/x": the last part is the subject
+        head, detail = title.rsplit(" - ", 1)
+        return head, detail.strip()
+    return title, ""
+
+
+def summary_lines(found):
+    """One line per kind of finding with its count, and the subjects it is about."""
+    groups = {}
+    for title, count in found.items():
+        head, detail = split_title(title)
+        total, details = groups.setdefault(head, [0, Counter()])
+        groups[head][0] = total + count
+        if len(detail) > DETAIL_LENGTH:
+            detail = detail[:DETAIL_LENGTH - 3] + "..."
+        details[detail or "unnamed"] += count
+    lines = []
+    for head, (count, details) in sorted(groups.items(), key=lambda g: (-g[1][0], g[0])):
+        lines.append(f"  {count} x {head}")
+        shown = [f"{d} ({n})" if n > 1 else d for d, n in sorted(details.items(), key=lambda x: (-x[1], x[0]))]
+        # A title without a subject needs no detail line
+        if list(details) != ["unnamed"]:
+            more = len(shown) - DETAILS_SHOWN
+            text = ", ".join(shown[:DETAILS_SHOWN]) + (f" and {more} more" if more > 0 else "")
+            lines += textwrap.wrap(text, width=76, initial_indent="      ", subsequent_indent="      ",
+                                   break_long_words=False, break_on_hyphens=False)
+    return lines
+
+
 def email(cursor):
     host = os.environ.get("TRAEFIK_HOST", "")
     recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
@@ -212,7 +257,7 @@ def email(cursor):
             counts[(customer, wazuh_agent.get("name", "?"), source.get("rule", {}).get("title", "?"))] += 1
         total += len(hits)
     if total:
-        # One block per customer and agent, one line per rule with a count, instead of one line per finding
+        # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
         lines = [f"{total} new findings.", ""]
         customers = sorted({c for c, _, _ in counts})
         for customer in customers:
@@ -222,8 +267,8 @@ def email(cursor):
                 lines += ["No customer", ""]
             for agent_name in sorted({a for c, a, _ in counts if c == customer}):
                 lines.append(agent_name)
-                rules = [(n, r) for (c, a, r), n in counts.items() if c == customer and a == agent_name]
-                lines += [f"  {n} x {r}" for n, r in sorted(rules, key=lambda x: (-x[0], x[1]))]
+                lines += summary_lines(Counter({r: n for (c, a, r), n in counts.items()
+                                                if c == customer and a == agent_name}))
                 lines.append("")
         lines.append(f"Open the dashboard: https://{host}/")
         send_mail(smtp, sender, recipients, f"Wazuh: {total} new findings on {host}", "\n".join(lines))

@@ -95,7 +95,7 @@ The same is available on the Agents page of the module. The token holds the serv
 
 ### Customers
 
-One server often watches the servers of several customers. Give the customer when you create the token: the agents enroll in a Wazuh group named after it, created when missing. The Agents page shows the customer of each agent, each `NS8 - ...` dashboard has a Customer then an Agent picker, and the findings email is grouped by customer, then by agent.
+One server often watches the servers of several customers. Give the customer when you create the token: the agents enroll in a Wazuh group named after it, created when missing. The Agents page shows the customer of each agent, each `NS8 - ...` dashboard has a Customer then an Agent picker, and the findings email is grouped by customer, then by agent. Under each agent, the findings of the same kind share one line with their count, and the accounts, services, files or CVEs they are about are listed below it.
 
 A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. Without a customer the agent goes in the `default` group.
 
