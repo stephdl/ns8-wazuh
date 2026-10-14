@@ -163,8 +163,9 @@ def controls(id, pattern, apps=False, program=False):
         fields.append(("3", "process.name", "Program", "4"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
                             "indexPatternRefName": f"control_{i}_index_pattern",
-                            "options": {"type": "terms", "multiselect": True, "dynamicOptions": True,
-                                        "size": 100, "order": "desc"}}
+                            # Dynamic options ask the indexer for 10 values only and ignore size
+                            "options": {"type": "terms", "multiselect": True, "dynamicOptions": False,
+                                        "size": 500, "order": "desc"}}
                            for i, (cid, field, label, parent) in enumerate(fields)],
               "updateFiltersOnChange": True, "useTimeFilter": True, "pinFilters": False}
     return {"id": id, "type": "visualization",
