@@ -120,10 +120,12 @@ def geo_map():
 
 
 def status_ranges(id="3"):
-    return {"id": id, "enabled": True, "type": "range", "schema": "group",
-            "params": {"field": "http.response.status_code", "ranges": [
-                {"from": 100, "to": 300, "label": "OK"}, {"from": 300, "to": 400, "label": "Redirect or cache"},
-                {"from": 400, "to": 500, "label": "Client error"}, {"from": 500, "to": 600, "label": "Server error"}]}}
+    """Status classes named in words: a range aggregation sends its labels to the indexer, which refuses them."""
+    classes = [("OK", "< 300"), ("Redirect or cache", ">= 300 and http.response.status_code < 400"),
+               ("Client error", ">= 400 and http.response.status_code < 500"), ("Server error", ">= 500")]
+    return {"id": id, "enabled": True, "type": "filters", "schema": "group",
+            "params": {"filters": [{"input": {"query": f"http.response.status_code {cond}", "language": "kuery"},
+                                    "label": label} for label, cond in classes]}}
 
 
 def search_source(query):
