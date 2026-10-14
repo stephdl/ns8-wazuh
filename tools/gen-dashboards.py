@@ -122,8 +122,8 @@ def geo_map():
 def status_ranges(id="3"):
     return {"id": id, "enabled": True, "type": "range", "schema": "group",
             "params": {"field": "http.response.status_code", "ranges": [
-                {"from": 100, "to": 300, "key": "1xx-2xx"}, {"from": 300, "to": 400, "key": "3xx"},
-                {"from": 400, "to": 500, "key": "4xx"}, {"from": 500, "to": 600, "key": "5xx"}]}}
+                {"from": 100, "to": 300, "key": "OK"}, {"from": 300, "to": 400, "key": "Redirect or cache"},
+                {"from": 400, "to": 500, "key": "Client error"}, {"from": 500, "to": 600, "key": "Server error"}]}}
 
 
 def search_source(query):
@@ -145,6 +145,15 @@ def vis(id, title, pattern, query, spec):
             "references": index_ref(pattern)}
 
 
+def markdown(id, title, text):
+    params = {"markdown": text, "fontSize": 12, "openLinksInNewTab": False}
+    return {"id": id, "type": "visualization",
+            "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
+                           "visState": json.dumps({"title": title, "type": "markdown", "params": params, "aggs": []}),
+                           "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
+            "references": []}
+
+
 def search(id, title, pattern, query, columns):
     return {"id": id, "type": "search",
             "attributes": {"title": title, "description": "", "version": 1, "hits": 0,
@@ -153,7 +162,7 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def controls(id, pattern, apps=False, program=False):
+def controls(id, pattern, apps=False, program=False, site=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
     # The picker lists every application of the agent, whatever the dashboard shows: only where several can match
@@ -161,6 +170,8 @@ def controls(id, pattern, apps=False, program=False):
         fields.append(("4", "orchestrator.namespace", "Application", "2"))
     if program:
         fields.append(("3", "process.name", "Program", "4"))
+    if site:
+        fields.append(("5", "service.target.name", "Site", "2"))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
                             "indexPatternRefName": f"control_{i}_index_pattern",
                             # Dynamic options ask the indexer for 10 values only and ignore size
@@ -177,9 +188,9 @@ def controls(id, pattern, apps=False, program=False):
                            for i in range(len(fields))]}
 
 
-def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False):
+def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False, site=False):
     """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
-    panels = [(controls(f"{id}-controls", pattern, apps, program), 48, 5)] + panels
+    panels = [(controls(f"{id}-controls", pattern, apps, program, site), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -237,40 +248,59 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
 
 # The apache and nginx of the lamp and webserver sites log the same requests again, without the route
 WEB = "event.category:web and process.name:traefik"
-WEB_ERRORS = f"{WEB} and http.response.status_code >= 400"
-PROBES = (f"{WEB} and http.response.status_code:404 and url.path:(*wp-login* or *xmlrpc* or *.env* "
-          "or *phpmyadmin* or *.git* or *wp-admin* or *.php*)")
+PROBE_PATHS = "url.path:(*wp-login* or *xmlrpc* or *.env* or *phpmyadmin* or *.git* or *wp-admin* or *.php*)"
+# A request to no route hit the bare address or an unknown name: nobody browses there
+SCANS = f"{WEB} and (not service.target.name:* or (http.response.status_code:404 and {PROBE_PATHS}))"
+SITES = f"{WEB} and service.target.name:* and not (http.response.status_code:404 and {PROBE_PATHS})"
+# 499: the client closed the connection, often a sync client
+# Traefik drops the User-Agent header: only the nginx and apache lines of the sites behind it carry one
+AGENTS = "event.category:web and user_agent.original:*"
+SITE_ERRORS = f"{SITES} and http.response.status_code >= 400 and not http.response.status_code:499"
+
+
 write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
-    "Web traffic of every site: errors and scanners", [
-    (vis("ns8-web-timeline", "Requests over time", APPS, WEB, over_time(status_ranges(), kind="histogram")), 32, 10),
-    (vis("ns8-web-status", "Status codes", APPS, WEB,
+    "Web traffic: the sites, their errors, and the scanners", [
+    (markdown("ns8-web-help", "How to read it",
+              "**Sites**: requests that reached a site, scans left out. **Errors to fix**: server errors and "
+              "missing pages of the sites. **Scans**: requests to no site, or to paths that attackers try. "
+              "A client closing the connection (499) is not counted as an error."), 48, 4),
+    (markdown("ns8-web-sites-title", "Sites", "### Sites"), 48, 2),
+    (vis("ns8-web-timeline", "Site requests over time", APPS, SITES,
+         over_time(status_ranges(), kind="histogram")), 32, 10),
+    (vis("ns8-web-status", "Site status codes", APPS, SITES,
          pie(terms("2", "http.response.status_code", "segment", size=10))), 16, 10),
-    (vis("ns8-hosting-sites", "Requests by site", APPS, WEB,
-         bars(terms("2", "service.name", "segment", size=20, missing=True, missing_label="no route"),
-              series=status_ranges("3"))), 24, 14),
-    (vis("ns8-web-errors", "Client and server errors", APPS, WEB_ERRORS,
+    (vis("ns8-hosting-sites", "Requests by site", APPS, SITES,
+         bars(terms("2", "service.target.name", "segment", size=30), series=status_ranges("3"))), 24, 14),
+    (vis("ns8-web-map", "Visitors map", APPS, SITES, geo_map()), 24, 14),
+    (vis("ns8-web-sources", "Top visitors", APPS, SITES,
+         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
+               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "source.as.organization.name", "bucket", size=1, label="Network", missing=True))), 24, 14),
+    (vis("ns8-web-agents", "Top user agents", APPS, AGENTS,
+         table(terms("2", "user_agent.original", "bucket", size=30, label="User agent"))), 24, 14),
+    (markdown("ns8-web-errors-title", "Errors to fix", "### Errors to fix"), 48, 2),
+    (vis("ns8-web-errors", "Site errors over time", APPS, SITE_ERRORS,
          over_time(terms("3", "http.response.status_code", "group", size=10), kind="line")), 24, 14),
-    (vis("ns8-web-paths", "Top paths in error", APPS, WEB_ERRORS,
-         table(terms("2", "url.path", "bucket", size=50, label="Path"),
-               terms("3", "http.response.status_code", "bucket", size=3, label="Status"))), 24, 14),
-    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{WEB} and http.response.status_code >= 500",
-         table(terms("2", "service.name", "bucket", size=20, label="Site", missing=True, missing_label="no route"),
+    (vis("ns8-hosting-errors", "Server errors by site", APPS, f"{SITES} and http.response.status_code >= 500",
+         table(terms("2", "service.target.name", "bucket", size=20, label="Site"),
                terms("3", "url.path", "bucket", size=5, label="Path"))), 24, 14),
-    (vis("ns8-hosting-probes", "Probed paths", APPS, PROBES,
+    (vis("ns8-web-paths", "Missing pages by site", APPS, f"{SITES} and http.response.status_code:404",
+         table(terms("2", "service.target.name", "bucket", size=20, label="Site"),
+               terms("3", "url.path", "bucket", size=10, label="Path"))), 48, 14),
+    (markdown("ns8-web-scans-title", "Scans", "### Scans"), 48, 2),
+    (vis("ns8-web-scans-timeline", "Scans over time", APPS, SCANS,
+         over_time(terms("3", "service.target.name", "group", size=10, missing=True, missing_label="no site"),
+                   kind="histogram")), 24, 14),
+    (vis("ns8-web-scans-map", "Scanners map", APPS, SCANS, geo_map()), 24, 14),
+    (vis("ns8-hosting-probes", "Probed paths", APPS, SCANS,
          table(terms("2", "url.path", "bucket", size=50, label="Path"),
-               terms("3", "service.name", "bucket", size=3, label="Site", missing=True, missing_label="no route"))), 24, 14),
-    (vis("ns8-hosting-probers", "Scanning sources", APPS, PROBES,
+               terms("3", "service.target.name", "bucket", size=3, label="Site", missing=True,
+                     missing_label="no site"))), 24, 14),
+    (vis("ns8-hosting-probers", "Scanning sources", APPS, SCANS,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
-    (vis("ns8-web-sources", "Top sources", APPS, WEB,
-         table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
-               terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
-    (vis("ns8-web-countries", "Requests by country", APPS, WEB,
-         pie(terms("2", "source.geo.country_name", "segment", size=10))), 24, 14),
-    (vis("ns8-web-map", "Requests map", APPS, WEB, geo_map()), 48, 14),
-]))
+               terms("5", "source.as.organization.name", "bucket", size=1, label="Network", missing=True))), 24, 14),
+], site=True))
 
 CROWDSEC = "event.action:crowdsec-alert"
 write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
