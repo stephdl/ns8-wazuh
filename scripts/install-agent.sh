@@ -203,6 +203,8 @@ FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,
 ROOTFUL_DIR = "/var/lib/nethserver"
 # A message longer than this is cut, the agent refuses lines over 64 KB
 MAX_MESSAGE = 16384
+# Lines per run. A run that never ends saves no cursor, and the next one sends the same lines again
+BATCH = 5000
 
 _owners = {}
 
@@ -246,11 +248,33 @@ def rootless_module_by_name(name):
         return ""
 
 
+def read_cursor():
+    try:
+        with open(CURSOR) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return ""
+
+
+def save_cursor(cursor):
+    with open(CURSOR + ".tmp", "w") as f:
+        f.write(cursor)
+    os.replace(CURSOR + ".tmp", CURSOR)
+
+
 def main():
-    # The first run starts from now: the history is already on the server, or not wanted
-    start = [] if os.path.exists(CURSOR) else ["-n", "0"]
-    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", f"--output-fields={FIELDS}",
-                             f"--cursor-file={CURSOR}"] + start, stdout=subprocess.PIPE, text=True)
+    cursor = read_cursor()
+    if not cursor:
+        # The first run starts from now: the history is already on the server, or not wanted
+        last = subprocess.run(["journalctl", "--no-pager", "-o", "json", "-n", "1", "--output-fields=_PID"],
+                              stdout=subprocess.PIPE, text=True).stdout
+        if last.strip():
+            save_cursor(json.loads(last)["__CURSOR"])
+        return
+    # Without --all journalctl gives null for any field over 4096 bytes
+    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", "--all", f"--output-fields={FIELDS}",
+                             f"--after-cursor={cursor}"], stdout=subprocess.PIPE, text=True)
+    count = 0
     for line in proc.stdout:
         try:
             entry = json.loads(line)
@@ -270,9 +294,15 @@ def main():
             "message": text(entry.get("MESSAGE")).rstrip("\n")[:MAX_MESSAGE],
         }
         print(json.dumps(event, separators=(",", ":"), ensure_ascii=False), flush=False)
-    sys.stdout.flush()
+        cursor = entry["__CURSOR"]
+        count += 1
+        if count >= BATCH:
+            break
+    proc.kill()
     proc.wait()
-
+    # Saved once the lines are out, so a run cut before that sends them again instead of losing them
+    sys.stdout.flush()
+    save_cursor(cursor)
 
 main()
 NS8JOURNAL
