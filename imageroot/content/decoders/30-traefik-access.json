@@ -66,6 +66,20 @@
         ]
       },
       {
+        "check": "starts_with($service.target.name, 'webserver')",
+        "parse|service.target.name": [
+          "webserver<~>-<_vhost>"
+        ]
+      },
+      {
+        "check": "exists($_vhost)",
+        "map": [
+          {
+            "service.target.name": "$_vhost"
+          }
+        ]
+      },
+      {
         "check": "NOT exists($service.target.name) AND NOT starts_with($orchestrator.namespace, 'traefik')",
         "map": [
           {
