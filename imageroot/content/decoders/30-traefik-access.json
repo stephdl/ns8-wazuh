@@ -6,8 +6,8 @@
       "decoder/ns8-root/0"
     ],
     "metadata": {
-      "title": "Traefik access log",
-      "description": "HTTP requests received by the NS8 reverse proxy",
+      "title": "Web access log",
+      "description": "HTTP requests of the NS8 reverse proxy, and of the nginx and apache sites behind it, which carry the user agent",
       "author": "NethServer",
       "module": "traefik",
       "compatibility": "NS8",
