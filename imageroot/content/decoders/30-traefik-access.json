@@ -56,6 +56,36 @@
             "user_agent.original": "$_ua"
           }
         ]
+      },
+      {
+        "check": "exists($service.name)",
+        "parse|service.name": [
+          "<service.target.name>-https",
+          "<service.target.name>-http",
+          "<service.target.name>"
+        ]
+      },
+      {
+        "check": "starts_with($service.target.name, 'webserver')",
+        "parse|service.target.name": [
+          "webserver<~>-<_vhost>"
+        ]
+      },
+      {
+        "check": "exists($_vhost)",
+        "map": [
+          {
+            "service.target.name": "$_vhost"
+          }
+        ]
+      },
+      {
+        "check": "NOT exists($service.target.name) AND NOT starts_with($orchestrator.namespace, 'traefik')",
+        "map": [
+          {
+            "service.target.name": "$orchestrator.namespace"
+          }
+        ]
       }
     ]
   }
