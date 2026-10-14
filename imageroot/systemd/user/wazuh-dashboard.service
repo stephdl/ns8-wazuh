@@ -20,6 +20,7 @@ ExecStartPre=/bin/rm -f %t/wazuh-dashboard.pid %t/wazuh-dashboard.ctr-id
 # Traefik terminates TLS, so the dashboard speaks plain HTTP on localhost.
 # SERVER_SSL_KEY and SERVER_SSL_CERTIFICATE still have to point to existing files
 # in the rc1 image, even if SERVER_SSL_ENABLED is false: it fails to start otherwise.
+# The pickers read 100000 lines per shard at most by default, and miss the quiet modules of a busy node.
 ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-dashboard.pid \
     --cidfile %t/wazuh-dashboard.ctr-id --cgroups=no-conmon \
     --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-dashboard \
@@ -39,7 +40,9 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-dashboard.pid \
     --health-interval=30s \
     --health-timeout=10s \
     --health-start-period=60s \
-    ${WAZUH_DASHBOARD_IMAGE}
+    ${WAZUH_DASHBOARD_IMAGE} \
+    --opensearchDashboards.autocompleteTerminateAfter=10000000 \
+    --opensearchDashboards.autocompleteTimeout=5000
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-dashboard.ctr-id -t 30
 ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-dashboard.ctr-id
 PIDFile=%t/wazuh-dashboard.pid
