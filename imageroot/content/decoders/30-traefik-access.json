@@ -27,6 +27,8 @@
       {
         "parse|_line": [
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\" <~> \"<service.name>@<~>\" <~>",
+          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\" <~>",
+          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\"",
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
         ]
       },
