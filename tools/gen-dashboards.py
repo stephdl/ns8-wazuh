@@ -119,7 +119,7 @@ def geo_map():
     return "region_map", params, aggs
 
 
-def status_ranges(id="3"):
+def status_classes(id="3"):
     """Status classes named in words: a range aggregation sends its labels to the indexer, which refuses them."""
     classes = [("OK", "< 300"), ("Redirect or cache", ">= 300 and http.response.status_code < 400"),
                ("Client error", ">= 400 and http.response.status_code < 500"), ("Server error", ">= 500")]
@@ -251,12 +251,13 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
 # The apache and nginx of the lamp and webserver sites log the same requests again, without the route
 WEB = "event.category:web and process.name:traefik"
 PROBE_PATHS = "url.path:(*wp-login* or *xmlrpc* or *.env* or *phpmyadmin* or *.git* or *wp-admin* or *.php*)"
-# A request to no route hit the bare address or an unknown name: nobody browses there
-SCANS = f"{WEB} and (not service.target.name:* or (http.response.status_code:404 and {PROBE_PATHS}))"
-SITES = f"{WEB} and service.target.name:* and not (http.response.status_code:404 and {PROBE_PATHS})"
-# 499: the client closed the connection, often a sync client
+# No route: the bare address or an unknown name, nobody browses there. service.name, as older lines have no site
+SCAN = f"not service.name:* or (http.response.status_code:404 and {PROBE_PATHS})"
+SCANS = f"{WEB} and ({SCAN})"
+SITES = f"{WEB} and not ({SCAN})"
 # Traefik drops the User-Agent header: only the nginx and apache lines of the sites behind it carry one
-AGENTS = "event.category:web and user_agent.original:*"
+AGENTS = f"event.category:web and user_agent.original:* and not (http.response.status_code:404 and {PROBE_PATHS})"
+# 499: the client closed the connection, often a sync client
 SITE_ERRORS = f"{SITES} and http.response.status_code >= 400 and not http.response.status_code:499"
 
 
@@ -267,11 +268,11 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
               "**Scans**: bots probing for flaws."), 48, 3),
     (markdown("ns8-web-sites-title", "Sites", "### Sites"), 48, 2),
     (vis("ns8-web-timeline", "Site requests over time", APPS, SITES,
-         over_time(status_ranges(), kind="histogram")), 32, 10),
+         over_time(status_classes(), kind="histogram")), 32, 10),
     (vis("ns8-web-status", "Site status codes", APPS, SITES,
          pie(terms("2", "http.response.status_code", "segment", size=10))), 16, 10),
     (vis("ns8-hosting-sites", "Requests by site", APPS, SITES,
-         bars(terms("2", "service.target.name", "segment", size=30), series=status_ranges("3"))), 24, 14),
+         bars(terms("2", "service.target.name", "segment", size=30), series=status_classes("3"))), 24, 14),
     (vis("ns8-web-map", "Visitors map", APPS, SITES, geo_map()), 24, 14),
     (vis("ns8-web-sources", "Top visitors", APPS, SITES,
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
