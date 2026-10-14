@@ -261,9 +261,8 @@ SITE_ERRORS = f"{SITES} and http.response.status_code >= 400 and not http.respon
 write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
     "Web traffic: the sites, their errors, and the scanners", [
     (markdown("ns8-web-help", "How to read it",
-              "**Sites**: requests that reached a site, scans left out. **Errors to fix**: server errors and "
-              "missing pages of the sites. **Scans**: requests to no site, or to paths that attackers try. "
-              "A client closing the connection (499) is not counted as an error."), 48, 4),
+              "**Sites**: real traffic. **Errors to fix**: broken pages of the sites. "
+              "**Scans**: bots probing for flaws."), 48, 3),
     (markdown("ns8-web-sites-title", "Sites", "### Sites"), 48, 2),
     (vis("ns8-web-timeline", "Site requests over time", APPS, SITES,
          over_time(status_ranges(), kind="histogram")), 32, 10),
