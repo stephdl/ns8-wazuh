@@ -122,8 +122,8 @@ def geo_map():
 def status_ranges(id="3"):
     return {"id": id, "enabled": True, "type": "range", "schema": "group",
             "params": {"field": "http.response.status_code", "ranges": [
-                {"from": 100, "to": 300, "key": "OK"}, {"from": 300, "to": 400, "key": "Redirect or cache"},
-                {"from": 400, "to": 500, "key": "Client error"}, {"from": 500, "to": 600, "key": "Server error"}]}}
+                {"from": 100, "to": 300, "label": "OK"}, {"from": 300, "to": 400, "label": "Redirect or cache"},
+                {"from": 400, "to": 500, "label": "Client error"}, {"from": 500, "to": 600, "label": "Server error"}]}}
 
 
 def search_source(query):
