@@ -201,8 +201,10 @@ CURSOR = "/var/ossec/var/ns8-journal.cursor"
 FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
 # Rootful modules and the core keep their state there, named after their id
 ROOTFUL_DIR = "/var/lib/nethserver"
-# A message longer than this is cut, the agent refuses lines over 64 KB
-MAX_MESSAGE = 16384
+# Bytes per line, the message is cut to fit: the agent refuses lines over 64 KB
+MAX_LINE = 16384
+# Lines per run. A run that never ends saves no cursor, and the next one sends the same lines again
+BATCH = 5000
 
 _owners = {}
 
@@ -246,33 +248,93 @@ def rootless_module_by_name(name):
         return ""
 
 
-def main():
-    # The first run starts from now: the history is already on the server, or not wanted
-    start = [] if os.path.exists(CURSOR) else ["-n", "0"]
-    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", f"--output-fields={FIELDS}",
-                             f"--cursor-file={CURSOR}"] + start, stdout=subprocess.PIPE, text=True)
-    for line in proc.stdout:
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        owner = entry.get("_SYSTEMD_OWNER_UID", "0")
-        unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
-        module = rootless_module(owner) if owner != "0" else ""
-        if not module:
-            module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
-        event = {
-            "ns8_journal": 1,
-            "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
-            "pid": text(entry.get("_PID")),
-            "module": module,
-            "unit": text(unit),
-            "message": text(entry.get("MESSAGE")).rstrip("\n")[:MAX_MESSAGE],
-        }
-        print(json.dumps(event, separators=(",", ":"), ensure_ascii=False), flush=False)
-    sys.stdout.flush()
-    proc.wait()
+def read_cursor():
+    try:
+        with open(CURSOR) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return ""
 
+
+def save_cursor(cursor):
+    with open(CURSOR + ".tmp", "w") as f:
+        f.write(cursor)
+        # Without it a power loss can leave an empty cursor, and the next run jumps to the end of the journal
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(CURSOR + ".tmp", CURSOR)
+
+
+def event(entry):
+    owner = entry.get("_SYSTEMD_OWNER_UID", "0")
+    unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
+    module = rootless_module(owner) if owner != "0" else ""
+    if not module:
+        module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
+    return {
+        "ns8_journal": 1,
+        "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
+        "pid": text(entry.get("_PID")),
+        "module": module,
+        "unit": text(unit),
+        "message": text(entry.get("MESSAGE")).rstrip("\n"),
+    }
+
+
+def encode(event):
+    """Return the event as one JSON line in UTF-8, its message cut until the line fits MAX_LINE."""
+    while True:
+        line = json.dumps(event, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n"
+        excess = len(line) - MAX_LINE
+        if excess <= 0 or not event["message"]:
+            return line
+        message = event["message"]
+        # A character can take up to 6 bytes once escaped: cut in proportion to the bytes it really takes
+        size = len(json.dumps(message, ensure_ascii=False).encode("utf-8"))
+        event["message"] = message[:min(len(message) - 1, len(message) * (size - excess) // size)]
+
+
+def main():
+    cursor = read_cursor()
+    if not cursor:
+        # The first run starts from now: the history is already on the server, or not wanted
+        last = subprocess.run(["journalctl", "--no-pager", "-o", "json", "-n", "1", "--output-fields=_PID"],
+                              stdout=subprocess.PIPE, text=True).stdout
+        if last.strip():
+            save_cursor(json.loads(last)["__CURSOR"])
+        return
+    # Without --all journalctl gives null for any field over 4096 bytes
+    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", "--all", f"--output-fields={FIELDS}",
+                             f"--after-cursor={cursor}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    count = 0
+    try:
+        for line in proc.stdout:
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            try:
+                data = encode(event(entry))
+            except Exception as error:
+                # A bad entry is skipped: stopping on it would send the lines before it again at each run
+                print(f"ns8-journal: entry skipped: {error!r}", file=sys.stderr)
+            else:
+                sys.stdout.buffer.write(data)
+            cursor = entry["__CURSOR"]
+            count += 1
+            if count >= BATCH:
+                proc.kill()
+                break
+    finally:
+        proc.wait()
+        # Saved once the lines are out, so a run cut before that sends them again instead of losing them
+        sys.stdout.buffer.flush()
+        save_cursor(cursor)
+    error = proc.stderr.read()
+    if count == 0 and proc.returncode != 0 and "cursor" in error:
+        # A broken cursor would silence the node for good: the next run starts again from now
+        print(f"ns8-journal: cursor dropped: {error.strip()}", file=sys.stderr)
+        os.remove(CURSOR)
 
 main()
 NS8JOURNAL
