@@ -164,7 +164,7 @@ def search(id, title, pattern, query, columns):
             "references": index_ref(pattern)}
 
 
-def controls(id, pattern, apps=False, program=False, site=False):
+def controls(id, pattern, apps=False, program=False, site=False, country=False):
     """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
     # The picker lists every application of the agent, whatever the dashboard shows: only where several can match
@@ -174,6 +174,9 @@ def controls(id, pattern, apps=False, program=False, site=False):
         fields.append(("3", "process.name", "Program", "4"))
     if site:
         fields.append(("5", "service.target.name", "Site", "2"))
+    # No parent: a child picker stays disabled until its parent has a value
+    if country:
+        fields.append(("6", "source.geo.country_name", "Country", ""))
     params = {"controls": [{"id": cid, "fieldName": field, "label": label, "type": "list", "parent": parent,
                             "indexPatternRefName": f"control_{i}_index_pattern",
                             # Dynamic options ask the indexer for 10 values only and ignore size
@@ -190,9 +193,10 @@ def controls(id, pattern, apps=False, program=False, site=False):
                            for i in range(len(fields))]}
 
 
-def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False, site=False):
+def dashboard(id, title, description, panels, pattern=EVENTS, apps=False, program=False, site=False,
+              country=False):
     """panels: list of (object, w, h). Laid out left to right on a 48 columns grid, under the customer picker."""
-    panels = [(controls(f"{id}-controls", pattern, apps, program, site), 48, 5)] + panels
+    panels = [(controls(f"{id}-controls", pattern, apps, program, site, country), 48, 5)] + panels
     x = y = row_h = 0
     panels_json, references = [], []
     for i, (obj, w, h) in enumerate(panels):
@@ -253,7 +257,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                      missing_label="ssh / host"))), 48, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
-], apps=True))
+], apps=True, country=True))
 
 # The apache and nginx of the lamp and webserver sites log the same requests again, without the route
 WEB = "event.category:web and process.name:traefik"
@@ -310,7 +314,7 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.as.organization.name", "bucket", size=1, label="Network", missing=True))), 24, 14),
-], site=True))
+], site=True, country=True))
 
 CROWDSEC = "event.action:crowdsec-alert"
 write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
@@ -328,7 +332,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True),
                terms("4", "event.reason", "bucket", size=3, label="Scenario"))), 32, 14),
     (vis("ns8-crowdsec-map", "Alerts map", APPS, CROWDSEC, geo_map()), 48, 14),
-]))
+], country=True))
 
 NOT_INFO = "not wazuh.rule.level:informational"
 write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
@@ -409,7 +413,7 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
-]))
+], country=True))
 
 SAMBA_AUTH = "service.type:samba and event.category:authentication"
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
@@ -454,7 +458,7 @@ write("95-telephony.ndjson", dashboard("ns8-telephony", "NS8 - Telephony",
          table(terms("2", "user.name", "bucket", size=50, label="Extension"),
                terms("3", "event.code", "bucket", size=2, label="SIP status"))), 24, 14),
     (vis("ns8-telephony-map", "Failures map", APPS, PHONE, geo_map()), 48, 14),
-], apps=True))
+], apps=True, country=True))
 
 PVE = "service.type:proxmox"
 PVE_AUTH = f"{PVE} and event.category:authentication"
@@ -480,7 +484,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
             f"{PVE_TASK} and event.code:(qmdestroy or vzdestroy)",
             ["wazuh.agent.name", "event.code", "service.name", "user.name"]), 48, 10),
     (vis("ns8-proxmox-map", "Failed logins map", APPS, f"{PVE_AUTH} and event.outcome:failure", geo_map()), 48, 14),
-]))
+], country=True))
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
