@@ -36,8 +36,12 @@ NOISE = [
     # The hourly anacron line of Debian and Proxmox, run by cron as root
     {"term": {"wazuh.rule.title": "Sudo command targeting a persistence path - if [ -x /etc/init.d/anacron ] && "
                                   "! [ -d /run/systemd/system ]; then exec /usr/sbin/invoke-rc.d anacron start >/dev/null; fi"}},
-    # The Proxmox cluster filesystem rewrites its state files and rotates its auth key every day
-    {"prefix": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/pve/"}},
+    # The Proxmox cluster filesystem rewrites its state files and rotates its auth key every day.
+    # Its configuration files, users, storage and firewall, stay in.
+    {"prefix": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/pve/."}},
+    {"wildcard": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/pve/nodes/*/lrm_status"}},
+    {"prefix": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/pve/authkey."}},
+    {"prefix": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/pve/priv/authkey."}},
     {"term": {"wazuh.rule.title": "Wazuh FIM - File modified - /etc/apt/apt.conf.d/76pveproxy"}},
     # Spam image signatures of the third-party ClamAV database: the message is refused, it is no virus
     {"bool": {"filter": [{"term": {"wazuh.rule.title": "NS8 mail virus found"}},
