@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-"""Routine findings, left out of the email and hidden by default in the fleet dashboard."""
+"""Routine findings: NOISE is left out of the email, DASHBOARD_NOISE is hidden by default in the fleet dashboard."""
 
 # Expected on an NS8 node: each rootless module has its own systemd session, and the log collector
 # restarts with it. Module users and firewall changes stay in:
@@ -35,8 +35,6 @@ NOISE = [
     # The CrowdSec bouncer adds each banned address to its nftables set. Other firewall changes stay in.
     {"bool": {"filter": [{"term": {"wazuh.rule.title": "Firewall rule modified"}},
                          {"prefix": {"process.name": "crowdsec-firew"}}]}},
-    # The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them
-    {"prefix": {"wazuh.rule.title": "Wazuh VD - "}},
     # The hourly anacron line of Debian and Proxmox, run by cron as root
     {"term": {"wazuh.rule.title": "Sudo command targeting a persistence path - if [ -x /etc/init.d/anacron ] && "
                                   "! [ -d /run/systemd/system ]; then exec /usr/sbin/invoke-rc.d anacron start >/dev/null; fi"}},
@@ -51,3 +49,9 @@ NOISE = [
     {"bool": {"filter": [{"term": {"wazuh.rule.title": "NS8 mail virus found"}},
                          {"wildcard": {"event.reason": "*Sanesecurity.Spam*"}}]}},
 ]
+
+DASHBOARD_NOISE = list(NOISE)
+
+# The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them.
+# The fleet dashboard keeps them, so a critical CVE still shows in the level counts.
+NOISE = NOISE + [{"prefix": {"wazuh.rule.title": "Wazuh VD - "}}]

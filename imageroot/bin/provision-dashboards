@@ -17,7 +17,7 @@ import time
 
 import wazuh_api
 from wazuh_api import api, dashboard_api
-from wazuh_noise import NOISE
+from wazuh_noise import DASHBOARD_NOISE
 
 wazuh_api.MEMORY_RETRY_SECONDS = 120
 
@@ -92,10 +92,10 @@ except (RuntimeError, KeyError, TypeError, AttributeError) as error:
 
 
 def hide_noise(dashboard):
-    """Add the routine findings of the email as a filter: a pill the administrator can switch off."""
+    """Add the routine findings as a filter: a pill the administrator can switch off."""
     meta = dashboard["attributes"]["kibanaSavedObjectMeta"]
     source = json.loads(meta["searchSourceJSON"])
-    query = {"bool": {"should": NOISE, "minimum_should_match": 1}}
+    query = {"bool": {"should": DASHBOARD_NOISE, "minimum_should_match": 1}}
     source["filter"] = [{
         # Without the index pattern, the dashboard marks the filter with a warning
         "meta": {"alias": "Routine findings hidden", "negate": True, "disabled": False,
