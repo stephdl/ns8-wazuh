@@ -24,10 +24,14 @@ NOISE = [
                                     for unit in TIMER_UNITS for state in ("started", "stopped", "deleted")]}},
     # Numbered after the module: backup12, crowdsec13-upgrade-hub
     {"wildcard": {"wazuh.rule.title": "System service st*ed - backup*"}},
+    {"wildcard": {"wazuh.rule.title": "System service deleted - backup*"}},
     {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-export-alerts"}},
+    {"wildcard": {"wazuh.rule.title": "System service deleted - crowdsec*-export-alerts"}},
     {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-upgrade-hub"}},
+    {"wildcard": {"wazuh.rule.title": "System service deleted - crowdsec*-upgrade-hub"}},
     # Transient units of systemd-run
     {"wildcard": {"wazuh.rule.title": "System service st*ed - run-r*"}},
+    {"wildcard": {"wazuh.rule.title": "System service deleted - run-r*"}},
     # The CrowdSec bouncer adds each banned address to its nftables set. Other firewall changes stay in.
     {"bool": {"filter": [{"term": {"wazuh.rule.title": "Firewall rule modified"}},
                          {"prefix": {"process.name": "crowdsec-firew"}}]}},
