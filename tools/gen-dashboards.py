@@ -165,7 +165,7 @@ def search(id, title, pattern, query, columns):
 
 
 def controls(id, pattern, apps=False, program=False, site=False, country=False):
-    """Customer then agent pickers: the customer is the Wazuh group the agent enrolled in."""
+    """Customer, agent and optional pickers: the customer is the Wazuh group the agent enrolled in."""
     fields = [("1", "wazuh.agent.groups", "Customer", ""), ("2", "wazuh.agent.name", "Agent", "1")]
     # The picker lists every application of the agent, whatever the dashboard shows: only where several can match
     if apps:
@@ -185,8 +185,8 @@ def controls(id, pattern, apps=False, program=False, site=False, country=False):
                            for i, (cid, field, label, parent) in enumerate(fields)],
               "updateFiltersOnChange": True, "useTimeFilter": True, "pinFilters": False}
     return {"id": id, "type": "visualization",
-            "attributes": {"title": "Customer and agent", "description": "", "version": 1, "uiStateJSON": "{}",
-                           "visState": json.dumps({"title": "Customer and agent", "type": "input_control_vis",
+            "attributes": {"title": "Filters", "description": "", "version": 1, "uiStateJSON": "{}",
+                           "visState": json.dumps({"title": "Filters", "type": "input_control_vis",
                                                    "params": params, "aggs": []}),
                            "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
             "references": [{"name": f"control_{i}_index_pattern", "type": "index-pattern", "id": pattern}
