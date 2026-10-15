@@ -24,6 +24,8 @@ wazuh_api.MEMORY_RETRY_SECONDS = 120
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 FINDINGS_DASHBOARD = "ns8-fleet"
 FINDINGS_INDEX_PATTERN = "wazuh-findings-v5*"
+# Overwriting never deletes: objects dropped from the dashboards would stay in Visualize forever
+RETIRED = [("visualization", "ns8-logins-countries")]
 
 
 def wait_ready():
@@ -123,3 +125,8 @@ for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson")
     if "saved_objects" not in answer or errors:
         raise SystemExit(f"{os.path.basename(path)}: {errors or answer}")
     print(f"dashboards {os.path.basename(path)}: {len(objects)} objects", file=sys.stderr)
+
+for kind, retired in RETIRED:
+    answer = dashboard_api("DELETE", f"api/saved_objects/{kind}/{retired}")
+    if answer.get("statusCode", 200) not in (200, 404):
+        print(f"Warning: {kind} {retired} is not removed: {answer}", file=sys.stderr)
