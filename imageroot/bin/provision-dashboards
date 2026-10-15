@@ -97,7 +97,7 @@ def hide_noise(dashboard):
     query = {"bool": {"should": NOISE, "minimum_should_match": 1}}
     source["filter"] = [{
         "meta": {"alias": "Routine findings hidden", "negate": True, "disabled": False,
-                 "type": "custom", "key": "query", "value": json.dumps(query)},
+                 "type": "custom", "value": json.dumps(query)},
         "query": query,
         "$state": {"store": "appState"},
     }]
