@@ -17,10 +17,13 @@ import time
 
 import wazuh_api
 from wazuh_api import api, dashboard_api
+from wazuh_noise import DASHBOARD_NOISE
 
 wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
+FINDINGS_DASHBOARD = "ns8-fleet"
+FINDINGS_INDEX_PATTERN = "wazuh-findings-v5*"
 
 
 def wait_ready():
@@ -87,6 +90,22 @@ try:
 except (RuntimeError, KeyError, TypeError, AttributeError) as error:
     print(f"Warning: the dashboard settings are not set: {error}", file=sys.stderr)
 
+
+def hide_noise(dashboard):
+    """Add the routine findings as a filter: a pill the administrator can switch off."""
+    meta = dashboard["attributes"]["kibanaSavedObjectMeta"]
+    source = json.loads(meta["searchSourceJSON"])
+    query = {"bool": {"should": DASHBOARD_NOISE, "minimum_should_match": 1}}
+    source["filter"] = [{
+        # Without the index pattern, the dashboard marks the filter with a warning
+        "meta": {"alias": "Routine findings hidden", "negate": True, "disabled": False,
+                 "type": "custom", "index": FINDINGS_INDEX_PATTERN, "value": json.dumps(query)},
+        "query": query,
+        "$state": {"store": "appState"},
+    }]
+    meta["searchSourceJSON"] = json.dumps(source)
+
+
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson"))):
     objects = []
     with open(path) as f:
@@ -95,6 +114,8 @@ for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "dashboards", "*.ndjson")
                 item = json.loads(line)
                 # The export ends with a summary line that is not an object
                 if "type" in item:
+                    if item["id"] == FINDINGS_DASHBOARD:
+                        hide_noise(item)
                     objects.append({key: item[key] for key in ("type", "id", "attributes", "references", "migrationVersion")
                                     if key in item})
     answer = dashboard_api("POST", "api/saved_objects/_bulk_create?overwrite=true", objects)
