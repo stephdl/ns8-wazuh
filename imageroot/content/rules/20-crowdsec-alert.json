@@ -2,7 +2,7 @@
   "resource": {
     "metadata": {
       "title": "NS8 CrowdSec scenario triggered",
-      "description": "CrowdSec detected a behavior from an IP address",
+      "description": "CrowdSec detected a behavior from an IP address. Mail spam senders are left to the CrowdSec dashboard",
       "author": "NethServer",
       "references": [
         "https://github.com/stephdl/ns8-wazuh"
@@ -16,10 +16,15 @@
       "product": "ns8"
     },
     "detection": {
-      "condition": "selection",
+      "condition": "selection and not filter_mail_spam",
       "selection": {
         "event.action": [
           "crowdsec-alert"
+        ]
+      },
+      "filter_mail_spam": {
+        "event.reason": [
+          "crowdsecurity/postfix-spam"
         ]
       }
     }
