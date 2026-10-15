@@ -7,6 +7,7 @@
 
 import json
 import os
+import subprocess
 import sys
 
 import agent
@@ -38,6 +39,9 @@ if group:
         if created.get("error", 1) != 0:
             print(agent.SD_ERR + f"group {group} refused: {created.get('detail') or created.get('message')}", file=sys.stderr)
             sys.exit(2)
+        # A new group starts with an empty configuration: its agents need the NS8 one
+        if subprocess.run(["runagent", "provision-agent-config", group], stdout=sys.stderr).returncode != 0:
+            print(agent.SD_WARNING + f"the agent configuration of group {group} is not set", file=sys.stderr)
 
 response = manager_api("POST", "agents/enrollment-tokens", body)
 if response.get("error", 1) != 0:

@@ -12,5 +12,6 @@ exec 1>&2
 runagent provision-content
 runagent provision-detector
 runagent provision-retention
+runagent provision-agent-config || echo "Warning: the agent configuration is not sent to every group"
 # A dashboard that does not load must not block the configuration
 runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"

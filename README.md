@@ -178,6 +178,8 @@ To watch something specific:
 - A log the agent does not read yet: add a `<localfile>` block in `/var/ossec/etc/ossec.conf` on the agent, then restart it. For a journald unit, filter on its name.
 - A file or directory to watch for changes: add it to the `<syscheck>` block (FIM) of the agent.
 
+The module sends a shared configuration to the agents of every group, from `imageroot/content/agent/agent.conf`, at each configuration, update and restore, and when a token creates a new customer group. The agents apply it without any change on the host. It keeps the file integrity monitoring (FIM) quiet on Proxmox: the status files and the daily auth key of `/etc/pve/` are ignored, the configuration files stay watched. It also ignores the GRUB modules in `/boot/grub/`, a few hundred findings at each kernel update. The file is replaced at each update: put a local change in `/var/ossec/etc/ossec.conf` on the agent.
+
 Every journal line of an agent is kept, even when no decoder reads it in detail: the NS8 root decoder takes it with its program and its text, and the NS8 - Journal dashboard lists it. The decoders keep the program name of the line, as `journalctl` shows it (`pvedaemon`, `postfix/smtpd`, `samba-dc`), and put the family they recognize in `service.type` (`proxmox`, `postfix`, `samba`, `web` for the access logs). The dashboards filter on `service.type`. `index_unclassified_events` only adds the few logs that even that decoder refuses, in the `wazuh-events-v5-unclassified` index, seen in Explore > Discover. Leave it off: it is mostly noise.
 
 ## Retention

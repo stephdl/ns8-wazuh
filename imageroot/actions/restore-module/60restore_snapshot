@@ -13,5 +13,6 @@ exec 1>&2
 runagent restore-snapshot
 # The restored indices are older than the policies, which only catch the new ones
 runagent provision-retention || echo "Warning: the log retention is not applied, the hourly timer tries again"
+runagent provision-agent-config || echo "Warning: the agent configuration is not sent to every group"
 systemctl --user try-restart wazuh-dashboard.service
 runagent provision-dashboards || echo "Warning: the NS8 dashboards were not loaded"

@@ -112,12 +112,13 @@ def _manager_jwt():
     return jwt
 
 
-def manager_api(method, path, body=None):
-    """Call the Wazuh API, which listens inside the pod only."""
+def manager_api(method, path, body=None, content_type="application/json"):
+    """Call the Wazuh API, which listens inside the pod only. A body of another type goes as a string."""
     config = f'request = "{method}"\nurl = "https://localhost:55000/{path}"\n'
-    config += f'header = "Authorization: Bearer {_manager_jwt()}"\nheader = "Content-Type: application/json"\n'
+    config += f'header = "Authorization: Bearer {_manager_jwt()}"\nheader = "Content-Type: {content_type}"\n'
     if body is not None:
-        config += f'data-binary = "{curl_quote(json.dumps(body))}"\n'
+        data = json.dumps(body) if content_type == "application/json" else body
+        config += f'data-binary = "{curl_quote(data)}"\n'
     try:
         return json.loads(_manager_curl(config))
     except ValueError:

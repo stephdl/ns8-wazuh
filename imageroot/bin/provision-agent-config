@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Send the NS8 shared configuration to the agents of every group, or of the groups given as arguments.
+# The manager pushes it to the agents, which apply it without a restart on the host.
+
+import os
+import sys
+
+from wazuh_api import manager_api
+
+CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+with open(os.path.join(CONTENT_DIR, "agent", "agent.conf")) as f:
+    config = f.read()
+
+groups = sys.argv[1:]
+if not groups:
+    answer = manager_api("GET", "groups?limit=100000")
+    if answer.get("error", 1) != 0:
+        sys.exit(f"groups: {answer.get('detail') or answer.get('message')}")
+    groups = [g["name"] for g in answer["data"]["affected_items"]]
+
+failed = 0
+for group in groups:
+    answer = manager_api("PUT", f"groups/{group}/configuration", config, content_type="application/xml")
+    if answer.get("error", 1) != 0:
+        log(f"agent configuration of group {group}: {answer.get('detail') or answer.get('message')}")
+        failed += 1
+log(f"agent configuration sent to {len(groups) - failed} groups")
+sys.exit(1 if failed else 0)
