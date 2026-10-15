@@ -413,7 +413,7 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
-], country=True))
+]))
 
 SAMBA_AUTH = "service.type:samba and event.category:authentication"
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
@@ -484,7 +484,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
             f"{PVE_TASK} and event.code:(qmdestroy or vzdestroy)",
             ["wazuh.agent.name", "event.code", "service.name", "user.name"]), 48, 10),
     (vis("ns8-proxmox-map", "Failed logins map", APPS, f"{PVE_AUTH} and event.outcome:failure", geo_map()), 48, 14),
-], country=True))
+]))
 
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
