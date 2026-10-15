@@ -23,6 +23,7 @@ wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 FINDINGS_DASHBOARD = "ns8-fleet"
+FINDINGS_INDEX_PATTERN = "wazuh-findings-v5*"
 
 
 def wait_ready():
@@ -96,8 +97,9 @@ def hide_noise(dashboard):
     source = json.loads(meta["searchSourceJSON"])
     query = {"bool": {"should": NOISE, "minimum_should_match": 1}}
     source["filter"] = [{
+        # Without the index pattern, the dashboard marks the filter with a warning
         "meta": {"alias": "Routine findings hidden", "negate": True, "disabled": False,
-                 "type": "custom", "value": json.dumps(query)},
+                 "type": "custom", "index": FINDINGS_INDEX_PATTERN, "value": json.dumps(query)},
         "query": query,
         "$state": {"store": "appState"},
     }]
