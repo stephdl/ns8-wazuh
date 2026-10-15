@@ -108,9 +108,9 @@ WORLD_COUNTRIES = {"name": "World Countries", "origin": "elastic_maps_service", 
                               {"type": "name", "name": "name", "description": "Name"}]}
 
 
-def geo_map():
+def geo_map(colors="Yellow to Red"):
     """Countries colored by count: the tooltip gives the country name, a circle map only its coordinates."""
-    params = {"addTooltip": True, "colorSchema": "Yellow to Red", "isDisplayWarning": False, "legendPosition": "bottomright",
+    params = {"addTooltip": True, "colorSchema": colors, "isDisplayWarning": False, "legendPosition": "bottomright",
               "mapZoom": 2, "mapCenter": [20, 0], "outlineWeight": 1, "showAllShapes": True, "emsHotLink": "",
               "layerChosenByUser": "default", "selectedLayer": WORLD_COUNTRIES,
               "selectedJoinField": WORLD_COUNTRIES["fields"][0],
@@ -225,6 +225,7 @@ def write(name, objects):
 AUTH = ("event.category:authentication"
         " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")")
 FAIL = f"{AUTH} and event.outcome:failure"
+SUCCESS = f"{AUTH} and event.outcome:success"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     "Successful and failed logins on every service and server", [
     (vis("ns8-logins-outcome", "Logins by outcome", EVENTS, AUTH,
@@ -241,9 +242,15 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
          table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 16, 12),
-    (vis("ns8-logins-countries", "Logins by country", EVENTS, AUTH,
-         pie(terms("2", "source.geo.country_name", "segment", size=10))), 16, 14),
-    (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 32, 14),
+    # Apart from the failures: mixed in, the bots hide where the users log in from
+    (vis("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS, geo_map("Greens")), 24, 14),
+    (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 24, 14),
+    (vis("ns8-logins-success-sources", "Successful logins by user and source", EVENTS, SUCCESS,
+         table(terms("2", "user.name", "bucket", size=50, label="User"),
+               terms("3", "source.ip", "bucket", size=10, label="Source IP", missing=True),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "service.type", "bucket", size=5, label="Service", missing=True,
+                     missing_label="ssh / host"))), 48, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
 ], apps=True))
