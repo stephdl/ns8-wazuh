@@ -215,7 +215,7 @@
   "customers": {
     "title": "Customers",
     "zones_title": "Login zones",
-    "zones_description": "Choose the countries or continents the users of each customer log in from. A successful login from anywhere else raises a finding and an email, once a day per user and country. Only public addresses are checked: logins from a LAN or a VPN have no country. A customer without zones is not watched.",
+    "zones_description": "Choose the countries or continents the users of each customer log in from. A successful login from anywhere else raises a finding and an email, once a day per user and address. Only public addresses are checked: logins from a LAN or a VPN have no country. A customer without zones is not watched.",
     "refresh": "Refresh",
     "search": "Search customers",
     "no_customers": "No customers",
@@ -236,6 +236,8 @@
     "recipients_invalid": "Each line must be a valid email address",
     "customer_not_found": "This customer no longer exists",
     "save": "Save",
-    "save_task": "Save customer {name}"
+    "save_task": "Save customer {name}",
+    "recipients_format": "Each line must be a valid email address",
+    "zones_pattern": "Choose countries or continents from the list"
   }
 }

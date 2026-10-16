@@ -40,9 +40,10 @@ SETTLE = timedelta(minutes=1)
 LEVELS = ["informational", "low", "medium", "high", "critical"]
 ZONE_TITLE = "NS8 login from outside the allowed zones"
 ZONE_SEEN_FILE = "login-zone-alerts.json"
-# Apart from the customer one: each email reports a user and country once a day on its own
+# Apart from the customer one: each email reports a user and address once a day on its own
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
-# A traveling user logs in again every few minutes: one email a day per user and country
+# A traveling user logs in again every few minutes: one email a day per user and address.
+# The address, not only the country: a second attacker in the same country must not go unseen
 ZONE_REPEAT = timedelta(days=1)
 
 
@@ -236,9 +237,9 @@ def email(cursor):
             customer = ", ".join(g for g in wazuh_agent.get("groups") or [] if g != "default")
             title = source.get("rule", {}).get("title", "?")
             if title == ZONE_TITLE:
-                country = hit["_source"].get("source", {}).get("geo", {}).get("country_iso_code", "?")
                 user = hit["_source"].get("user", {}).get("name", "?")
-                if not seen.first(f"{customer}:{user}:{country}"):
+                address = hit["_source"].get("source", {}).get("ip", "?")
+                if not seen.first(f"{customer}:{user}:{address}"):
                     continue
                 title = f"{title} - {zone_detail(hit['_source'])}"
             counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
@@ -271,7 +272,7 @@ def email(cursor):
 
 
 def zone_alerts(cursor):
-    """Mail each customer its logins from outside its allowed zones, once a day per user and country."""
+    """Mail each customer its logins from outside its allowed zones, once a day per user and address."""
     customers = wazuh_zones.load()["customers"]
     host = os.environ.get("TRAEFIK_HOST", "")
     smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
@@ -289,14 +290,14 @@ def zone_alerts(cursor):
             groups = source.get("wazuh", {}).get("agent", {}).get("groups") or []
             customer = groups[0] if groups else ""
             user = source.get("user", {}).get("name", "?")
-            country = source.get("source", {}).get("geo", {}).get("country_iso_code", "?")
-            if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{country}"):
+            address = source.get("source", {}).get("ip", "?")
+            if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{address}"):
                 continue
             alerts.setdefault(customer, []).append(f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {zone_detail(source)}")
     for customer, lines in sorted(alerts.items()):
         zones = ", ".join(customers[customer].get("zones", []))
         text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] + lines +
-                         ["", "Each user and country is reported once a day.", f"Open the dashboard: https://{host}/"])
+                         ["", "Each user and address is reported once a day.", f"Open the dashboard: https://{host}/"])
         send_mail(smtp, sender, customers[customer]["recipients"],
                   f"Wazuh: login from outside the allowed zones ({customer})", text)
         log(f"zone alert sent to {customer}, {len(lines)} logins")
@@ -315,7 +316,7 @@ def zone_detail(source):
 
 
 class SeenLogins:
-    """Users already reported per customer and country, forgotten after a day."""
+    """Users already reported per customer and address, forgotten after a day."""
 
     def __init__(self, path):
         self.path = path
