@@ -126,7 +126,9 @@
     "get-health": "Get health",
     "list-user-domains": "List user domains",
     "list-agents": "List agents",
-    "remove-agent": "Revoke agent"
+    "remove-agent": "Revoke agent",
+    "list-customers": "List customers",
+    "set-customer": "Set customer"
   },
   "error": {
     "error": "Error",
@@ -152,7 +154,7 @@
     "customer": "Customer",
     "choose_customer": "Choose or type a customer",
     "new_customer": "new customer",
-    "customer_helper": "Optional. Pick a customer or type a new one. It groups its servers in the list and the dashboards.",
+    "customer_helper": "Pick a customer or type a new one. It groups its servers in the list and the dashboards, and holds their login zones.",
     "agent_name": "Agent name",
     "agent_name_placeholder": "mail.example.com",
     "agent_name_helper": "Optional. The host name of the server when empty.",
@@ -208,6 +210,35 @@
     "update_command": "Update command",
     "update_title": "Update the agent",
     "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed.",
-    "col_customer": "Customer"
+    "col_customer": "Customer",
+    "customer_reserved": "This name is reserved, choose another one"
+  },
+  "customers": {
+    "title": "Customers",
+    "zones_title": "Login zones",
+    "zones_description": "Choose the countries or continents the users of each customer log in from. A successful login from anywhere else raises a finding and an email, once a day per user and address. Only public addresses are checked: logins from a LAN or a VPN have no country. A customer without zones is not watched.",
+    "refresh": "Refresh",
+    "search": "Search customers",
+    "no_customers": "No customers",
+    "no_customers_description": "A customer is created with an enrollment token, in the Agents page.",
+    "col_name": "Customer",
+    "col_agents": "Agents",
+    "col_zones": "Allowed zones",
+    "col_recipients": "Alert recipients",
+    "not_watched": "Not watched",
+    "edit": "Edit",
+    "edit_title": "Edit customer {name}",
+    "zones": "Allowed zones",
+    "choose_zones": "Choose countries or continents",
+    "zones_helper": "Empty to stop watching the logins of this customer",
+    "continent": "continent",
+    "recipients": "Alert recipients (optional)",
+    "recipients_helper": "One address per line. They receive the logins of this customer from outside its zones. The recipients of the Settings page receive them too.",
+    "recipients_invalid": "Each line must be a valid email address",
+    "customer_not_found": "This customer no longer exists",
+    "save": "Save",
+    "save_task": "Save customer {name}",
+    "recipients_format": "Each line must be a valid email address",
+    "zones_pattern": "Choose countries or continents from the list"
   }
 }

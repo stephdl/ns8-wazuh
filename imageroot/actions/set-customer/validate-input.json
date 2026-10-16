@@ -1,0 +1,46 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Set a customer",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/set-customer",
+    "description": "Set the zones the users of a customer may log in from, and who receives the alerts of the logins from outside them",
+    "examples": [
+        {
+            "name": "acme",
+            "zones": ["@EU", "CA"],
+            "recipients": ["soc@acme.example"]
+        }
+    ],
+    "type": "object",
+    "required": ["name", "zones", "recipients"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "title": "Customer",
+            "description": "Wazuh agent group of the customer",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "not": {
+                "enum": [".", ".."]
+            }
+        },
+        "zones": {
+            "type": "array",
+            "title": "Allowed zones",
+            "description": "ISO 3166 country codes like FR, or continents like @EU (AF, AN, AS, EU, NA, OC, SA). Empty to stop watching the logins of this customer.",
+            "items": {
+                "type": "string",
+                "pattern": "^([A-Z]{2}|@(AF|AN|AS|EU|NA|OC|SA))$"
+            },
+            "uniqueItems": true
+        },
+        "recipients": {
+            "type": "array",
+            "title": "Alert recipients",
+            "description": "Addresses of the customer that receive its logins from outside the allowed zones, besides the module recipients",
+            "items": {
+                "type": "string",
+                "format": "email"
+            },
+            "uniqueItems": true
+        }
+    }
+}

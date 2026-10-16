@@ -27,17 +27,14 @@ if data.get("description"):
     body["description"] = data["description"]
 
 # An agent that declares a group missing on the manager is refused at enrollment
-group = data.get("group", "")
-# The default group is where an agent without customer goes: no --group needed
-if group == "default":
-    group = ""
-if group:
-    existing = manager_api("GET", f"groups?groups_list={group}")
-    if not existing.get("data", {}).get("affected_items"):
-        created = manager_api("POST", "groups", {"group_id": group})
-        if created.get("error", 1) != 0:
-            print(agent.SD_ERR + f"group {group} refused: {created.get('detail') or created.get('message')}", file=sys.stderr)
-            sys.exit(2)
+# Every agent belongs to a customer: its login zones are set per customer
+group = data["group"]
+existing = manager_api("GET", f"groups?groups_list={group}")
+if not existing.get("data", {}).get("affected_items"):
+    created = manager_api("POST", "groups", {"group_id": group})
+    if created.get("error", 1) != 0:
+        print(agent.SD_ERR + f"group {group} refused: {created.get('detail') or created.get('message')}", file=sys.stderr)
+        sys.exit(2)
 
 response = manager_api("POST", "agents/enrollment-tokens", body)
 if response.get("error", 1) != 0:

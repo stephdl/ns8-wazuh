@@ -6,7 +6,8 @@
     "examples": [
         {
             "max_uses": 1,
-            "description": "web server"
+            "description": "web server",
+            "group": "acme"
         }
     ],
     "type": "object",
@@ -32,9 +33,13 @@
             "not": {
                 "enum": [
                     ".",
-                    ".."
+                    "..",
+                    "default"
                 ]
             }
         }
-    }
+    },
+    "required": [
+        "group"
+    ]
 }

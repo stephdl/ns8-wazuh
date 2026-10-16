@@ -37,7 +37,7 @@
         },
         "group": {
             "type": "string",
-            "description": "Agent group to pass to the install script, empty for the default group"
+            "description": "Wazuh agent group of the customer, given to the install command"
         }
     }
 }

@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Write the allowed login zones of the customers to the KVDB of the engine, then promote it.
+# provision-content does the same at each configuration: this script only applies a change of the zones.
+
+import sys
+
+import wazuh_zones
+
+integration = wazuh_zones.integration_id()
+if integration is None:
+    raise SystemExit("the ns8 integration is missing: configure the module first")
+wazuh_zones.write_kvdb(integration)
+wazuh_zones.promote()
+print(f"{wazuh_zones.KVDB_TITLE}: ok", file=sys.stderr)

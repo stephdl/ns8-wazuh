@@ -1,0 +1,60 @@
+{
+  "resource": {
+    "name": "decoder/ns8-postfix-sasl-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Postfix successful SMTP login",
+      "description": "SMTP authentications accepted by Postfix",
+      "author": "NethServer",
+      "module": "postfix",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\", sasl_username=\")"
+      },
+      {
+        "_line": "contains(\": client=\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>: client=<~>[<source.ip>], sasl_method=<~>, sasl_username=<user.name>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "postfix"
+          }
+        ]
+      }
+    ]
+  }
+}

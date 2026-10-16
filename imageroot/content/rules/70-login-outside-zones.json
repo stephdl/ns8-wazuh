@@ -1,0 +1,27 @@
+{
+  "resource": {
+    "metadata": {
+      "title": "NS8 login from outside the allowed zones",
+      "description": "A user logged in from a country outside the zones allowed for the customer",
+      "author": "NethServer",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ]
+    },
+    "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0012",
+    "enabled": true,
+    "status": "experimental",
+    "level": "medium",
+    "logsource": {
+      "product": "ns8"
+    },
+    "detection": {
+      "condition": "selection",
+      "selection": {
+        "event.reason|startswith": [
+          "Login from outside the allowed zones"
+        ]
+      }
+    }
+  }
+}

@@ -124,7 +124,7 @@ Check if an agent on the same node can enroll
     Use the install node
     Execute Command    grep -q '${TEST_HOST}' /etc/hosts || echo '127.0.0.1 ${TEST_HOST}' >> /etc/hosts
     Put File    ${AGENT_SCRIPT}    /root/install-agent.sh    mode=0700
-    ${token} =    Run action    get-enrollment-token    {"max_uses":1,"description":"robot"}
+    ${token} =    Run action    get-enrollment-token    {"max_uses":1,"description":"robot","group":"robot"}
     Should Be Equal    ${token}[address]    ${TEST_HOST}
     Use the install node
     # The token goes through a root only file, never on the command line
