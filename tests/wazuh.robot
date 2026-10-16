@@ -267,7 +267,7 @@ Check the pages of the module and take screenshots
     # The agent menu offers the move to another customer, the modal opens empty
     Click    iframe >>> tbody tr:has(td:text-is("${AGENT_NAME}")) >> .bx--overflow-menu
     Click    iframe >>> .bx--overflow-menu-options__btn >> text="Change customer"
-    Wait For Elements State    iframe >>> .bx--modal.is-visible >> text="Its customer is now robot-moved."    visible    timeout=10s
+    Wait For Elements State    iframe >>> .bx--modal.is-visible >> text=Its customer is now robot-moved    visible    timeout=10s
     Get Property    iframe >>> .bx--modal.is-visible input    value    ==    ${EMPTY}
     Take Screenshot    filename=${SCREENSHOTS}/3._Change_customer.png
     Click    iframe >>> .bx--modal.is-visible button >> text="Cancel"
