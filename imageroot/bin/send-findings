@@ -40,10 +40,11 @@ SETTLE = timedelta(minutes=1)
 LEVELS = ["informational", "low", "medium", "high", "critical"]
 ZONE_TITLE = "NS8 login from outside the allowed zones"
 ZONE_SEEN_FILE = "login-zone-alerts.json"
-# Apart from the customer one: each email reports a user and address once a day on its own
+# Apart from the customer one: each email reports a user, address and service once a day on its own
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
-# A traveling user logs in again every few minutes: one email a day per user and address.
-# The address, not only the country: a second attacker in the same country must not go unseen
+# A traveling user logs in again every few minutes: one email a day per user, address and service.
+# The address, not only the country: a second attacker in the same country must not go unseen.
+# The service: a stolen password used on one more application must show
 ZONE_REPEAT = timedelta(days=1)
 
 
@@ -279,7 +280,7 @@ def email(cursor):
 
 
 def zone_alerts(cursor):
-    """Mail each customer its logins from outside its allowed zones, once a day per user and address."""
+    """Mail each customer its logins from outside its allowed zones, once a day per user, address and service."""
     customers = wazuh_zones.load()["customers"]
     host = os.environ.get("TRAEFIK_HOST", "")
     smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
@@ -302,7 +303,7 @@ def zone_alerts(cursor):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
         text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] +
                          list(logins.values()) +
-                         ["", "Each user and address is reported once a day.", f"Open the dashboard: https://{host}/"])
+                         ["", "Each user, address and service is reported once a day.", f"Open the dashboard: https://{host}/"])
         send_mail(smtp, sender, customers[customer]["recipients"],
                   f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", text)
         # Saved per customer: a failure on the next one must not send this one again
@@ -314,7 +315,8 @@ def zone_alerts(cursor):
 
 
 def zone_key(customer, source):
-    return f"{customer}:{source.get('user', {}).get('name', '?')}:{source.get('source', {}).get('ip', '?')}"
+    return (f"{customer}:{source.get('user', {}).get('name', '?')}:{source.get('source', {}).get('ip', '?')}"
+            f":{source.get('service', {}).get('type', '?')}")
 
 
 def plural(count, word):
@@ -337,7 +339,7 @@ def zone_detail(source):
 
 
 class SeenLogins:
-    """Users already reported per customer and address, forgotten after a day."""
+    """Users already reported per customer, address and service, forgotten after a day."""
 
     def __init__(self, path):
         self.path = path
