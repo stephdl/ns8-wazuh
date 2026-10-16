@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+import fcntl
 import json
 import sys
 
@@ -22,8 +23,15 @@ if name == "default" or not response.get("data", {}).get("affected_items"):
     json.dump([{"field": "name", "parameter": "name", "value": name, "error": "customer_not_found"}], fp=sys.stdout)
     sys.exit(3)
 
-settings = wazuh_zones.load()
-settings["customers"][name] = {"zones": data.get("zones", []), "recipients": data.get("recipients", [])}
-wazuh_zones.save(settings)
+# Two saves at once would each write the file they read, and the first change would be lost
+with open(wazuh_zones.CUSTOMERS_FILE + ".lock", "w") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    settings = wazuh_zones.load()
+    settings["customers"][name] = {"zones": data.get("zones", []), "recipients": data.get("recipients", [])}
+    wazuh_zones.save(settings)
+    applied = agent.run_helper("runagent", "provision-zones").returncode == 0
 
-agent.run_helper("runagent", "provision-zones").check_returncode()
+# Saved anyway: the next configuration of the module applies it
+if not applied:
+    print(agent.SD_ERR + f"the zones of {name} are saved but the engine did not take them", file=sys.stderr)
+    sys.exit(1)

@@ -29,4 +29,7 @@ for group in response["data"]["affected_items"]:
         "zones": customer.get("zones", []),
         "recipients": customer.get("recipients", []),
     })
-json.dump({"customers": sorted(customers, key=lambda c: c["name"])}, fp=sys.stdout)
+# The zones the backend knows: the page offers these only, with the country names of the browser
+json.dump({"customers": sorted(customers, key=lambda c: c["name"]),
+           "countries": sorted(wazuh_zones.COUNTRIES),
+           "continents": wazuh_zones.CONTINENTS}, fp=sys.stdout)

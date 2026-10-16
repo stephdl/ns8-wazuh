@@ -34,20 +34,30 @@
             "_zone.geo": "geoip($source.ip)"
           },
           {
-            "_zone.customer": "join($wazuh.agent.groups, ',')"
+            "_zone.groups": "join($wazuh.agent.groups, ',')"
           }
         ]
       },
       {
         "map": [
           {
-            "_zone.list": "concat($_zone.customer, ':list')"
+            "_zone.customer": "concat(',', $_zone.groups, ',')"
           },
           {
-            "_zone.country": "concat($_zone.customer, ':', $_zone.geo.country_iso_code)"
+            "_zone.customer": "replace(',default,', ',')"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "_zone.list": "concat($_zone.customer, 'list')"
           },
           {
-            "_zone.continent": "concat($_zone.customer, ':@', $_zone.geo.continent_code)"
+            "_zone.country": "concat($_zone.customer, $_zone.geo.country_iso_code)"
+          },
+          {
+            "_zone.continent": "concat($_zone.customer, '@', $_zone.geo.continent_code)"
           }
         ]
       },

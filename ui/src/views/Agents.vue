@@ -626,6 +626,12 @@ export default {
           this.focusElement("group");
         }
         isValidationOk = false;
+      } else if (this.customer === "default") {
+        this.error.group = "agents.customer_reserved";
+        if (isValidationOk) {
+          this.focusElement("group");
+        }
+        isValidationOk = false;
       } else if (
         !namePattern.test(this.customer) ||
         /^\.\.?$/.test(this.customer)

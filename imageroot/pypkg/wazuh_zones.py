@@ -92,29 +92,40 @@ def save(data):
     os.replace(tmp, CUSTOMERS_FILE)
 
 
+def customer_of(groups):
+    """The customer of an agent: its Wazuh group, apart from default where old agents also are."""
+    return ",".join(g for g in groups or [] if g != "default")
+
+
 def kvdb_content(data):
-    """customer:list marks a customer with zones, customer:FR and customer:@EU are its zones."""
+    """,acme,list marks a customer with zones, ,acme,FR and ,acme,@EU are its zones.
+
+    The commas frame the name as the decoder builds it, so that it can drop the group default exactly.
+    """
     content = {}
     for name, customer in data["customers"].items():
         zones = customer.get("zones", [])
         if zones:
-            content[f"{name}:list"] = True
-            content.update({f"{name}:{zone}": True for zone in zones})
+            content[f",{name},list"] = True
+            content.update({f",{name},{zone}": True for zone in zones})
     # The Content Manager refuses an empty KVDB
     return content or {"none:list": False}
 
 
-def _draft_id(index, title):
+def find_draft(index, field, value):
+    """Return the id of the draft document whose field equals value, or None."""
     answer = api("POST", f"{index}/_search", {"size": 50, "query": {"bool": {"filter": [
-        {"match_phrase": {"space.name": "draft"}}, {"match_phrase": {"document.metadata.title": title}}]}}})
+        {"match_phrase": {"space.name": "draft"}}, {"match_phrase": {field: value}}]}}})
     for hit in answer.get("hits", {}).get("hits", []):
-        if hit["_source"]["document"]["metadata"]["title"] == title:
+        document = hit["_source"]["document"]
+        actual = document["name"] if field == "document.name" else document["metadata"]["title"]
+        if actual == value:
             return hit["_id"]
     return None
 
 
 def integration_id(title="ns8"):
-    return _draft_id("wazuh-threatintel-integrations", title)
+    return find_draft("wazuh-threatintel-integrations", "document.metadata.title", title)
 
 
 def write_kvdb(integration):
@@ -125,7 +136,7 @@ def write_kvdb(integration):
         "enabled": True,
         "content": kvdb_content(load()),
     }
-    existing = _draft_id("wazuh-threatintel-kvdbs", KVDB_TITLE)
+    existing = find_draft("wazuh-threatintel-kvdbs", "document.metadata.title", KVDB_TITLE)
     if existing:
         answer = api("PUT", f"{CM}/kvdbs/{existing}", {"resource": resource})
     else:
@@ -134,14 +145,17 @@ def write_kvdb(integration):
         raise RuntimeError(f"{KVDB_TITLE}: {answer.get('message', answer)}")
 
 
-def promote():
+def promote(log=lambda message: None):
     # A change needs both steps to reach the space the engine runs
     for space in ("draft", "test"):
         changes = api("GET", f"{CM}/promote?space={space}").get("changes", {})
-        if any(changes.get(kind) for kind in changes):
-            answer = api("POST", f"{CM}/promote", {"space": space, "changes": changes})
-            if answer.get("status") != 200:
-                raise RuntimeError(f"promotion from {space}: {answer.get('message', answer)}")
+        if not any(changes.get(kind) for kind in changes):
+            log(f"nothing to promote from {space}")
+            continue
+        answer = api("POST", f"{CM}/promote", {"space": space, "changes": changes})
+        if answer.get("status") != 200:
+            raise RuntimeError(f"promotion from {space}: {answer.get('message', answer)}")
+        log(f"promoted from {space}")
 
 
 def zone_name(zone):

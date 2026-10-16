@@ -200,6 +200,8 @@ export default {
       },
       urlCheckInterval: null,
       customers: [],
+      countries: [],
+      continents: {},
       tablePage: [],
       tableColumns: ["name", "agents", "zones", "recipients"],
       customerToEdit: null,
@@ -229,7 +231,12 @@ export default {
       return this.$i18n.locale;
     },
     zoneOptions() {
-      return zoneOptions(this.locale, this.$t("customers.continent"));
+      return zoneOptions(
+        this.countries,
+        this.continents,
+        this.locale,
+        this.$t("customers.continent")
+      );
     },
     recipientList() {
       return this.recipients.split(/[\s,;]+/).filter((r) => r !== "");
@@ -251,7 +258,12 @@ export default {
   },
   methods: {
     zoneText(zone) {
-      return zoneLabel(zone, this.locale, this.$t("customers.continent"));
+      return zoneLabel(
+        zone,
+        this.locale,
+        this.continents,
+        this.$t("customers.continent")
+      );
     },
     isEmail(value) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -302,6 +314,8 @@ export default {
     },
     listCustomersCompleted(taskContext, taskResult) {
       this.customers = taskResult.output.customers;
+      this.countries = taskResult.output.countries;
+      this.continents = taskResult.output.continents;
       this.loading.listCustomers = false;
     },
     // Only to warn that the emails need the cluster smarthost

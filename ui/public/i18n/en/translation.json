@@ -210,7 +210,8 @@
     "update_command": "Update command",
     "update_title": "Update the agent",
     "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed.",
-    "col_customer": "Customer"
+    "col_customer": "Customer",
+    "customer_reserved": "This name is reserved, choose another one"
   },
   "customers": {
     "title": "Customers",

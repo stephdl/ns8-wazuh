@@ -41,18 +41,6 @@ def wait_ready():
     raise SystemExit("the Content Manager is not ready")
 
 
-def find_draft(index, field, value):
-    """Return the id of the draft document whose field equals value, or None."""
-    answer = api("POST", f"{index}/_search", {"size": 50, "query": {"bool": {"filter": [
-        {"match_phrase": {"space.name": "draft"}}, {"match_phrase": {field: value}}]}}})
-    for hit in answer.get("hits", {}).get("hits", []):
-        document = hit["_source"]["document"]
-        actual = document["name"] if field == "document.name" else document["metadata"]["title"]
-        if actual == value:
-            return hit["_id"]
-    return None
-
-
 def check(answer, what):
     if answer.get("status") not in (200, 201):
         raise SystemExit(f"{what}: {answer.get('message', answer)}")
@@ -67,7 +55,7 @@ def load(path):
 wait_ready()
 
 integration = load(os.path.join(CONTENT_DIR, "integration.json"))
-integration_id = find_draft("wazuh-threatintel-integrations", "document.metadata.title", integration["resource"]["metadata"]["title"])
+integration_id = wazuh_zones.find_draft("wazuh-threatintel-integrations", "document.metadata.title", integration["resource"]["metadata"]["title"])
 if integration_id is None:
     integration_id = check(api("POST", f"{CM}/integrations", integration), "integration")
     log(f"integration created: {integration_id}")
@@ -79,7 +67,7 @@ log(f"kvdb {wazuh_zones.KVDB_TITLE}: ok")
 root_decoder_id = None
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "decoders", "*.json"))):
     resource = load(path)["resource"]
-    existing = find_draft("wazuh-threatintel-decoders", "document.name", resource["name"])
+    existing = wazuh_zones.find_draft("wazuh-threatintel-decoders", "document.name", resource["name"])
     if existing:
         new_id = check(api("PUT", f"{CM}/decoders/{existing}", {"resource": resource}), resource["name"])
         existing_id = existing
@@ -92,7 +80,7 @@ for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "decoders", "*.json"))):
 
 for path in sorted(glob.glob(os.path.join(CONTENT_DIR, "rules", "*.json"))):
     resource = load(path)["resource"]
-    existing = find_draft("wazuh-threatintel-rules", "document.metadata.title", resource["metadata"]["title"])
+    existing = wazuh_zones.find_draft("wazuh-threatintel-rules", "document.metadata.title", resource["metadata"]["title"])
     if existing:
         check(api("PUT", f"{CM}/rules/{existing}", {"resource": resource}), resource["metadata"]["title"])
     else:
@@ -155,11 +143,7 @@ put_policy("draft", {
 }, "draft policy")
 log("draft policy updated")
 
-for space in ("draft", "test"):
-    preview = api("GET", f"{CM}/promote?space={space}")
-    changes = preview.get("changes", {})
-    if not any(changes.get(kind) for kind in changes):
-        log(f"nothing to promote from {space}")
-        continue
-    check(api("POST", f"{CM}/promote", {"space": space, "changes": changes}), f"promotion from {space}")
-    log(f"promoted from {space}")
+try:
+    wazuh_zones.promote(log)
+except RuntimeError as error:
+    raise SystemExit(str(error))

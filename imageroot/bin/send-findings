@@ -229,26 +229,28 @@ def email(cursor):
     ts, ids = cursor.load()
     counts = Counter()
     zone_logins = {}
-    total = 0
-    for hits, ts, ids in pages(ts, ids, [{"terms": {"wazuh.rule.level": levels}}], NOISE):
+    # The zone logins come whatever the minimum level: the customers get them, so must the admin
+    wanted = [{"bool": {"should": [{"terms": {"wazuh.rule.level": levels}},
+                                   {"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], "minimum_should_match": 1}}]
+    for hits, ts, ids in pages(ts, ids, wanted, NOISE):
         for hit in hits:
             source = hit["_source"]["wazuh"]
             wazuh_agent = source.get("agent", {})
-            # The customer is the group the agent enrolled in, "default" means none
-            customer = ", ".join(g for g in wazuh_agent.get("groups") or [] if g != "default")
+            customer = wazuh_zones.customer_of(wazuh_agent.get("groups"))
             title = source.get("rule", {}).get("title", "?")
             if title == ZONE_TITLE:
-                user = hit["_source"].get("user", {}).get("name", "?")
-                address = hit["_source"].get("source", {}).get("ip", "?")
-                if seen.first(f"{customer}:{user}:{address}"):
+                if seen.first(zone_key(customer, hit["_source"])):
                     zone_logins.setdefault(customer, []).append(zone_line(hit["_source"]))
-                    total += 1
                 continue
             counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
-            total += 1
-    if total:
+    findings = sum(counts.values())
+    logins = sum(len(z) for z in zone_logins.values())
+    if findings or logins:
+        summary = [plural(logins, "login") + " from outside the allowed zones" if logins else "",
+                   plural(findings, "new finding") if findings else ""]
+        summary = " and ".join(part for part in summary if part)
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
-        lines = [f"{total} new findings.", ""]
+        lines = [f"{summary[0].upper()}{summary[1:]}.", ""]
         customers = sorted({c for c, _, _ in counts} | set(zone_logins))
         for customer in customers:
             if customer:
@@ -268,11 +270,8 @@ def email(cursor):
                                                 if c == customer and a == agent_name}))
                 lines.append("")
         lines.append(f"Open the dashboard: https://{host}/")
-        subject = f"Wazuh: {total} new findings on {host}"
-        if zone_logins:
-            subject += f", {sum(len(z) for z in zone_logins.values())} logins from outside the allowed zones"
-        send_mail(smtp, sender, recipients, subject, "\n".join(lines))
-        log(f"email sent, {total} findings")
+        send_mail(smtp, sender, recipients, f"Wazuh: {summary} on {host}", "\n".join(lines))
+        log(f"email sent, {findings} findings, {logins} zone logins")
     # Saved after the email only: a failed delivery is sent again at the next run
     seen.save()
     cursor.save(ts, ids)
@@ -295,24 +294,31 @@ def zone_alerts(cursor):
     for hits, ts, ids in pages(ts, ids, [{"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], []):
         for hit in hits:
             source = hit["_source"]
-            groups = source.get("wazuh", {}).get("agent", {}).get("groups") or []
-            customer = groups[0] if groups else ""
-            user = source.get("user", {}).get("name", "?")
-            address = source.get("source", {}).get("ip", "?")
-            if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{address}"):
-                continue
-            alerts.setdefault(customer, []).append(zone_line(source))
-    for customer, lines in sorted(alerts.items()):
+            customer = wazuh_zones.customer_of(source.get("wazuh", {}).get("agent", {}).get("groups"))
+            key = zone_key(customer, source)
+            if customers.get(customer, {}).get("recipients") and not seen.known(key):
+                alerts.setdefault(customer, {}).setdefault(key, zone_line(source))
+    for customer, logins in sorted(alerts.items()):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
-        text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] + lines +
+        text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] +
+                         list(logins.values()) +
                          ["", "Each user and address is reported once a day.", f"Open the dashboard: https://{host}/"])
         send_mail(smtp, sender, customers[customer]["recipients"],
-                  f"Wazuh: login from outside the allowed zones ({customer})", text)
-        log(f"zone alert sent to {customer}, {len(lines)} logins")
-    # Saved after the emails only, like the findings
-    seen.save()
+                  f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", text)
+        # Saved per customer: a failure on the next one must not send this one again
+        seen.add(logins)
+        seen.save()
+        log(f"zone alert sent to {customer}, {len(logins)} logins")
     cursor.save(ts, ids)
     return 0
+
+
+def zone_key(customer, source):
+    return f"{customer}:{source.get('user', {}).get('name', '?')}:{source.get('source', {}).get('ip', '?')}"
+
+
+def plural(count, word):
+    return f"{count} {word}" + ("" if count == 1 else "s")
 
 
 def zone_line(source):
@@ -343,11 +349,17 @@ class SeenLogins:
             self.seen = {}
         self.now = now
 
+    def known(self, key):
+        return key in self.seen
+
     def first(self, key):
         if key in self.seen:
             return False
         self.seen[key] = self.now
         return True
+
+    def add(self, keys):
+        self.seen.update({key: self.now for key in keys})
 
     def save(self):
         tmp = self.path + ".new"
