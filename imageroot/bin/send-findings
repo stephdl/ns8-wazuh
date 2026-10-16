@@ -253,7 +253,7 @@ def email(cursor):
                 lines.append(f"Customer {customer}")
                 zones = zone_settings.get(customer, {}).get("zones")
                 if zones and any(c == customer and r.startswith(ZONE_TITLE) for c, _, r in counts):
-                    lines.append(f"  Allowed login zones: {', '.join(zones)}")
+                    lines.append(f"  Allowed login zones: {', '.join(wazuh_zones.zone_name(z) for z in zones)}")
                 lines.append("")
             elif len(customers) > 1:
                 lines += ["No customer", ""]
@@ -295,7 +295,7 @@ def zone_alerts(cursor):
                 continue
             alerts.setdefault(customer, []).append(f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {zone_detail(source)}")
     for customer, lines in sorted(alerts.items()):
-        zones = ", ".join(customers[customer].get("zones", []))
+        zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
         text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] + lines +
                          ["", "Each user and address is reported once a day.", f"Open the dashboard: https://{host}/"])
         send_mail(smtp, sender, customers[customer]["recipients"],
