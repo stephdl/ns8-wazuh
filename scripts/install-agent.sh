@@ -194,9 +194,11 @@ setup_ns8_journal() {
 import json
 import os
 import pwd
+import re
 import signal
 import subprocess
 import sys
+import time
 
 CURSOR = "/var/ossec/var/ns8-journal.cursor"
 FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
@@ -209,9 +211,18 @@ BATCH = 5000
 # Seconds per run. The agent never starts this command again while it runs, so a run stuck on a
 # full pipe or a stalled journalctl would silence the node
 DEADLINE = 60
+# Readable names of the Nextcloud LDAP users, which Nextcloud logs by their UUID only
+USERS = "/var/ossec/var/ns8-journal.users.json"
+# occ takes about 2 seconds. Seconds of lookups per run: a burst of new users must not reach DEADLINE
+LOOKUP_BUDGET = 15
+LOOKUP_TIMEOUT = 5
+# A user that occ cannot name is asked again after this many seconds, not at each login
+RETRY_UNKNOWN = 3600
 
 _owners = {}
 _journal = None
+_users = None
+_lookup_time = 0.0
 
 
 def text(value):
@@ -270,13 +281,67 @@ def save_cursor(cursor):
     os.replace(CURSOR + ".tmp", CURSOR)
 
 
+def load_users():
+    global _users
+    if _users is None:
+        try:
+            with open(USERS) as f:
+                _users = json.load(f)
+        except (OSError, ValueError):
+            _users = {}
+    return _users
+
+
+def occ_user_info(module, uid):
+    """Return the user:info of a Nextcloud user, or an empty dict."""
+    # A session of its own: on timeout the whole group dies, podman exec included. Killed alone,
+    # runagent would leave it holding the pipe and the read would wait past DEADLINE
+    proc = subprocess.Popen(["runagent", "-m", module, "occ", "user:info", uid, "--output=json"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    try:
+        out = proc.communicate(timeout=LOOKUP_TIMEOUT)[0]
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        return {}
+    try:
+        # The log lines of Nextcloud come first when its log level is debug
+        return json.loads(next(line for line in out.splitlines() if line.startswith("{")))
+    except (StopIteration, ValueError):
+        return {}
+
+
+def nextcloud_user(module, uid):
+    """Return the email or display name of a Nextcloud user, or an empty string."""
+    global _lookup_time
+    users = load_users().setdefault(module, {})
+    known = users.get(uid)
+    # A name, or [time] for a user occ could not name
+    if isinstance(known, str):
+        return known
+    if (known and time.time() - known[0] < RETRY_UNKNOWN) or _lookup_time >= LOOKUP_BUDGET:
+        return ""
+    start = time.time()
+    try:
+        info = occ_user_info(module, uid)
+    except OSError:
+        info = {}
+    _lookup_time += time.time() - start
+    name = info.get("email") or info.get("display_name") or ""
+    users[uid] = name or [time.time()]
+    with open(USERS + ".tmp", "w") as f:
+        json.dump(_users, f)
+    os.replace(USERS + ".tmp", USERS)
+    return name
+
+
 def event(entry):
     owner = entry.get("_SYSTEMD_OWNER_UID", "0")
     unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
     module = rootless_module(owner) if owner != "0" else ""
     if not module:
         module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
-    return {
+    data = {
         "ns8_journal": 1,
         "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
         "pid": text(entry.get("_PID")),
@@ -284,6 +349,12 @@ def event(entry):
         "unit": text(unit),
         "message": text(entry.get("MESSAGE")).rstrip("\n"),
     }
+    if module.startswith("nextcloud") and " postLogin" in data["message"]:
+        found = re.search(r"LoginListener - ([0-9A-Fa-f-]+) postLogin", data["message"])
+        name = nextcloud_user(module, found.group(1)) if found else ""
+        if name:
+            data["user"] = name
+    return data
 
 
 def encode(event):

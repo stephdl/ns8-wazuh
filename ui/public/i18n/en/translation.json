@@ -222,7 +222,8 @@
   "customers": {
     "title": "Customers",
     "zones_title": "Login zones",
-    "zones_description": "Choose the countries or continents the users of each customer log in from. A successful login from anywhere else raises a finding and an email, once a day per user and address. Only public addresses are checked: logins from a LAN or a VPN have no country. A customer without zones is not watched.",
+    "zones_description": "Choose the countries or continents the users of each customer log in from. A successful login from anywhere else raises a finding and an email, once a day per user, address and service. Only public addresses are checked: logins from a LAN or a VPN have no country. A customer without zones is not watched.",
+    "zones_doc": "Watched services",
     "refresh": "Refresh",
     "search": "Search customers",
     "no_customers": "No customers",

@@ -1,0 +1,48 @@
+{
+  "resource": {
+    "name": "decoder/ns8-webtop-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-traefik-access/0"
+    ],
+    "metadata": {
+      "title": "WebTop successful login",
+      "description": "Logins accepted on WebTop, seen in the reverse proxy log: WebTop logs no client IP",
+      "author": "NethServer",
+      "module": "webtop",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": "exists($service.name) AND starts_with($service.target.name, 'webtop') AND string_equal($http.request.method, 'POST') AND string_equal($url.path, '/webtop/login') AND int_equal($http.response.status_code, 302)",
+    "normalize": [
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "webtop"
+          }
+        ]
+      }
+    ]
+  }
+}

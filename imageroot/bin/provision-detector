@@ -77,6 +77,14 @@ detector = {
 }
 
 detector_id = find_detector()
+if detector_id and "--recreate" in sys.argv:
+    # A restore swaps the events index under the detector: its monitor keeps the position it had in
+    # the empty index and reads the whole history again, too slow to ever reach the new events.
+    # A new detector starts at the end of the index.
+    answer = api("DELETE", f"{SA}/detectors/{detector_id}")
+    if "_id" not in answer:
+        sys.exit(f"detector: {answer}")
+    detector_id = None
 if detector_id:
     answer = api("PUT", f"{SA}/detectors/{detector_id}", detector)
 else:

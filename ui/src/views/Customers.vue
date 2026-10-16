@@ -15,6 +15,8 @@
           kind="info"
           :title="$t('customers.zones_title')"
           :description="$t('customers.zones_description')"
+          :actionLabel="$t('customers.zones_doc')"
+          @action="openUrl(zonesDocUrl)"
           :showCloseButton="false"
         />
       </cv-column>
@@ -234,6 +236,7 @@ export default {
         page: "customers",
       },
       urlCheckInterval: null,
+      zonesDocUrl: "https://github.com/stephdl/ns8-wazuh/blob/main/README.md#login-zones",
       customers: [],
       countries: [],
       continents: {},
@@ -295,6 +298,9 @@ export default {
     next();
   },
   methods: {
+    openUrl(url) {
+      window.open(url, "_blank", "noopener");
+    },
     zoneText(zone) {
       return zoneLabel(
         zone,

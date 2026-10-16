@@ -230,6 +230,8 @@ AUTH = ("event.category:authentication"
         " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
+# Only the login zone decoder writes a reason that starts so
+OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     "Successful and failed logins on every service and server", [
     (vis("ns8-logins-outcome", "Logins by outcome", EVENTS, AUTH,
@@ -254,6 +256,14 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                terms("3", "source.ip", "bucket", size=5, label="Source IP", missing=True),
                terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "service.type", "bucket", size=3, label="Service", missing=True,
+                     missing_label="ssh / host"))), 48, 14),
+    # Every application a user reached from outside the zones: the emails report each one once a day
+    (vis("ns8-logins-outside-zones", "Logins from outside the allowed zones", EVENTS, OUTSIDE,
+         # WebTop logs no user name: without the missing bucket its logins would not show
+         table(terms("2", "user.name", "bucket", size=50, label="User", missing=True),
+               terms("3", "source.ip", "bucket", size=5, label="Source IP", missing=True),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "service.type", "bucket", size=10, label="Service", missing=True,
                      missing_label="ssh / host"))), 48, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
@@ -400,17 +410,18 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
          table(terms("2", "email.to.address", "bucket", size=30, label="Recipient"),
                terms("3", "event.action", "bucket", size=2, label="Status"))), 16, 14),
     # Rspamd scans sent mail too, but users mostly send from the LAN, which has no country
+    # The maps side by side, each table under its map
+    (vis("ns8-mail-source-map", "Mail sources map", APPS, SPAM, geo_map()), 24, 14),
+    (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
     (vis("ns8-mail-source-countries", "Mail sources by country", APPS, SPAM,
          table(terms("2", "source.geo.country_name", "bucket", size=30, label="Country"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "cardinality", "schema": "metric",
-                               "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 16, 14),
-    (vis("ns8-mail-source-map", "Mail sources map", APPS, SPAM, geo_map()), 32, 14),
+                               "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 24, 14),
     (vis("ns8-mail-sasl-sources", "SMTP login failures", APPS, SASL,
          table(terms("2", "source.ip", "bucket", size=30, label="Source IP"),
                terms("3", "user.name", "bucket", size=3, label="User", missing=True),
                terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
-    (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))
