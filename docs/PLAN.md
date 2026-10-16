@@ -101,7 +101,7 @@ Modules to watch first: mail, samba, openldap, nextcloud, traefik, crowdsec and 
 ## 6. Export and monitoring
 
 - Customer export: a timer of the module posts the new findings with a cursor, so nothing is lost after a stop. An Alerting monitor was tried first: it reads a fixed time window and never catches up. The customer endpoint must accept an HTTPS POST. Findings only.
-- Logs contain user names and IP addresses. The customer chooses the destination and the retention.
+- Logs contain user names and IP addresses. The customer chooses the destination and the retention (`retention_days`).
 - Agents on monitored nodes: journald, FIM (`/etc`, `/etc/nethserver`), auditd and vulnerabilities, with the configuration pushed by agent group.
 - Module health: the NS8 Alertmanager does not accept rules from a module. Version 1 relies on the `get-status` action and the dashboard monitors. A Prometheus target and a PR in ns8-metrics can come later.
 
@@ -143,14 +143,92 @@ Known gaps:
 **Later.**
 - Let's Encrypt for the dashboard, with a real host name.
 - Remote agent update with a WPK package, once 5.0.0 is out (see below).
-- Slack, Microsoft Teams and Mattermost channels (see below).
+- Slack, Microsoft Teams, Mattermost and Telegram channels (see below).
+- Generic NS8 dashboards shipped with the module, then one family of NS8 modules at a time (see below).
 - Move from `5.0.0-rc1` to `5.0.0` through the Renovate pull request. Check the agent package name and the staging repository of the install script then: the final packages will likely move to the stable Wazuh repository.
+
+**Generic NS8 dashboards.** The dashboard imports saved objects (ndjson) through `POST /api/saved_objects/_import?overwrite=true`. The module ships them in `imageroot/content/dashboards/` and loads them at each configuration and update, like the decoders and rules. Useful to any NS8 customer:
+- Logins: Dovecot and api-server successes and failures, by user, source IP and country, with a map.
+- Web: Traefik requests by status code, top source IPs, paths and countries, bursts of 4xx and 5xx.
+- CrowdSec: triggered scenarios and banned IPs.
+- Fleet: findings by level, agent, rule and MITRE tactic over time, last event per agent.
+- System changes: users created or deleted, services stopped, firewall changes.
+
+Checked on the test node with rc1. Multi-tenancy is off, so the saved objects are global and every user sees them. The dashboard already creates index patterns whose id is their title (`wazuh-events-v5-applications*`, `wazuh-findings-v5*`): our objects point to them, no pattern of our own. GeoIP works out of the box: the custom space policy has the `geo` enrichment and the manager ships GeoLite2 City and ASN. A public source IP gets `source.geo.*` and `source.as.*`, a private one gets nothing. The agent status is not in the indexer, only in the manager API: Fleet shows the last event per agent instead, the Endpoints page keeps the real status.
+
+**Every NS8 module.** The agent reads the whole host journal, so the log of each module container already reaches the manager. What is missing per module is decoders, rules and a panel. Done in pull request #5, merged, tested on the test cluster:
+1. Mail, done: Postfix SASL failures, rejections and deliveries, Rspamd results. Rules for a virus and a denied relay. ClamAV is read through the Postfix rejection, its own lines do not reach the indexer.
+2. Directory, done: the Samba JSON audit, logins with account, source and workstation, group and password changes, directory objects, password policy changes. The samba module logs no login by default: the README gives one line for `include.conf`. Not tested: the locked account rule, the test domain has no lockout policy.
+3. Collaboration, done: failed logins of Roundcube, SOGo, Nextcloud, Matrix, Ejabberd and Mattermost (existing accounts only). Its dashboard was removed in #11, the logins show in NS8 - Logins, by service.
+4. Web hosting, done: the Traefik router name gives the site, a rule flags scans of typical attack paths. Its dashboard was merged into NS8 - Web in #11.
+5. Telephony, done from the ns8-crowdsec scenarios (#182, #184, #212): Kamailio SIP failures, refused CTI and reports logins. Tested on sample lines only, check on a real NethVoice.
+
+Left out, and why:
+- Webtop: a failed login answers HTTP 200 like a good one, and nothing is logged.
+- Passbolt: the login uses a GPG key, not a password.
+- OpenLDAP and ldapproxy binds: nothing reaches journald.
+- Samba file access: in the `samba_audit` table only, a script on the samba node could read it (see Samba audit below).
+- Later: MariaDB and PostgreSQL auth failures, BackupPC failed backups, n8n, Paperless, Grafana, Piler, nethsecurity-controller.
+
+Also in #5: customers (see Per customer view), the dashboards loaded at each configuration, update and restore, and a retry when the indexer is short of memory right after a restart.
+
+**Journal and module of each line, done in #5 (merged).** The NS8 - Journal dashboard lists every log line like `journalctl`, with pickers for customer, server, NS8 module and program. A word typed alone in the search bar searches the text, whatever its case (a lowercased `message.text` copy, searched by default). The Wazuh agent journald reader sends only `program[pid]: message`, it drops the user and the unit, and it cannot send JSON (`read_journald.c` always calls the syslog dump, Wazuh 4 too). So on an NS8 node `install-agent.sh` makes the agent run `/var/ossec/bin/ns8-journal` every 10 s (`log_format command`): it reads `journalctl -o json` with a cursor and adds the module, from the owner user for a rootless module and from the unit name for a rootful one. No service, nothing stored but the cursor. The root decoder reads both forms and puts the module in `orchestrator.namespace`, the unit in `service.id`. A burst did double lines: a run too long to finish saved no cursor and the next one sent the same lines again, 37 million in a day on one node. Fixed in #15, a run sends 5000 lines at most. Messages over 4096 bytes also came empty, `journalctl -o json` gives null for them without `--all`. To ask upstream: a JSON output for the journald reader, the dump already exists in the agent (`entry_as_json`).
+
+**ns8-journal hang, done in #23 (merged).** An NS8 node sent no log for nine hours. `ns8-journal` was stuck: Python waited for `journalctl` to exit, and `journalctl` waited to write into a pipe nobody read, once the write to the agent failed. The agent never starts a command again while the previous one runs, so the node stayed silent. Now `journalctl` is always killed when a run ends, and a run stops after 60 s whatever happens (`signal.alarm`), with no cursor saved, so the next one sends the same lines again. `journalctl` runs with `LC_ALL=C`, only for its own process, so the broken cursor check finds the English word in its error. An entry without `__CURSOR` is skipped instead of stopping every later run on it. `install-agent.sh --update` kills a run already stuck before it restarts the agent: a restart leaves the commands of the agent running. A Robot test cuts the output with `head` and checks that the run ends and the cursor stays.
+
+**Retention, done in #6.** Setting `retention_days` in Settings > Advanced, 365 by default, from 30 to 3650, copied by restore and clone. `provision-retention` rewrites `stream-events-policy` and `stream-findings-policy`: an index is deleted once its newest line is older than the retention (`min_rollover_age`). Not one index per day: Wazuh has 16 streams, so that gives more than 5800 indices a year, over the 1000 shards of a single node. Each stream rolls over every 30 days, or every twelfth of the retention beyond a year, and still at 20 GB, so it keeps about 13 indices. A log stays at least the retention, and about 30 days more for one year. Found on the test node: the indexer writes back the Wazuh policies at each start, once the cluster is green, so a timer runs the script every hour; each index keeps its own copy of the policy and is attached again only when its conditions differ. The Status page warns from 80% of disk, the indexer goes read only at 95%. The README gives a disk estimate, about 20 MB of events a day per NS8 node. Also in #6: the log tables load 5000 lines instead of 500 (`discover:sampleSize`, an administrator value is kept), and the Program picker of NS8 - Journal follows the Module picker. To check: the restore with a backup taken before the setting, and whether an empty stream gets a new index at each rollover. The table pages stay at 50 lines: the size is fixed in the Discover code.
+
+**Application picker, done in #7.** The Module picker of the dashboards is now called Application, the name the NS8 UI gives to the modules. A line without a module, from the host system of an NS8 node or from a server that is not an NS8 node, gets the application `system`, so the Program picker works on it too. The chain is Customer, Agent, Application, Program. The raw audit lines that reach the NS8 root decoder get the program `auditd` instead of a piece of the audit record. Limit: the lines of the standard Wazuh integrations, such as `linux` or `auditd` in `system-activity`, do not go through the NS8 root decoder, so they have no application. An AppArmor denial is indexed twice, once by the NS8 root decoder (program `kernel`) and once by the `linux` integration (program of the denied process).
+
+**Real program names, done in #8.** The NS8 decoders replaced `process.name` with a family name: `pvedaemon` became `proxmox`, `postfix/smtpd` became `postfix`, `samba-dc` became `samba`, and the nginx and apache access lines of the lamp and webserver sites became `traefik`. They now keep the program name of the line, as `journalctl` shows it, and put the family in `service.type`, which the dashboards filter on. The access log decoder sets `web`. Only the new lines have `service.type`, the older ones are not rewritten.
+
+**Findings email, done in #9 and #10.** On a test node, one week at the default level (medium) gave 1212 findings, and the real alerts got lost. Left out of the email, kept in the dashboards and the export: the start and stop of the oneshot services run by timers (logrotate, the NS8 backups, the CrowdSec hub update and alert export, systemd-run units, and more), the vulnerability findings, which come back at each scan, and the firewall changes of the CrowdSec bouncer, one at each ban. `NS8 CrowdSec scenario triggered` went from medium to low, the address is already banned. The same week now gives 173 findings. Under each agent, the findings of the same kind share one line with their count, and the services, accounts, files or CVEs they are about are listed below it, 10 at most. Still noisy and left as is: an AppArmor profile that keeps denying a service (462 findings in a week for cupsd on a Proxmox host) must be fixed on the host. A file under `/boot` changed by a kernel update stays in the email, a change outside an update is a real signal.
+
+**Dashboards, done in #11 and #12.** NS8 - Collaboration only listed failed logins and was empty most of the time: removed, NS8 - Logins shows them by `service.type`, a click on a service filters on it. NS8 - Web hosting was NS8 - Web filtered on the lamp, webserver, wordpress and dokuwiki routes: merged into NS8 - Web, which now counts the Traefik lines only and splits the requests by site (route). The Application picker lists every application of the agent whatever the dashboard shows, so it stays only on Journal, Logins and Telephony (several NethVoice can run on one node). The dashboard descriptions are one short sentence. The maps color each country by count with its name on hover, instead of circles that gave coordinates, and the source tables have a City column. The module never deletes a dashboard: an existing install keeps the removed ones until an administrator deletes them in Saved objects.
+
+**Refused or left as is.**
+- A threshold per rule, for example mail the authentication failures only above N per user or address: CrowdSec already bans.
+- The Discover table pages stay at 50 lines, the size is fixed in its code. `discover:sampleSize` loads 5000 lines since #6.
+- A Site picker on NS8 - Web: `service.name` also holds systemd units and module names, so the picker would list values that empty the dashboard. It would need the route in a field of its own, such as `service.target.name`. Left out, a click on a site in Requests by site filters already.
+- The apache and nginx lines of the lamp and webserver sites look like Traefik access lines, some arrive with the program `traefik` and show as `no route` in NS8 - Web, next to the scanners that hit the IP address. Left as is.
+- A city on the map: needs the Maps application and a document layer, not generated like the dashboards, slow with many points.
+- Renaming the `ns8` integration: it is the content package that read the line, not the host, and every decoder, rule and the detector depend on it.
+- Active responses: CrowdSec already bans, a second source of blocking risks cutting a real customer on a false positive.
+- The Program picker stays disabled for the lines of the standard Wazuh integrations (auditd, linux), which have no application: an AppArmor denial shows with its program in the `linux` integration but cannot be picked.
+- The Wazuh 5 rule `Sudo command targeting a persistence path` fires on the hourly anacron line of cron on Debian and Proxmox. A Standard rule cannot be turned off alone, only its whole integration. Copying it to the Custom space with a `process.name` filter needs a second detector, as a detector does not mix Standard and Custom. Left out of the email only (#13), to report upstream instead.
+- `ns8-journal` sends 5000 lines per run, so 500 lines a second at most. Enough for the nodes seen so far, to raise if a node logs faster.
+- The pickers load 500 values at most with static options (#16), typing in them filters that list only. The dynamic options asked for 10 values whatever the size. The options query reads 10 million lines per shard: the "Terms list might be incomplete" icon still shows on a bigger shard.
+
+**Tests to add.** The Robot tests still match the module, none checks what was added since #6. Planned: the retention is kept when `configure-module` leaves it out; the NS8 dashboards are loaded and the removed ones are not; `discover:sampleSize` is 5000; the `ns8` detector holds every NS8 rule; end to end on the CI agent, a fake Dovecot failure written with `logger -t dovecot` reaches the index with `service.type: dovecot`, the application `system` and a `NS8 authentication failure` finding. A decoder case through the logtest endpoint of the Content Manager, on the test space: one Traefik, one nginx and one apache access line, each with its expected `user_agent.original` and `service.name`. The user agent of #14 shipped and never reached the index, nothing caught it (fixed in #17). Not tested: the email (no smarthost in CI) and the rendering of the maps. Done in #23: `ns8-journal` ends when its output is cut, and the cursor stays.
+
+**Unclassified logs.** Tested: every journal line is kept by the NS8 root decoder, even without a decoder of its own. `index_unclassified_events` only adds the few logs that decoder refuses. Leave it off.
+
+To do: download the install script of the module version instead of `main`, so a new option such as `--group` works before the merge.
+
+**Agents to update after #23.** On each NS8 node, run the install script again with `--update`, from `main`. Done on the three agents of wazuh.sdl: they stay active and the cursor of rockylinux.sdl moves. ns8-leader and pve are production servers: checked only from the manager (status and keepalive), not by SSH. To check there: no `ns8-journal` run older than a minute, and the cursor file changing.
+
+**Agents to update after #5.** On each NS8 node, run the install script again with `--update`: the agent switches to `ns8-journal` and its lines get their module. Done on the two test nodes, r1-node1 and debian13. The burst is checked, see #15 above.
+
+**Next.** Open the Wazuh issue on the anacron line above. Delete the doubled Nextcloud lines of ns8-leader from 14 October with a delete by query, or let the retention do it. Find why `ns8-journal` stopped moving on ns8-leader between 16:47 and 17:45 the same day, before the fix of #15 was complete. The Robot tests above. A test on a real NethVoice and a real Proxmox VE 9, and the locked domain account rule on a domain with a lockout policy. The certificate expiry watch below.
+
+Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
+- Proxmox VE, done in #5 (merged): the Wazuh 5 CTI has no Proxmox integration, so the decoders are ported from the Wazuh 4 one (`0440-proxmox-ve_decoders.xml`). Web and API logins, tasks from their UPID with type, guest, user and result, rules for a deleted guest and a failed backup, an NS8 - Proxmox dashboard. Tested on sample lines only, check on a real Proxmox VE 9. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
+- OPNsense: FreeBSD based. OPNsense has an `os-wazuh-agent` plugin, but a Wazuh 5 agent for FreeBSD is not checked. Otherwise its firewall and login logs come by syslog.
+- NethSecurity (OpenWrt): no Wazuh agent package exists for OpenWrt, so its logs come by syslog. Firewall drops, VPN logins, web interface logins.
+
+Syslog needs a new input in the module: a port opened on the node, and a check that the 5.0 manager still receives syslog. Plain syslog is not encrypted: from another site it needs TLS, which Wazuh does not receive natively.
+
+Each one is named `NS8 - ...` with a fixed id, so an update replaces it: an administrator copies it before changing it. They live in the `.kibana` index, so the backup snapshot keeps them. The field names may change between `5.0.0-rc1` and `5.0.0`: check them at the version change.
+
+**Per customer view.** One server often watches several customers of an integrator. An agent is enrolled in a Wazuh group named after its customer (`wazuh.agent.groups`). Each NS8 dashboard has a control to pick a customer, then an agent, and the findings email is grouped by customer, then by agent. Only the integrator reads the dashboards and the emails, so one global view and one global notification are enough.
+
+Not planned unless a customer asks: isolation, where a customer logs in and sees only its agents (document level security on `wazuh.agent.groups` in the indexer roles), and email recipients per customer. A customer who needs isolation can get its own wazuh module instead.
 
 **Remote agent update.** The Wazuh API can upgrade an agent through its own connection with a signed WPK package (`PUT /agents/upgrade`), without SSH. No WPK is published for 5.0.0-rc1. To look at once 5.0.0 is out, as a button next to the update command.
 
 **Agent as an NS8 module.** It would need a privileged rootfull container with the host mounted to read the journal, the packages and the files, and Wazuh does not support that layout. The install script stays the way to deploy agents unless a customer asks for a module.
 
-**Other notification channels.** The Notifications plugin also has Slack, Microsoft Teams and Chime channels. Mattermost accepts the Slack format. Not done.
+**Other notification channels.** The Notifications plugin also has Slack, Microsoft Teams and Chime channels. Mattermost accepts the Slack format. Telegram is planned too: it has no channel of its own in the plugin, so it goes through a custom webhook to the Telegram Bot API (`sendMessage` with the bot token and a chat id), to check. Not done.
 
 **Samba file audit (on hold).** Tested on a node: ns8-samba 3.5.0 logs each audited operation (`create_file`, `unlinkat`, `renameat`, `mkdirat`, `fsetxattr`) with user, source IP, share, result and path, but syslog-ng sends them only to TimescaleDB (`samba-dc/etc/syslog-ng/syslog-ng.conf`, destination `d_sql`), never to journald. So a Wazuh agent cannot see them. A second syslog-ng destination writing to the container output brought them to journald in a manual test, for example:
 
@@ -161,6 +239,18 @@ Two ways, none done yet:
 - Without changing Samba: a script on the node, run by the agent `command` wodle every minute, that reads the new rows of the `samba_audit` table. It depends on the internals of ns8-samba (table, port, password).
 
 Once the lines reach Wazuh: a decoder for the `|` separated record, a rule per deletion, and a rule for mass activity by one user.
+
+**Certificate expiry.** On an NS8 node, Traefik holds every certificate the node serves. Its state directory has `acme/acme.json` for Let's Encrypt and `custom_certificates/*.crt` for the uploaded ones. Each node runs one Traefik instance (`traefik1`, `traefik2`...), found with `runagent -l`, and `runagent -m <traefik>` runs in that directory, so no `/home` path is needed. Traefik asks Let's Encrypt for a renewal 30 days before expiry, so a certificate with less than 14 days left means the renewal fails. Nothing renews an uploaded certificate.
+
+The plan reuses the `ns8-journal` way:
+- `install-agent.sh` writes `/var/ossec/bin/ns8-certs`, only on an NS8 node, and adds a `<localfile>` command with the alias `ns8-certs` and a frequency of one day. It also runs at each start of the agent.
+- The script reads the certificates of the Traefik of the node and runs `openssl x509` on each one. It never prints a private key. It writes one JSON line per certificate: Traefik module, source (`acme` or `custom`), domain and other names, issuer, expiry date, days left and a state, `ok`, `expiring` or `expired`. The threshold is 14 days for Let's Encrypt and 30 days for an uploaded certificate. The self-signed default certificate is left out.
+- A decoder maps the line to the ECS `tls.server.x509.*` fields, the Traefik module to `orchestrator.namespace`, and the state to `event.action`.
+- Two rules: `NS8 certificate expiring` (medium) and `NS8 certificate expired` (high). The script decides the state, so the rules only compare strings, Sigma has no date check. The finding comes back every day until the certificate is fixed, and the findings email reminds it.
+- An `NS8 - Certificates` dashboard: the latest expiry per domain and node, the findings over time, the Customer and Agent pickers.
+- An enrolled agent gets it with `install-agent.sh --update`. A host that is not an NS8 node gets nothing. The certificate of the agent listener of the module is already on the Status page.
+
+Test with a short certificate uploaded through the `upload-certificate` action of Traefik.
 
 
 - LDAP and `securityadmin.sh` in practice in the rc1 image. The 5.0 documentation does not cover LDAP.
