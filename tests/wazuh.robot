@@ -292,14 +292,14 @@ Check the pages of the module and take screenshots
     Wait For Elements State    iframe >>> button >> text="Create a token"    visible    timeout=10s
     Take Screenshot    filename=${SCREENSHOTS}/4._Enrollment.png
     Open the module page    customers    Customers
-    Wait For Elements State    iframe >>> text="Europe (continent)"    visible    timeout=20s
+    Wait For Elements State    iframe >>> tbody >> text="Europe (continent)"    visible    timeout=20s
     Get Text    iframe >>> tbody    contains    soc@ns8-ci.test
     Take Screenshot    filename=${SCREENSHOTS}/5._Customers.png
     # The customer with zones opens with them, and the picker offers the continents first
     # Exact name: robot-moved also holds robot
     Click    iframe >>> tbody tr:has(td:text-is("robot")) >> .bx--overflow-menu
     Click    iframe >>> .bx--overflow-menu-options__btn >> text="Edit"
-    Wait For Elements State    iframe >>> .bx--modal.is-visible >> text="Canada (CA)"    visible    timeout=10s
+    Wait For Elements State    iframe >>> .bx--modal.is-visible .bx--tag >> text="Canada (CA)"    visible    timeout=10s
     Take Screenshot    filename=${SCREENSHOTS}/6._Edit_customer.png
     Click    iframe >>> .bx--modal.is-visible button >> text="Cancel"
     Open the module page    settings    Settings
