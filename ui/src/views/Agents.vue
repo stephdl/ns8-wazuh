@@ -341,7 +341,7 @@
             })
           }}
         </p>
-        <cv-form @submit.prevent="setAgentCustomer">
+        <cv-form @submit.prevent="setAgentCustomer" class="customer-form">
           <!-- Empty and rebuilt at each opening: with a value, the box highlights the first customer whose name it contains -->
           <NsComboBox
             :key="moveModalCount"
@@ -853,6 +853,10 @@ export default {
 }
 .toolbar {
   margin-bottom: $spacing-05;
+}
+// The modal clips the open customer list, keep room for the label, the box and the list
+.customer-form {
+  min-height: 19rem;
 }
 // Carbon resets the list markers, the steps need them back
 ol.steps {
