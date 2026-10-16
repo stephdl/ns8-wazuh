@@ -228,6 +228,7 @@ def email(cursor):
     seen = SeenLogins(ZONE_ADMIN_SEEN_FILE)
     ts, ids = cursor.load()
     counts = Counter()
+    zone_logins = {}
     total = 0
     for hits, ts, ids in pages(ts, ids, [{"terms": {"wazuh.rule.level": levels}}], NOISE):
         for hit in hits:
@@ -239,31 +240,38 @@ def email(cursor):
             if title == ZONE_TITLE:
                 user = hit["_source"].get("user", {}).get("name", "?")
                 address = hit["_source"].get("source", {}).get("ip", "?")
-                if not seen.first(f"{customer}:{user}:{address}"):
-                    continue
-                title = f"{title} - {zone_detail(hit['_source'])}"
+                if seen.first(f"{customer}:{user}:{address}"):
+                    zone_logins.setdefault(customer, []).append(zone_line(hit["_source"]))
+                    total += 1
+                continue
             counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
             total += 1
     if total:
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
         lines = [f"{total} new findings.", ""]
-        customers = sorted({c for c, _, _ in counts})
+        customers = sorted({c for c, _, _ in counts} | set(zone_logins))
         for customer in customers:
             if customer:
-                lines.append(f"Customer {customer}")
-                zones = zone_settings.get(customer, {}).get("zones")
-                if zones and any(c == customer and r.startswith(ZONE_TITLE) for c, _, r in counts):
-                    lines.append(f"  Allowed login zones: {', '.join(wazuh_zones.zone_name(z) for z in zones)}")
-                lines.append("")
+                lines += [f"Customer {customer}", ""]
             elif len(customers) > 1:
                 lines += ["No customer", ""]
+            # Apart from the other findings and in full: the detail is the alert, a cut line would hide it
+            if customer in zone_logins:
+                zones = zone_settings.get(customer, {}).get("zones", [])
+                lines += ["Logins from outside the allowed zones",
+                          f"  Allowed: {', '.join(wazuh_zones.zone_name(z) for z in zones)}"]
+                lines += [f"  {line}" for line in zone_logins[customer]]
+                lines.append("")
             for agent_name in sorted({a for c, a, _ in counts if c == customer}):
                 lines.append(agent_name)
                 lines += summary_lines(Counter({r: n for (c, a, r), n in counts.items()
                                                 if c == customer and a == agent_name}))
                 lines.append("")
         lines.append(f"Open the dashboard: https://{host}/")
-        send_mail(smtp, sender, recipients, f"Wazuh: {total} new findings on {host}", "\n".join(lines))
+        subject = f"Wazuh: {total} new findings on {host}"
+        if zone_logins:
+            subject += f", {sum(len(z) for z in zone_logins.values())} logins from outside the allowed zones"
+        send_mail(smtp, sender, recipients, subject, "\n".join(lines))
         log(f"email sent, {total} findings")
     # Saved after the email only: a failed delivery is sent again at the next run
     seen.save()
@@ -293,7 +301,7 @@ def zone_alerts(cursor):
             address = source.get("source", {}).get("ip", "?")
             if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{address}"):
                 continue
-            alerts.setdefault(customer, []).append(f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {zone_detail(source)}")
+            alerts.setdefault(customer, []).append(zone_line(source))
     for customer, lines in sorted(alerts.items()):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
         text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] + lines +
@@ -305,6 +313,13 @@ def zone_alerts(cursor):
     seen.save()
     cursor.save(ts, ids)
     return 0
+
+
+def zone_line(source):
+    """2026-10-16 07:35 UTC  root on ssh from 86.201.48.4 (Paris, France), server mail1"""
+    when = source["@timestamp"][:16].replace("T", " ")
+    server = source.get("wazuh", {}).get("agent", {}).get("name", "?")
+    return f"{when} UTC  {zone_detail(source)}, server {server}"
 
 
 def zone_detail(source):
