@@ -153,6 +153,23 @@ Check if the agent update keeps the enrollment
     Should Be Equal As Integers    ${rc}  0    ${stderr}
     Wait Until Keyword Succeeds    2 min    10 s    Agent status should be    active
 
+Check if ns8-journal ends when its output is cut
+    Use the install node
+    # The agent runs ns8-journal too and would move the cursor during the check
+    Execute Command    systemctl stop wazuh-agent
+    ${before} =    Execute Command    cat /var/ossec/var/ns8-journal.cursor
+    # More lines than a pipe holds, so journalctl blocks when nobody reads them
+    Execute Command    for i in $(seq 1500); do logger -t robot "ns8-journal check line $i"; done
+    ${rc} =    Execute Command    timeout 60 sh -c '/var/ossec/bin/ns8-journal | head -c 1 >/dev/null'
+    ...    return_rc=True  return_stdout=False
+    ${after} =    Execute Command    cat /var/ossec/var/ns8-journal.cursor
+    ${left} =    Execute Command    pgrep -f [/]var/ossec/bin/ns8-journal    return_rc=True  return_stdout=False
+    Execute Command    pkill -f /var/ossec/bin/ns8-journal; systemctl start wazuh-agent
+    Should Not Be Equal As Integers    ${rc}  124
+    Should Not Be Equal As Integers    ${left}  0
+    Should Be Equal    ${before}    ${after}
+    Wait Until Keyword Succeeds    2 min    10 s    Agent status should be    active
+
 Check if the certificates can be issued again
     Run action    renew-certificates
     Use the install node
