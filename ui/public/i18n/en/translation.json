@@ -128,7 +128,8 @@
     "list-agents": "List agents",
     "remove-agent": "Revoke agent",
     "list-customers": "List customers",
-    "set-customer": "Set customer"
+    "set-customer": "Set customer",
+    "set-agent-customer": "Change the customer of an agent"
   },
   "error": {
     "error": "Error",
@@ -211,7 +212,11 @@
     "update_title": "Update the agent",
     "update_description": "{name} runs {from}, the server runs {to}. Run this command as root on {name}: it installs the version of the server and keeps the enrollment, no token is needed.",
     "col_customer": "Customer",
-    "customer_reserved": "This name is reserved, choose another one"
+    "customer_reserved": "This name is reserved, choose another one",
+    "change_customer": "Change customer",
+    "change_customer_title": "Change the customer of {name}",
+    "change_customer_description": "The agent keeps its key, no new enrollment is needed. Its new events take the login zones of the new customer. The events already stored keep the old customer.",
+    "change_customer_task": "Move {name} to {customer}"
   },
   "customers": {
     "title": "Customers",

@@ -124,6 +124,16 @@ def manager_api(method, path, body=None):
         raise RuntimeError("the Wazuh API did not answer with JSON")
 
 
+def ensure_group(group):
+    """Create the Wazuh group of a customer when missing; raise RuntimeError when the manager refuses it."""
+    existing = manager_api("GET", f"groups?groups_list={group}")
+    if existing.get("data", {}).get("affected_items"):
+        return
+    created = manager_api("POST", "groups", {"group_id": group})
+    if created.get("error", 1) != 0:
+        raise RuntimeError(f"group {group} refused: {created.get('detail') or created.get('message')}")
+
+
 def wait_indexer(statuses=("green", "yellow")):
     """Wait up to 10 minutes for the indexer cluster to reach one of the statuses."""
     for _ in range(60):
