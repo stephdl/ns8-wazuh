@@ -620,9 +620,15 @@ export default {
       // Same characters as Wazuh accepts for a group and the install script for a name
       const namePattern = /^[A-Za-z0-9._-]{1,128}$/;
       this.customer = (this.customer || "").trim();
-      if (
-        this.customer &&
-        (!namePattern.test(this.customer) || /^\.\.?$/.test(this.customer))
+      if (!this.customer) {
+        this.error.group = "common.required";
+        if (isValidationOk) {
+          this.focusElement("group");
+        }
+        isValidationOk = false;
+      } else if (
+        !namePattern.test(this.customer) ||
+        /^\.\.?$/.test(this.customer)
       ) {
         this.error.group = "agents.name_invalid";
         if (isValidationOk) {
@@ -659,10 +665,10 @@ export default {
         `${taskAction}-completed-${eventId}`,
         this.getEnrollmentTokenCompleted
       );
-      const data = { max_uses: parseInt(this.maxUses, 10) };
-      if (this.customer) {
-        data.group = this.customer;
-      }
+      const data = {
+        max_uses: parseInt(this.maxUses, 10),
+        group: this.customer,
+      };
       // The token description shows who it was made for in the manager
       const description = [this.customer, this.agentNameToSend]
         .filter((part) => part)

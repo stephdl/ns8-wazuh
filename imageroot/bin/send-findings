@@ -221,6 +221,7 @@ def email(cursor):
     levels = LEVELS[LEVELS.index(min_level):] if min_level in LEVELS else LEVELS[2:]
     sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
 
+    zone_settings = wazuh_zones.load()["customers"]
     ts, ids = cursor.load()
     counts = Counter()
     total = 0
@@ -230,7 +231,10 @@ def email(cursor):
             wazuh_agent = source.get("agent", {})
             # The customer is the group the agent enrolled in, "default" means none
             customer = ", ".join(g for g in wazuh_agent.get("groups") or [] if g != "default")
-            counts[(customer, wazuh_agent.get("name", "?"), source.get("rule", {}).get("title", "?"))] += 1
+            title = source.get("rule", {}).get("title", "?")
+            if title == ZONE_TITLE:
+                title = f"{title} - {zone_detail(hit['_source'])}"
+            counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
         total += len(hits)
     if total:
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
@@ -238,7 +242,11 @@ def email(cursor):
         customers = sorted({c for c, _, _ in counts})
         for customer in customers:
             if customer:
-                lines += [f"Customer {customer}", ""]
+                lines.append(f"Customer {customer}")
+                zones = zone_settings.get(customer, {}).get("zones")
+                if zones and any(c == customer and r.startswith(ZONE_TITLE) for c, _, r in counts):
+                    lines.append(f"  Allowed login zones: {', '.join(zones)}")
+                lines.append("")
             elif len(customers) > 1:
                 lines += ["No customer", ""]
             for agent_name in sorted({a for c, a, _ in counts if c == customer}):
@@ -276,13 +284,10 @@ def zone_alerts(cursor):
             country = source.get("source", {}).get("geo", {}).get("country_iso_code", "?")
             if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{country}"):
                 continue
-            geo = source.get("source", {}).get("geo", {})
-            place = ", ".join(p for p in (geo.get("city_name"), geo.get("country_name", country)) if p)
-            alerts.setdefault(customer, []).append(
-                f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {user} on {source.get('service', {}).get('type', '?')}"
-                f" from {source.get('source', {}).get('ip', '?')} ({place})")
+            alerts.setdefault(customer, []).append(f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {zone_detail(source)}")
     for customer, lines in sorted(alerts.items()):
-        text = "\n".join([f"Logins of {customer} from outside its allowed zones:", ""] + lines +
+        zones = ", ".join(customers[customer].get("zones", []))
+        text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] + lines +
                          ["", "Each user and country is reported once a day.", f"Open the dashboard: https://{host}/"])
         send_mail(smtp, sender, customers[customer]["recipients"],
                   f"Wazuh: login from outside the allowed zones ({customer})", text)
@@ -291,6 +296,14 @@ def zone_alerts(cursor):
     seen.save()
     cursor.save(ts, ids)
     return 0
+
+
+def zone_detail(source):
+    """root on ssh from 86.201.48.4 (Paris, France)"""
+    geo = source.get("source", {}).get("geo", {})
+    place = ", ".join(p for p in (geo.get("city_name"), geo.get("country_name") or geo.get("country_iso_code")) if p)
+    return (f"{source.get('user', {}).get('name', '?')} on {source.get('service', {}).get('type', '?')}"
+            f" from {source.get('source', {}).get('ip', '?')} ({place or '?'})")
 
 
 class SeenLogins:

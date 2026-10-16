@@ -154,7 +154,7 @@
     "customer": "Customer",
     "choose_customer": "Choose or type a customer",
     "new_customer": "new customer",
-    "customer_helper": "Optional. Pick a customer or type a new one. It groups its servers in the list and the dashboards.",
+    "customer_helper": "Pick a customer or type a new one. It groups its servers in the list and the dashboards, and holds their login zones.",
     "agent_name": "Agent name",
     "agent_name_placeholder": "mail.example.com",
     "agent_name_helper": "Optional. The host name of the server when empty.",
