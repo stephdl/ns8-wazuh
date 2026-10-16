@@ -198,6 +198,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 
 CURSOR = "/var/ossec/var/ns8-journal.cursor"
 FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
@@ -212,13 +213,16 @@ BATCH = 5000
 DEADLINE = 60
 # Readable names of the Nextcloud LDAP users, which Nextcloud logs by their UUID only
 USERS = "/var/ossec/var/ns8-journal.users.json"
-# occ takes about 2 seconds: a burst of new users must not reach DEADLINE
-LOOKUPS = 3
+# occ takes about 2 seconds. Seconds of lookups per run: a burst of new users must not reach DEADLINE
+LOOKUP_BUDGET = 15
+LOOKUP_TIMEOUT = 5
+# A user that occ cannot name is asked again after this many seconds, not at each login
+RETRY_UNKNOWN = 3600
 
 _owners = {}
 _journal = None
 _users = None
-_lookups = 0
+_lookup_time = 0.0
 
 
 def text(value):
@@ -288,26 +292,46 @@ def load_users():
     return _users
 
 
+def occ_user_info(module, uid):
+    """Return the user:info of a Nextcloud user, or an empty dict."""
+    # A session of its own: on timeout the whole group dies, podman exec included. Killed alone,
+    # runagent would leave it holding the pipe and the read would wait past DEADLINE
+    proc = subprocess.Popen(["runagent", "-m", module, "occ", "user:info", uid, "--output=json"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    try:
+        out = proc.communicate(timeout=LOOKUP_TIMEOUT)[0]
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        return {}
+    try:
+        # The log lines of Nextcloud come first when its log level is debug
+        return json.loads(next(line for line in out.splitlines() if line.startswith("{")))
+    except (StopIteration, ValueError):
+        return {}
+
+
 def nextcloud_user(module, uid):
     """Return the email or display name of a Nextcloud user, or an empty string."""
-    global _lookups
+    global _lookup_time
     users = load_users().setdefault(module, {})
-    if uid in users or _lookups >= LOOKUPS:
-        return users.get(uid, "")
-    _lookups += 1
-    try:
-        proc = subprocess.run(["runagent", "-m", module, "occ", "user:info", uid, "--output=json"],
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=15)
-        # The log lines of Nextcloud come first when its log level is debug
-        info = json.loads(next(line for line in proc.stdout.splitlines() if line.startswith("{")))
-    except (OSError, subprocess.SubprocessError, StopIteration, ValueError):
+    known = users.get(uid)
+    # A name, or [time] for a user occ could not name
+    if isinstance(known, str):
+        return known
+    if (known and time.time() - known[0] < RETRY_UNKNOWN) or _lookup_time >= LOOKUP_BUDGET:
         return ""
+    start = time.time()
+    try:
+        info = occ_user_info(module, uid)
+    except OSError:
+        info = {}
+    _lookup_time += time.time() - start
     name = info.get("email") or info.get("display_name") or ""
-    if name:
-        users[uid] = name
-        with open(USERS + ".tmp", "w") as f:
-            json.dump(_users, f)
-        os.replace(USERS + ".tmp", USERS)
+    users[uid] = name or [time.time()]
+    with open(USERS + ".tmp", "w") as f:
+        json.dump(_users, f)
+    os.replace(USERS + ".tmp", USERS)
     return name
 
 
