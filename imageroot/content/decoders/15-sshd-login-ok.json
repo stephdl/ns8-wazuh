@@ -1,0 +1,60 @@
+{
+  "resource": {
+    "name": "decoder/ns8-sshd-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "SSH successful login",
+      "description": "Password and key logins accepted by sshd",
+      "author": "NethServer",
+      "module": "sshd",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"]: Accepted \")"
+      },
+      {
+        "_line": "contains(\" from \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>Accepted <~> for <user.name> from <source.ip> port <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "ssh"
+          }
+        ]
+      }
+    ]
+  }
+}

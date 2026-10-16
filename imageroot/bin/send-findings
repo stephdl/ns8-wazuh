@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-# Send the new findings to the export endpoint (--export) or by email (--email).
+# Send the new findings to the export endpoint (--export) or by email (--email). With --email,
+# each customer also gets its logins from outside its allowed zones, at its own addresses.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
@@ -27,6 +28,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_zones
 from wazuh_api import api
 from wazuh_noise import NOISE
 
@@ -36,6 +38,10 @@ EXPORT_BATCH = 100
 # A finding becomes searchable a little after its @timestamp: leave the last minute for the next run
 SETTLE = timedelta(minutes=1)
 LEVELS = ["informational", "low", "medium", "high", "critical"]
+ZONE_TITLE = "NS8 login from outside the allowed zones"
+ZONE_SEEN_FILE = "login-zone-alerts.json"
+# A traveling user logs in again every few minutes: one email a day per user and country
+ZONE_REPEAT = timedelta(days=1)
 
 
 def log(message):
@@ -248,6 +254,71 @@ def email(cursor):
     return 0
 
 
+def zone_alerts(cursor):
+    """Mail each customer its logins from outside its allowed zones, once a day per user and country."""
+    customers = wazuh_zones.load()["customers"]
+    host = os.environ.get("TRAEFIK_HOST", "")
+    smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
+    if not (host and smtp["enabled"] and smtp["host"] and any(c.get("recipients") for c in customers.values())):
+        cursor.forget()
+        return 0
+    sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
+    seen = SeenLogins(ZONE_SEEN_FILE)
+
+    ts, ids = cursor.load()
+    alerts = {}
+    for hits, ts, ids in pages(ts, ids, [{"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], []):
+        for hit in hits:
+            source = hit["_source"]
+            groups = source.get("wazuh", {}).get("agent", {}).get("groups") or []
+            customer = groups[0] if groups else ""
+            user = source.get("user", {}).get("name", "?")
+            country = source.get("source", {}).get("geo", {}).get("country_iso_code", "?")
+            if not customers.get(customer, {}).get("recipients") or not seen.first(f"{customer}:{user}:{country}"):
+                continue
+            geo = source.get("source", {}).get("geo", {})
+            place = ", ".join(p for p in (geo.get("city_name"), geo.get("country_name", country)) if p)
+            alerts.setdefault(customer, []).append(
+                f"{source['@timestamp'][:16].replace('T', ' ')} UTC  {user} on {source.get('service', {}).get('type', '?')}"
+                f" from {source.get('source', {}).get('ip', '?')} ({place})")
+    for customer, lines in sorted(alerts.items()):
+        text = "\n".join([f"Logins of {customer} from outside its allowed zones:", ""] + lines +
+                         ["", "Each user and country is reported once a day.", f"Open the dashboard: https://{host}/"])
+        send_mail(smtp, sender, customers[customer]["recipients"],
+                  f"Wazuh: login from outside the allowed zones ({customer})", text)
+        log(f"zone alert sent to {customer}, {len(lines)} logins")
+    # Saved after the emails only, like the findings
+    seen.save()
+    cursor.save(ts, ids)
+    return 0
+
+
+class SeenLogins:
+    """Users already reported per customer and country, forgotten after a day."""
+
+    def __init__(self, path):
+        self.path = path
+        now = datetime.now(timezone.utc).timestamp()
+        try:
+            with open(path) as f:
+                self.seen = {k: t for k, t in json.load(f).items() if now - t < ZONE_REPEAT.total_seconds()}
+        except (FileNotFoundError, ValueError):
+            self.seen = {}
+        self.now = now
+
+    def first(self, key):
+        if key in self.seen:
+            return False
+        self.seen[key] = self.now
+        return True
+
+    def save(self):
+        tmp = self.path + ".new"
+        with open(tmp, "w") as f:
+            json.dump(self.seen, f)
+        os.replace(tmp, self.path)
+
+
 def main():
     output = (sys.argv[1:] or [""])[0].lstrip("-")
     if output not in ("export", "email"):
@@ -260,7 +331,10 @@ def main():
             log("previous run still going")
             return 0
         cursor = Cursor(f"send-findings-{output}.cursor")
-        return export(cursor) if output == "export" else email(cursor)
+        if output == "export":
+            return export(cursor)
+        email(cursor)
+        return zone_alerts(Cursor("send-findings-zones.cursor"))
 
 
 sys.exit(main())

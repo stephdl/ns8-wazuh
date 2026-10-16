@@ -1,0 +1,81 @@
+{
+  "resource": {
+    "name": "decoder/ns8-login-zone/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-dovecot-login-ok/0",
+      "decoder/ns8-sshd-login-ok/0",
+      "decoder/ns8-api-server-login-ok/0",
+      "decoder/ns8-postfix-sasl-ok/0",
+      "decoder/ns8-proxmox-login-ok/0"
+    ],
+    "metadata": {
+      "title": "NS8 login zone",
+      "description": "Marks a successful login from outside the zones allowed for the customer",
+      "author": "NethServer",
+      "module": "ns8",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "source.ip": "is_public_ip()"
+      }
+    ],
+    "normalize": [
+      {
+        "map": [
+          {
+            "_zone.geo": "geoip($source.ip)"
+          },
+          {
+            "_zone.customer": "join($wazuh.agent.groups, ',')"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "_zone.list": "concat($_zone.customer, ':list')"
+          },
+          {
+            "_zone.country": "concat($_zone.customer, ':', $_zone.geo.country_iso_code)"
+          },
+          {
+            "_zone.continent": "concat($_zone.customer, ':@', $_zone.geo.continent_code)"
+          }
+        ]
+      },
+      {
+        "check": [
+          {
+            "_zone.list": "kvdb_match(ns8-login-zones)"
+          },
+          {
+            "_zone.country": "kvdb_not_match(ns8-login-zones)"
+          },
+          {
+            "_zone.continent": "kvdb_not_match(ns8-login-zones)"
+          }
+        ],
+        "map": [
+          {
+            "event.reason": "concat('Login from outside the allowed zones: ', $_zone.geo.country_iso_code)"
+          }
+        ]
+      },
+      {
+        "map": [
+          {
+            "_zone": "delete()"
+          }
+        ]
+      }
+    ]
+  }
+}

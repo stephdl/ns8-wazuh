@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+
+import agent
+import wazuh_zones
+from wazuh_api import manager_api
+
+# A customer is a Wazuh agent group: "default" holds the agents enrolled without one
+response = manager_api("GET", "groups?limit=500")
+if response.get("error", 1) != 0:
+    print(agent.SD_ERR + f"cannot list the customers: {response.get('detail')}", file=sys.stderr)
+    sys.exit(2)
+settings = wazuh_zones.load()["customers"]
+customers = []
+for group in response["data"]["affected_items"]:
+    if group["name"] == "default":
+        continue
+    customer = settings.get(group["name"], {})
+    customers.append({
+        "name": group["name"],
+        "agents": group.get("count", 0),
+        "zones": customer.get("zones", []),
+        "recipients": customer.get("recipients", []),
+    })
+json.dump({"customers": sorted(customers, key=lambda c: c["name"])}, fp=sys.stdout)

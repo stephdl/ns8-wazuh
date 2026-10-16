@@ -7,6 +7,7 @@ import VueRouter from "vue-router";
 import Status from "../views/Status.vue";
 import Settings from "../views/Settings.vue";
 import Agents from "../views/Agents.vue";
+import Customers from "../views/Customers.vue";
 
 Vue.use(VueRouter);
 
@@ -26,6 +27,11 @@ const routes = [
     path: "/agents",
     name: "Agents",
     component: Agents,
+  },
+  {
+    path: "/customers",
+    name: "Customers",
+    component: Customers,
   },
   {
     path: "/about",

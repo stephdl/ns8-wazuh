@@ -1,0 +1,35 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Customers",
+    "$id": "http://nethserver.org/json-schema/task/output/wazuh/list-customers",
+    "description": "The customers, that is the Wazuh agent groups, with their login zones and alert recipients",
+    "examples": [
+        {
+            "customers": [
+                {
+                    "name": "acme",
+                    "agents": 3,
+                    "zones": ["@EU", "CA"],
+                    "recipients": ["soc@acme.example"]
+                }
+            ]
+        }
+    ],
+    "type": "object",
+    "required": ["customers"],
+    "properties": {
+        "customers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "agents", "zones", "recipients"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "agents": {"type": "integer", "description": "Agents enrolled in this customer"},
+                    "zones": {"type": "array", "items": {"type": "string"}},
+                    "recipients": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        }
+    }
+}
