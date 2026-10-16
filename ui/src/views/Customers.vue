@@ -500,8 +500,13 @@ export default {
     removeCustomerValidationFailed(validationErrors) {
       this.loading.removeCustomer = false;
       this.customerToRemove = null;
+      // A schema error has no message of its own
       this.error.removeCustomer = validationErrors
-        .map((e) => this.$t("customers." + e.error))
+        .map((e) =>
+          this.$te("customers." + e.error)
+            ? this.$t("customers." + e.error)
+            : this.$t("error.generic_error")
+        )
         .join(" ");
       this.listCustomers();
     },

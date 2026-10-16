@@ -11,7 +11,7 @@ import sys
 
 import agent
 import wazuh_zones
-from wazuh_api import manager_api
+from wazuh_api import find_group, manager_api
 
 
 def refuse(error):
@@ -20,28 +20,36 @@ def refuse(error):
     sys.exit(3)
 
 
+def fail(message):
+    print(agent.SD_ERR + message, file=sys.stderr)
+    sys.exit(2)
+
+
 data = json.load(sys.stdin)
 name = data["name"]
 
-response = manager_api("GET", f"groups?groups_list={name}")
-groups = response.get("data", {}).get("affected_items", [])
-if not groups:
-    refuse("customer_not_found")
-# Its agents would fall back to the group default and lose their login zones without a word
-if groups[0].get("count", 0) > 0:
-    refuse("customer_has_agents")
+try:
+    group = find_group(name)
+except RuntimeError as error:
+    fail(str(error))
 
-response = manager_api("DELETE", f"groups?groups_list={name}")
-if response.get("error", 1) != 0 or response.get("data", {}).get("failed_items"):
-    reason = response.get("detail") or response.get("message") or json.dumps(response.get("data", {}).get("failed_items"))
-    print(agent.SD_ERR + f"cannot remove the customer {name}: {reason}", file=sys.stderr)
-    sys.exit(2)
+if group is not None:
+    # Its agents would fall back to the group default and lose their login zones without a word
+    if group.get("count", 0) > 0:
+        refuse("customer_has_agents")
+    response = manager_api("DELETE", f"groups?groups_list={name}")
+    if response.get("error", 1) != 0 or response.get("data", {}).get("failed_items"):
+        fail(f"cannot remove the customer {name}: "
+             f"{response.get('detail') or response.get('message') or response.get('data', {}).get('failed_items')}")
 
+# Also when the group is already gone: a removal cut after the delete is finished by running it again
 with open(wazuh_zones.CUSTOMERS_FILE + ".lock", "w") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
     settings = wazuh_zones.load()
-    if settings["customers"].pop(name, None) is not None:
-        wazuh_zones.save(settings)
-        agent.run_helper("runagent", "provision-zones").check_returncode()
+    if settings["customers"].pop(name, None) is None and group is None:
+        refuse("customer_not_found")
+    wazuh_zones.save(settings)
+    if agent.run_helper("runagent", "provision-zones").returncode != 0:
+        fail(f"the customer {name} is removed but the engine still has its zones until the next configuration")
 
 print(f"customer {name} removed", file=sys.stderr)

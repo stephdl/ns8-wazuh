@@ -29,6 +29,10 @@ for group in response["data"]["affected_items"]:
         "zones": customer.get("zones", []),
         "recipients": customer.get("recipients", []),
     })
+# Settings left by a removal cut short: shown without agents, so that the page can remove them again
+groups = {c["name"] for c in customers}
+customers += [{"name": name, "agents": 0, "zones": c.get("zones", []), "recipients": c.get("recipients", [])}
+              for name, c in settings.items() if name not in groups]
 # The zones the backend knows: the page offers these only, with the country names of the browser
 json.dump({"customers": sorted(customers, key=lambda c: c["name"]),
            "countries": sorted(wazuh_zones.COUNTRIES),

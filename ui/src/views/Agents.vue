@@ -640,7 +640,10 @@ export default {
       this.agentToMove = agent;
     },
     hideMoveModal() {
-      this.agentToMove = null;
+      // The answer of the task lands in this modal: closed early, its error would never show
+      if (!this.loading.setAgentCustomer) {
+        this.agentToMove = null;
+      }
     },
     async setAgentCustomer() {
       this.newCustomer = (this.newCustomer || "").trim();
@@ -692,7 +695,7 @@ export default {
     },
     setAgentCustomerCompleted() {
       this.loading.setAgentCustomer = false;
-      this.hideMoveModal();
+      this.agentToMove = null;
       this.listAgents();
     },
     showUpdateModal(agent) {
@@ -762,23 +765,8 @@ export default {
       // Same characters as Wazuh accepts for a group and the install script for a name
       const namePattern = /^[A-Za-z0-9._-]{1,128}$/;
       this.customer = (this.customer || "").trim();
-      if (!this.customer) {
-        this.error.group = "common.required";
-        if (isValidationOk) {
-          this.focusElement("group");
-        }
-        isValidationOk = false;
-      } else if (this.customer === "default") {
-        this.error.group = "agents.customer_reserved";
-        if (isValidationOk) {
-          this.focusElement("group");
-        }
-        isValidationOk = false;
-      } else if (
-        !namePattern.test(this.customer) ||
-        /^\.\.?$/.test(this.customer)
-      ) {
-        this.error.group = "agents.name_invalid";
+      this.error.group = this.customerError(this.customer);
+      if (this.error.group) {
         if (isValidationOk) {
           this.focusElement("group");
         }
