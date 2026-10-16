@@ -230,6 +230,8 @@ AUTH = ("event.category:authentication"
         " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
+# Only the login zone decoder writes a reason that starts so
+OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
     "Successful and failed logins on every service and server", [
     (vis("ns8-logins-outcome", "Logins by outcome", EVENTS, AUTH,
@@ -254,6 +256,13 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                terms("3", "source.ip", "bucket", size=5, label="Source IP", missing=True),
                terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "service.type", "bucket", size=3, label="Service", missing=True,
+                     missing_label="ssh / host"))), 48, 14),
+    # Every application a user reached from outside the zones: the emails report each one once a day
+    (vis("ns8-logins-outside-zones", "Logins from outside the allowed zones", EVENTS, OUTSIDE,
+         table(terms("2", "user.name", "bucket", size=50, label="User"),
+               terms("3", "source.ip", "bucket", size=5, label="Source IP", missing=True),
+               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
+               terms("5", "service.type", "bucket", size=10, label="Service", missing=True,
                      missing_label="ssh / host"))), 48, 14),
     (search("ns8-logins-failures", "NS8 - Failed logins", EVENTS, FAIL,
             ["wazuh.agent.name", "process.name", "user.name", "source.ip", "source.geo.country_name"]), 48, 14),
