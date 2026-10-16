@@ -1,0 +1,58 @@
+{
+  "resource": {
+    "name": "decoder/ns8-sogo-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "SOGo successful login",
+      "description": "Logins accepted on the SOGo web interface",
+      "author": "NethServer",
+      "module": "sogo",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"SOGoRootPage successful login from '\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>SOGoRootPage successful login from '<source.ip>, <~>' for user '<user.name>'<~>",
+          "<~>SOGoRootPage successful login from '<source.ip>' for user '<user.name>'<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "sogo"
+          }
+        ]
+      }
+    ]
+  }
+}

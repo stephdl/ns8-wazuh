@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-roundcube-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Roundcube successful login",
+      "description": "Logins accepted on the Roundcube webmail, written when log_logins is on",
+      "author": "NethServer",
+      "module": "roundcubemail",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"userlogins: \")"
+      },
+      {
+        "_line": "contains(\"Successful login for \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>Successful login for <user.name> \\(ID: <~>\\) from <~> \\(X-Real-IP: <source.ip>,<~>",
+          "<~>Successful login for <user.name> \\(ID: <~>\\) from <source.ip> in session <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "roundcube"
+          }
+        ]
+      }
+    ]
+  }
+}

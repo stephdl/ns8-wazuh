@@ -7,7 +7,11 @@
       "decoder/ns8-sshd-login-ok/0",
       "decoder/ns8-api-server-login-ok/0",
       "decoder/ns8-postfix-sasl-ok/0",
-      "decoder/ns8-proxmox-login-ok/0"
+      "decoder/ns8-proxmox-login-ok/0",
+      "decoder/ns8-sogo-login-ok/0",
+      "decoder/ns8-roundcube-login-ok/0",
+      "decoder/ns8-nextcloud-login-ok/0",
+      "decoder/ns8-webtop-login-ok/0"
     ],
     "metadata": {
       "title": "NS8 login zone",

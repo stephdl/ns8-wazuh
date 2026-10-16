@@ -1,0 +1,68 @@
+{
+  "resource": {
+    "name": "decoder/ns8-nextcloud-login-ok/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Nextcloud successful login",
+      "description": "Logins of LDAP users on Nextcloud, written when its log level is info or lower",
+      "author": "NethServer",
+      "module": "nextcloud",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"LoginListener - \")"
+      },
+      {
+        "_line": "contains(\" postLogin\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>\"remoteAddr\":\"<source.ip>\",\"user\":\"<user.name>\",<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "start"
+            ]
+          },
+          {
+            "event.action": "logged-in"
+          },
+          {
+            "event.outcome": "success"
+          },
+          {
+            "service.type": "nextcloud"
+          }
+        ]
+      },
+      {
+        "check": "exists($_nj.user)",
+        "map": [
+          {
+            "user.name": "$_nj.user"
+          }
+        ]
+      }
+    ]
+  }
+}
