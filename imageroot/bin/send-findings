@@ -40,6 +40,8 @@ SETTLE = timedelta(minutes=1)
 LEVELS = ["informational", "low", "medium", "high", "critical"]
 ZONE_TITLE = "NS8 login from outside the allowed zones"
 ZONE_SEEN_FILE = "login-zone-alerts.json"
+# Apart from the customer one: each email reports a user and country once a day on its own
+ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
 # A traveling user logs in again every few minutes: one email a day per user and country
 ZONE_REPEAT = timedelta(days=1)
 
@@ -222,6 +224,7 @@ def email(cursor):
     sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
 
     zone_settings = wazuh_zones.load()["customers"]
+    seen = SeenLogins(ZONE_ADMIN_SEEN_FILE)
     ts, ids = cursor.load()
     counts = Counter()
     total = 0
@@ -233,9 +236,13 @@ def email(cursor):
             customer = ", ".join(g for g in wazuh_agent.get("groups") or [] if g != "default")
             title = source.get("rule", {}).get("title", "?")
             if title == ZONE_TITLE:
+                country = hit["_source"].get("source", {}).get("geo", {}).get("country_iso_code", "?")
+                user = hit["_source"].get("user", {}).get("name", "?")
+                if not seen.first(f"{customer}:{user}:{country}"):
+                    continue
                 title = f"{title} - {zone_detail(hit['_source'])}"
             counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
-        total += len(hits)
+            total += 1
     if total:
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
         lines = [f"{total} new findings.", ""]
@@ -258,6 +265,7 @@ def email(cursor):
         send_mail(smtp, sender, recipients, f"Wazuh: {total} new findings on {host}", "\n".join(lines))
         log(f"email sent, {total} findings")
     # Saved after the email only: a failed delivery is sent again at the next run
+    seen.save()
     cursor.save(ts, ids)
     return 0
 
