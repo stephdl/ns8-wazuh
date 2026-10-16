@@ -129,7 +129,8 @@
     "remove-agent": "Revoke agent",
     "list-customers": "List customers",
     "set-customer": "Set customer",
-    "set-agent-customer": "Change the customer of an agent"
+    "set-agent-customer": "Change the customer of an agent",
+    "remove-customer": "Remove a customer"
   },
   "error": {
     "error": "Error",
@@ -244,6 +245,13 @@
     "save": "Save",
     "save_task": "Save customer {name}",
     "recipients_format": "Each line must be a valid email address",
-    "zones_pattern": "Choose countries or continents from the list"
+    "zones_pattern": "Choose countries or continents from the list",
+    "remove": "Remove",
+    "remove_title": "Remove customer",
+    "remove_warning": "Its login zones and alert recipients are lost.",
+    "remove_description": "Only a customer without agents can be removed. The events already stored keep its name.",
+    "remove_type_to_confirm": "Type '{name}' to confirm",
+    "remove_task": "Remove customer {name}",
+    "customer_has_agents": "This customer still has agents: move them to another customer first."
   }
 }

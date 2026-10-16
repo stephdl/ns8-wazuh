@@ -1,0 +1,24 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Remove a customer",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/remove-customer",
+    "description": "Remove a customer without agents: its Wazuh group, its login zones and its alert recipients. The events already stored keep its name",
+    "examples": [
+        {
+            "name": "acme"
+        }
+    ],
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "title": "Customer",
+            "description": "Wazuh agent group of the customer",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "not": {
+                "enum": [".", "..", "default"]
+            }
+        }
+    }
+}
