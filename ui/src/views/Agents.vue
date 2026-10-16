@@ -336,7 +336,9 @@
       <template slot="content">
         <p class="mg-bottom">{{ $t("agents.change_customer_description") }}</p>
         <cv-form @submit.prevent="setAgentCustomer">
+          <!-- Rebuilt at each opening: the combo box keeps the text typed before instead of the new value -->
           <NsComboBox
+            :key="moveModalCount"
             v-model="newCustomer"
             :options="customerOptions"
             acceptUserInput
@@ -439,6 +441,7 @@ export default {
       agentToUpdate: null,
       agentToMove: null,
       newCustomer: "",
+      moveModalCount: 0,
       managerVersion: "",
       packageVersion: "",
       loading: {
@@ -627,6 +630,7 @@ export default {
       this.error.customer = "";
       this.error.setAgentCustomer = "";
       this.newCustomer = agent.customer;
+      this.moveModalCount++;
       this.agentToMove = agent;
     },
     hideMoveModal() {
