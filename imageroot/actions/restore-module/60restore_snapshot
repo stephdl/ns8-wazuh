@@ -11,6 +11,7 @@ exec 1>&2
 # The services run since 50traefik called configure-module: load the snapshot, then reload the dashboard.
 # The snapshot brings back the dashboards of the backup: load the ones of this version again.
 runagent restore-snapshot
+runagent provision-detector --recreate
 # The restored indices are older than the policies, which only catch the new ones
 runagent provision-retention || echo "Warning: the log retention is not applied, the hourly timer tries again"
 systemctl --user try-restart wazuh-dashboard.service
