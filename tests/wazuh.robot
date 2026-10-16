@@ -176,7 +176,7 @@ Check if an agent on the same node can enroll
     # The token goes through a root only file, never on the command line
     Execute Command    umask 077; printf '%s' '${token}[token]' > /root/robot.token
     ${output}  ${stderr}  ${rc} =    Execute Command
-    ...    bash /root/install-agent.sh --token-file /root/robot.token --name ${AGENT_NAME}
+    ...    bash /root/install-agent.sh --token-file /root/robot.token --name ${AGENT_NAME} --group robot
     ...    return_rc=True  return_stderr=True
     Execute Command    rm -f /root/robot.token
     Should Be Equal As Integers    ${rc}  0    ${stderr}
@@ -210,7 +210,7 @@ Check if the certificates can be issued again
 
 Check if a token needs a customer
     ${output} =    Run action that fails    get-enrollment-token    {"max_uses":1}
-    Should Contain    ${output}    group
+    Should Contain    ${output}    required
     ${output} =    Run action that fails    get-enrollment-token    {"max_uses":1,"group":"default"}
     Should Contain    ${output}    group
 
