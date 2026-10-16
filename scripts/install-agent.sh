@@ -194,6 +194,7 @@ setup_ns8_journal() {
 import json
 import os
 import pwd
+import re
 import signal
 import subprocess
 import sys
@@ -209,9 +210,15 @@ BATCH = 5000
 # Seconds per run. The agent never starts this command again while it runs, so a run stuck on a
 # full pipe or a stalled journalctl would silence the node
 DEADLINE = 60
+# Readable names of the Nextcloud LDAP users, which Nextcloud logs by their UUID only
+USERS = "/var/ossec/var/ns8-journal.users.json"
+# occ takes about 2 seconds: a burst of new users must not reach DEADLINE
+LOOKUPS = 3
 
 _owners = {}
 _journal = None
+_users = None
+_lookups = 0
 
 
 def text(value):
@@ -270,13 +277,47 @@ def save_cursor(cursor):
     os.replace(CURSOR + ".tmp", CURSOR)
 
 
+def load_users():
+    global _users
+    if _users is None:
+        try:
+            with open(USERS) as f:
+                _users = json.load(f)
+        except (OSError, ValueError):
+            _users = {}
+    return _users
+
+
+def nextcloud_user(module, uid):
+    """Return the email or display name of a Nextcloud user, or an empty string."""
+    global _lookups
+    users = load_users().setdefault(module, {})
+    if uid in users or _lookups >= LOOKUPS:
+        return users.get(uid, "")
+    _lookups += 1
+    try:
+        proc = subprocess.run(["runagent", "-m", module, "occ", "user:info", uid, "--output=json"],
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=15)
+        # The log lines of Nextcloud come first when its log level is debug
+        info = json.loads(next(line for line in proc.stdout.splitlines() if line.startswith("{")))
+    except (OSError, subprocess.SubprocessError, StopIteration, ValueError):
+        return ""
+    name = info.get("email") or info.get("display_name") or ""
+    if name:
+        users[uid] = name
+        with open(USERS + ".tmp", "w") as f:
+            json.dump(_users, f)
+        os.replace(USERS + ".tmp", USERS)
+    return name
+
+
 def event(entry):
     owner = entry.get("_SYSTEMD_OWNER_UID", "0")
     unit = entry.get("_SYSTEMD_USER_UNIT") if owner != "0" else entry.get("_SYSTEMD_UNIT")
     module = rootless_module(owner) if owner != "0" else ""
     if not module:
         module = rootful_module(entry.get("_SYSTEMD_UNIT", ""))
-    return {
+    data = {
         "ns8_journal": 1,
         "program": text(entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM")),
         "pid": text(entry.get("_PID")),
@@ -284,6 +325,12 @@ def event(entry):
         "unit": text(unit),
         "message": text(entry.get("MESSAGE")).rstrip("\n"),
     }
+    if module.startswith("nextcloud") and " postLogin" in data["message"]:
+        found = re.search(r"LoginListener - ([0-9A-Fa-f-]+) postLogin", data["message"])
+        name = nextcloud_user(module, found.group(1)) if found else ""
+        if name:
+            data["user"] = name
+    return data
 
 
 def encode(event):
