@@ -334,9 +334,15 @@
         })
       }}</template>
       <template slot="content">
-        <p class="mg-bottom">{{ $t("agents.change_customer_description") }}</p>
+        <p class="mg-bottom">
+          {{
+            $t("agents.change_customer_description", {
+              customer: agentToMove ? agentToMove.customer || "-" : "",
+            })
+          }}
+        </p>
         <cv-form @submit.prevent="setAgentCustomer">
-          <!-- Rebuilt at each opening: the combo box keeps the text typed before instead of the new value -->
+          <!-- Empty and rebuilt at each opening: with a value, the box highlights the first customer whose name it contains -->
           <NsComboBox
             :key="moveModalCount"
             v-model="newCustomer"
@@ -629,7 +635,7 @@ export default {
     showMoveModal(agent) {
       this.error.customer = "";
       this.error.setAgentCustomer = "";
-      this.newCustomer = agent.customer;
+      this.newCustomer = "";
       this.moveModalCount++;
       this.agentToMove = agent;
     },

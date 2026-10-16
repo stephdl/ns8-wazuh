@@ -215,7 +215,7 @@
     "customer_reserved": "This name is reserved, choose another one",
     "change_customer": "Change customer",
     "change_customer_title": "Change the customer of {name}",
-    "change_customer_description": "The agent keeps its key, no new enrollment is needed. Its new events take the login zones of the new customer. The events already stored keep the old customer.",
+    "change_customer_description": "Its customer is now {customer}. The agent keeps its key, no new enrollment is needed. Its new events take the login zones of the new customer. The events already stored keep the old customer.",
     "change_customer_task": "Move {name} to {customer}"
   },
   "customers": {
