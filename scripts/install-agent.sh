@@ -194,9 +194,9 @@ setup_ns8_journal() {
 import json
 import os
 import pwd
+import signal
 import subprocess
 import sys
-import tempfile
 
 CURSOR = "/var/ossec/var/ns8-journal.cursor"
 FIELDS = "SYSLOG_IDENTIFIER,_COMM,_PID,MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_USER_UNIT,_SYSTEMD_OWNER_UID"
@@ -206,8 +206,12 @@ ROOTFUL_DIR = "/var/lib/nethserver"
 MAX_LINE = 16384
 # Lines per run. A run that never ends saves no cursor, and the next one sends the same lines again
 BATCH = 5000
+# Seconds per run. The agent never starts this command again while it runs, so a run stuck on a
+# full pipe or a stalled journalctl would silence the node
+DEADLINE = 60
 
 _owners = {}
+_journal = None
 
 
 def text(value):
@@ -295,7 +299,17 @@ def encode(event):
         event["message"] = message[:min(len(message) - 1, len(message) * (size - excess) // size)]
 
 
+def give_up(signum, frame):
+    if _journal:
+        _journal.kill()
+    # No flush and no cursor: the next run sends the same lines again
+    os._exit(1)
+
+
 def main():
+    global _journal
+    signal.signal(signal.SIGALRM, give_up)
+    signal.alarm(DEADLINE)
     cursor = read_cursor()
     if not cursor:
         # The first run starts from now: the history is already on the server, or not wanted
@@ -304,17 +318,19 @@ def main():
         if last.strip():
             save_cursor(json.loads(last)["__CURSOR"])
         return
-    # Without --all journalctl gives null for any field over 4096 bytes. Its errors go to a file:
-    # a pipe nobody reads fills up and blocks it
-    errors = tempfile.TemporaryFile(mode="w+")
-    proc = subprocess.Popen(["journalctl", "--no-pager", "-o", "json", "--all", f"--output-fields={FIELDS}",
-                             f"--after-cursor={cursor}"], stdout=subprocess.PIPE, stderr=errors, text=True)
+    # Without --all journalctl gives null for any field over 4096 bytes. LC_ALL=C keeps its errors in
+    # English, the broken cursor check below looks for a word in them
+    _journal = proc = subprocess.Popen(
+        ["journalctl", "--no-pager", "-o", "json", "--all", f"--output-fields={FIELDS}", f"--after-cursor={cursor}"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
+        env={**os.environ, "LC_ALL": "C"})
     count = 0
     try:
         for line in proc.stdout:
             try:
                 entry = json.loads(line)
-            except ValueError:
+                position = entry["__CURSOR"]
+            except (ValueError, TypeError, KeyError):
                 continue
             try:
                 data = encode(event(entry))
@@ -323,21 +339,23 @@ def main():
                 print(f"ns8-journal: entry skipped: {error!r}", file=sys.stderr)
             else:
                 sys.stdout.buffer.write(data)
-            cursor = entry["__CURSOR"]
+            cursor = position
             count += 1
             if count >= BATCH:
                 break
-    finally:
-        # Also when the output fails: journalctl would wait forever to write the rest, and the
-        # agent never starts this command again while it runs
-        if proc.poll() is None:
-            proc.kill()
-        proc.wait()
-        # Saved once the lines are out, so a run cut before that sends them again instead of losing them
         sys.stdout.buffer.flush()
-        save_cursor(cursor)
-    errors.seek(0)
-    error = errors.read()
+    except BrokenPipeError:
+        # The agent stopped reading, the next run sends these lines again. Python would fail once more
+        # when it flushes stdout at exit
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(1)
+    finally:
+        # Also when the output fails: journalctl would wait forever to write the rest
+        proc.kill()
+        proc.wait()
+    # Saved once the lines are out, so a run cut before that sends them again instead of losing them
+    save_cursor(cursor)
+    error = proc.stderr.read()
     if count == 0 and proc.returncode != 0 and "cursor" in error:
         # A broken cursor would silence the node for good: the next run starts again from now
         print(f"ns8-journal: cursor dropped: {error.strip()}", file=sys.stderr)
@@ -376,6 +394,8 @@ if [ "${UPDATE}" -eq 1 ]; then
     say "Installed version: ${before:-unknown}, wanted: ${VERSION}"
     install_package
     setup_ns8_journal
+    # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
+    pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
     # The package keeps ossec.conf and the key, a restart loads the new binaries
     if command -v systemctl >/dev/null 2>&1; then
         systemctl restart wazuh-agent
