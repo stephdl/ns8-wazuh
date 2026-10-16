@@ -854,9 +854,13 @@ export default {
 .toolbar {
   margin-bottom: $spacing-05;
 }
-// The modal clips the open customer list, keep room for the label, the box and the list
+// The modal clips the open customer list, keep room for the label, the box and four customers
 .customer-form {
-  min-height: 19rem;
+  min-height: 14rem;
+}
+// Beyond four customers the list scrolls inside itself
+.customer-form ::v-deep .bx--list-box__menu {
+  max-height: 10rem;
 }
 // Carbon resets the list markers, the steps need them back
 ol.steps {
