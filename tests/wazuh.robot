@@ -286,7 +286,10 @@ Check the pages of the module and take screenshots
     Take Screenshot    filename=${SCREENSHOTS}/6._Edit_customer.png
     Click    iframe >>> .bx--modal.is-visible button >> text="Cancel"
     Open the module page    settings    Settings
-    Take Screenshot    filename=${SCREENSHOTS}/7._Settings.png
+    # The longest page: the whole of it, not only the screen
+    Take Screenshot    filename=${SCREENSHOTS}/7._Settings.png    fullPage=True
+    Open the module page    about    About
+    Take Screenshot    filename=${SCREENSHOTS}/8._About.png
     Close Browser
 
 Check if a failed move leaves no customer behind
