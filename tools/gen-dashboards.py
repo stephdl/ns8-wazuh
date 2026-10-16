@@ -259,7 +259,8 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                      missing_label="ssh / host"))), 48, 14),
     # Every application a user reached from outside the zones: the emails report each one once a day
     (vis("ns8-logins-outside-zones", "Logins from outside the allowed zones", EVENTS, OUTSIDE,
-         table(terms("2", "user.name", "bucket", size=50, label="User"),
+         # WebTop logs no user name: without the missing bucket its logins would not show
+         table(terms("2", "user.name", "bucket", size=50, label="User", missing=True),
                terms("3", "source.ip", "bucket", size=5, label="Source IP", missing=True),
                terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "service.type", "bucket", size=10, label="Service", missing=True,
