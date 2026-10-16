@@ -46,6 +46,8 @@ ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
 ZONE_REPEAT = timedelta(days=1)
+# The logins of the last day, where the zone table lists every application a user reached
+LOGINS_DASHBOARD = "/app/dashboards#/view/ns8-logins?_g=(time:(from:now-24h,to:now))"
 
 
 def log(message):
@@ -303,7 +305,8 @@ def zone_alerts(cursor):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
         text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] +
                          list(logins.values()) +
-                         ["", "Each user, address and service is reported once a day.", f"Open the dashboard: https://{host}/"])
+                         ["", "Each user, address and service is reported once a day.",
+                          f"Open the logins dashboard: https://{host}{LOGINS_DASHBOARD}"])
         send_mail(smtp, sender, customers[customer]["recipients"],
                   f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", text)
         # Saved per customer: a failure on the next one must not send this one again
