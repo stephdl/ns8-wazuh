@@ -164,7 +164,7 @@ Check if ns8-journal ends when its output is cut
     ...    return_rc=True  return_stdout=False
     ${after} =    Execute Command    cat /var/ossec/var/ns8-journal.cursor
     ${left} =    Execute Command    pgrep -f [/]var/ossec/bin/ns8-journal    return_rc=True  return_stdout=False
-    Execute Command    pkill -f /var/ossec/bin/ns8-journal; systemctl start wazuh-agent
+    Execute Command    pkill -f [/]var/ossec/bin/ns8-journal; systemctl start wazuh-agent
     Should Not Be Equal As Integers    ${rc}  124
     Should Not Be Equal As Integers    ${left}  0
     Should Be Equal    ${before}    ${after}
