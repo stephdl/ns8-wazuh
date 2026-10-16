@@ -116,6 +116,14 @@
                                 :label="$t('agents.update_command')"
                               />
                             </cv-overflow-menu-item>
+                            <cv-overflow-menu-item
+                              @click="showMoveModal(row)"
+                            >
+                              <NsMenuItem
+                                :icon="Edit20"
+                                :label="$t('agents.change_customer')"
+                              />
+                            </cv-overflow-menu-item>
                             <NsMenuDivider />
                             <cv-overflow-menu-item
                               danger
@@ -312,6 +320,56 @@
       </template>
       <template slot="secondary-button">{{ core.$t("common.close") }}</template>
     </NsModal>
+    <NsModal
+      size="default"
+      :visible="!!agentToMove"
+      :primary-button-disabled="loading.setAgentCustomer"
+      :isLoading="loading.setAgentCustomer"
+      @modal-hidden="hideMoveModal"
+      @primary-click="setAgentCustomer"
+    >
+      <template slot="title">{{
+        $t("agents.change_customer_title", {
+          name: agentToMove ? agentToMove.name : "",
+        })
+      }}</template>
+      <template slot="content">
+        <p class="mg-bottom">
+          {{
+            $t("agents.change_customer_description", {
+              customer: agentToMove ? agentToMove.customer || "-" : "",
+            })
+          }}
+        </p>
+        <cv-form @submit.prevent="setAgentCustomer">
+          <!-- Empty and rebuilt at each opening: with a value, the box highlights the first customer whose name it contains -->
+          <NsComboBox
+            :key="moveModalCount"
+            v-model="newCustomer"
+            :options="customerOptions"
+            acceptUserInput
+            :userInputLabel="$t('agents.new_customer')"
+            :title="$t('agents.customer')"
+            :label="$t('agents.choose_customer')"
+            :invalid-message="$t(error.customer)"
+            :disabled="loading.setAgentCustomer"
+            class="mg-bottom"
+            ref="customer"
+          />
+          <NsInlineNotification
+            v-if="error.setAgentCustomer"
+            kind="error"
+            :title="$t('action.set-agent-customer')"
+            :description="error.setAgentCustomer"
+            :showCloseButton="false"
+          />
+        </cv-form>
+      </template>
+      <template slot="secondary-button">{{ core.$t("common.cancel") }}</template>
+      <template slot="primary-button">{{
+        $t("agents.change_customer")
+      }}</template>
+    </NsModal>
     <NsDangerDeleteModal
       :isShown="isShownRevokeModal"
       :name="agentToRevoke ? agentToRevoke.name : ''"
@@ -387,12 +445,16 @@ export default {
       isShownRevokeModal: false,
       agentToRevoke: null,
       agentToUpdate: null,
+      agentToMove: null,
+      newCustomer: "",
+      moveModalCount: 0,
       managerVersion: "",
       packageVersion: "",
       loading: {
         listAgents: false,
         getEnrollmentToken: false,
         removeAgent: false,
+        setAgentCustomer: false,
       },
       error: {
         listAgents: "",
@@ -401,6 +463,8 @@ export default {
         max_uses: "",
         group: "",
         agent_name: "",
+        customer: "",
+        setAgentCustomer: "",
       },
     };
   },
@@ -553,6 +617,87 @@ export default {
       }
       return 0;
     },
+    customerError(customer) {
+      if (!customer) {
+        return "common.required";
+      }
+      if (customer === "default") {
+        return "agents.customer_reserved";
+      }
+      if (
+        !/^[A-Za-z0-9._-]{1,128}$/.test(customer) ||
+        /^\.\.?$/.test(customer)
+      ) {
+        return "agents.name_invalid";
+      }
+      return "";
+    },
+    showMoveModal(agent) {
+      this.error.customer = "";
+      this.error.setAgentCustomer = "";
+      this.newCustomer = "";
+      this.moveModalCount++;
+      this.agentToMove = agent;
+    },
+    hideMoveModal() {
+      // The answer of the task lands in this modal: closed early, its error would never show
+      if (!this.loading.setAgentCustomer) {
+        this.agentToMove = null;
+      }
+    },
+    async setAgentCustomer() {
+      this.newCustomer = (this.newCustomer || "").trim();
+      this.error.customer = this.customerError(this.newCustomer);
+      if (this.error.customer) {
+        this.focusElement("customer");
+        return;
+      }
+      if (this.newCustomer === this.agentToMove.customer) {
+        this.hideMoveModal();
+        return;
+      }
+      this.loading.setAgentCustomer = true;
+      this.error.setAgentCustomer = "";
+      const taskAction = "set-agent-customer";
+      const eventId = this.getUuid();
+      this.core.$root.$once(
+        `${taskAction}-aborted-${eventId}`,
+        this.setAgentCustomerAborted
+      );
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.setAgentCustomerCompleted
+      );
+      const res = await to(
+        this.createModuleTaskForApp(this.instanceName, {
+          action: taskAction,
+          data: { id: this.agentToMove.id, customer: this.newCustomer },
+          extra: {
+            title: this.$t("agents.change_customer_task", {
+              name: this.agentToMove.name,
+              customer: this.newCustomer,
+            }),
+            eventId,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.setAgentCustomer = this.getErrorMessage(err);
+        this.loading.setAgentCustomer = false;
+      }
+    },
+    setAgentCustomerAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.setAgentCustomer = this.$t("error.generic_error");
+      this.loading.setAgentCustomer = false;
+    },
+    setAgentCustomerCompleted() {
+      this.loading.setAgentCustomer = false;
+      this.agentToMove = null;
+      this.listAgents();
+    },
     showUpdateModal(agent) {
       this.agentToUpdate = agent;
     },
@@ -620,23 +765,8 @@ export default {
       // Same characters as Wazuh accepts for a group and the install script for a name
       const namePattern = /^[A-Za-z0-9._-]{1,128}$/;
       this.customer = (this.customer || "").trim();
-      if (!this.customer) {
-        this.error.group = "common.required";
-        if (isValidationOk) {
-          this.focusElement("group");
-        }
-        isValidationOk = false;
-      } else if (this.customer === "default") {
-        this.error.group = "agents.customer_reserved";
-        if (isValidationOk) {
-          this.focusElement("group");
-        }
-        isValidationOk = false;
-      } else if (
-        !namePattern.test(this.customer) ||
-        /^\.\.?$/.test(this.customer)
-      ) {
-        this.error.group = "agents.name_invalid";
+      this.error.group = this.customerError(this.customer);
+      if (this.error.group) {
         if (isValidationOk) {
           this.focusElement("group");
         }

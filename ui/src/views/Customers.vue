@@ -32,6 +32,13 @@
               >{{ $t("customers.refresh") }}</NsButton
             >
           </div>
+          <NsInlineNotification
+            v-if="error.removeCustomer"
+            kind="error"
+            :title="$t('action.remove-customer')"
+            :description="error.removeCustomer"
+            :showCloseButton="false"
+          />
           <NsDataTable
             :allRows="customers"
             :columns="i18nTableColumns"
@@ -92,6 +99,17 @@
                   <cv-overflow-menu flip-menu class="table-overflow-menu">
                     <cv-overflow-menu-item @click="showEditModal(row)">
                       <NsMenuItem :icon="Edit20" :label="$t('customers.edit')" />
+                    </cv-overflow-menu-item>
+                    <NsMenuDivider />
+                    <cv-overflow-menu-item
+                      danger
+                      :disabled="row.agents > 0"
+                      @click="showRemoveModal(row)"
+                    >
+                      <NsMenuItem
+                        :icon="TrashCan20"
+                        :label="$t('customers.remove')"
+                      />
                     </cv-overflow-menu-item>
                   </cv-overflow-menu>
                 </cv-data-table-cell>
@@ -166,6 +184,23 @@
       <template slot="secondary-button">{{ core.$t("common.cancel") }}</template>
       <template slot="primary-button">{{ $t("customers.save") }}</template>
     </NsModal>
+    <NsDangerDeleteModal
+      :isShown="!!customerToRemove"
+      :name="customerToRemove ? customerToRemove.name : ''"
+      :title="$t('customers.remove_title')"
+      :warning="$t('customers.remove_warning')"
+      :description="$t('customers.remove_description')"
+      :typeToConfirm="
+        $t('customers.remove_type_to_confirm', {
+          name: customerToRemove ? customerToRemove.name : '',
+        })
+      "
+      :deleteLabel="$t('customers.remove')"
+      :cancelLabel="core.$t('common.cancel')"
+      :loading="loading.removeCustomer"
+      @hide="customerToRemove = null"
+      @confirmDelete="removeCustomer"
+    />
   </cv-grid>
 </template>
 
@@ -205,16 +240,19 @@ export default {
       tablePage: [],
       tableColumns: ["name", "agents", "zones", "recipients"],
       customerToEdit: null,
+      customerToRemove: null,
       zones: [],
       recipients: "",
       smarthostEnabled: true,
       loading: {
         listCustomers: false,
         setCustomer: false,
+        removeCustomer: false,
       },
       error: {
         listCustomers: "",
         setCustomer: "",
+        removeCustomer: "",
         zones: "",
         recipients: "",
       },
@@ -409,6 +447,72 @@ export default {
     setCustomerCompleted() {
       this.loading.setCustomer = false;
       this.customerToEdit = null;
+      this.listCustomers();
+    },
+    showRemoveModal(customer) {
+      this.error.removeCustomer = "";
+      this.customerToRemove = customer;
+    },
+    async removeCustomer() {
+      this.loading.removeCustomer = true;
+      this.error.removeCustomer = "";
+      const taskAction = "remove-customer";
+      const eventId = this.getUuid();
+      this.core.$root.$once(
+        `${taskAction}-aborted-${eventId}`,
+        this.removeCustomerAborted
+      );
+      this.core.$root.$once(
+        `${taskAction}-validation-failed-${eventId}`,
+        this.removeCustomerValidationFailed
+      );
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.removeCustomerCompleted
+      );
+      const res = await to(
+        this.createModuleTaskForApp(this.instanceName, {
+          action: taskAction,
+          data: { name: this.customerToRemove.name },
+          extra: {
+            title: this.$t("customers.remove_task", {
+              name: this.customerToRemove.name,
+            }),
+            isNotificationHidden: true,
+            eventId,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.removeCustomer = this.getErrorMessage(err);
+        this.loading.removeCustomer = false;
+        this.customerToRemove = null;
+      }
+    },
+    removeCustomerAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.removeCustomer = this.$t("error.generic_error");
+      this.loading.removeCustomer = false;
+      this.customerToRemove = null;
+    },
+    removeCustomerValidationFailed(validationErrors) {
+      this.loading.removeCustomer = false;
+      this.customerToRemove = null;
+      // A schema error has no message of its own
+      this.error.removeCustomer = validationErrors
+        .map((e) =>
+          this.$te("customers." + e.error)
+            ? this.$t("customers." + e.error)
+            : this.$t("error.generic_error")
+        )
+        .join(" ");
+      this.listCustomers();
+    },
+    removeCustomerCompleted() {
+      this.loading.removeCustomer = false;
+      this.customerToRemove = null;
       this.listCustomers();
     },
   },

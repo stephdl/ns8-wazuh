@@ -1,0 +1,31 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Change the customer of an agent",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/set-agent-customer",
+    "description": "Move an agent to another customer, created when missing. The agent keeps its key and needs no new enrollment",
+    "examples": [
+        {
+            "id": "001",
+            "customer": "acme"
+        }
+    ],
+    "type": "object",
+    "required": ["id", "customer"],
+    "properties": {
+        "id": {
+            "type": "string",
+            "title": "Agent id",
+            "description": "Identifier of the agent, as returned by list-agents",
+            "pattern": "^[0-9]{3,}$"
+        },
+        "customer": {
+            "type": "string",
+            "title": "Customer",
+            "description": "Wazuh agent group of the customer",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "not": {
+                "enum": [".", "..", "default"]
+            }
+        }
+    }
+}

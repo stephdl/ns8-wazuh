@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+
+import agent
+from wazuh_api import ensure_group, manager_api
+
+data = json.load(sys.stdin)
+agent_id = data["id"]
+customer = data["customer"]
+agent.assert_exp(agent_id != "000", "the manager is not an agent and has no customer")
+
+try:
+    created = ensure_group(customer)
+    # force_single_group drops the other groups in the same call: an agent belongs to one customer only
+    response = manager_api("PUT", f"agents/{agent_id}/group/{customer}?force_single_group=true")
+except RuntimeError as error:
+    print(agent.SD_ERR + str(error), file=sys.stderr)
+    sys.exit(2)
+
+failed = response.get("data", {}).get("failed_items", [])
+if response.get("error", 1) != 0 or failed:
+    reason = response.get("detail") or response.get("message") or json.dumps(failed)
+    print(agent.SD_ERR + f"cannot move the agent {agent_id} to {customer}: {reason}", file=sys.stderr)
+    # A customer made only for this move would stay empty, a typo in its name too
+    if created:
+        manager_api("DELETE", f"groups?groups_list={customer}")
+    sys.exit(2)
+
+print(f"agent {agent_id} moved to {customer}", file=sys.stderr)

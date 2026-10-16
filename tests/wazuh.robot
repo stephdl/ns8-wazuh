@@ -7,6 +7,10 @@ ${TEST_HOST}         wazuh.ns8-ci.test
 ${AGENT_NAME}        robot-agent
 ${ADMIN_PASSWORD}    Robot.Test-2026
 ${AGENT_SCRIPT}      ${CURDIR}/../scripts/install-agent.sh
+# The cluster admin of the CI node, set by the NS8 install
+${CLUSTER_USER}      admin
+${CLUSTER_PASSWORD}  Nethesis,1234
+${SCREENSHOTS}       ${OUTPUT DIR}/browser/screenshot
 
 *** Keywords ***
 Use the install node
@@ -25,6 +29,48 @@ Run action
     Should Be Equal As Integers    ${rc}  0    ${action} failed: ${output}
     ${result} =    Evaluate    json.loads('''${output}''') if '''${output}'''.strip() else {}    modules=json
     [Return]    ${result}
+
+Run action that fails
+    [Arguments]    ${action}    ${data}
+    Use the leader
+    ${output}  ${rc} =    Execute Command
+    ...    api-cli run module/${module_id}/${action} --data '${data}'
+    ...    return_rc=True
+    Should Not Be Equal As Integers    ${rc}  0    ${action} did not fail: ${output}
+    [Return]    ${output}
+
+Customer of the agent should be
+    [Arguments]    ${expected}
+    ${result} =    Run action    list-agents
+    ${groups} =    Evaluate    [a['groups'] for a in $result['agents'] if a['name'] == '${AGENT_NAME}']
+    Should Be Equal    ${groups}    ${{ [['${expected}']] }}
+
+Customer should be listed
+    [Arguments]    ${name}    ${agents}
+    ${result} =    Run action    list-customers
+    ${found} =    Evaluate    [c['agents'] for c in $result['customers'] if c['name'] == '${name}']
+    Should Be Equal    ${found}    ${{ [${agents}] }}
+
+Customer should not be listed
+    [Arguments]    ${name}
+    ${result} =    Run action    list-customers
+    ${names} =    Evaluate    [c['name'] for c in $result['customers']]
+    Should Not Contain    ${names}    ${name}
+
+Login to cluster-admin
+    New Page    https://${NODE_ADDR}/cluster-admin/
+    Fill Text    text="Username"    ${CLUSTER_USER}
+    Click    button >> text="Continue"
+    Fill Text    text="Password"    ${CLUSTER_PASSWORD}
+    Click    button >> text="Log in"
+    Wait For Elements State    css=#main-content    visible    timeout=10s
+
+Open the module page
+    [Arguments]    ${page}    ${title}
+    Go To    https://${NODE_ADDR}/cluster-admin/#/apps/${module_id}?page=${page}
+    Wait For Elements State    iframe >>> h2 >> text="${title}"    visible    timeout=20s
+    # The page lists through a task: let it fill the table before the shot
+    Sleep    5s
 
 Agent status should be
     [Arguments]    ${expected}
@@ -130,7 +176,7 @@ Check if an agent on the same node can enroll
     # The token goes through a root only file, never on the command line
     Execute Command    umask 077; printf '%s' '${token}[token]' > /root/robot.token
     ${output}  ${stderr}  ${rc} =    Execute Command
-    ...    bash /root/install-agent.sh --token-file /root/robot.token --name ${AGENT_NAME}
+    ...    bash /root/install-agent.sh --token-file /root/robot.token --name ${AGENT_NAME} --group robot
     ...    return_rc=True  return_stderr=True
     Execute Command    rm -f /root/robot.token
     Should Be Equal As Integers    ${rc}  0    ${stderr}
@@ -178,6 +224,111 @@ Check if the certificates can be issued again
     Should Be Equal As Integers    ${rc}  0
     # Same certificate authority: the agent reconnects without a new token
     Wait Until Keyword Succeeds    3 min    10 s    Agent status should be    active
+
+Check if a token needs a customer
+    ${output} =    Run action that fails    get-enrollment-token    {"max_uses":1}
+    Should Contain    ${output}    required
+    ${output} =    Run action that fails    get-enrollment-token    {"max_uses":1,"group":"default"}
+    Should Contain    ${output}    group
+
+Check if the customer has login zones
+    Customer should be listed    robot    1
+    Run action    set-customer    {"name":"robot","zones":["@EU","CA"],"recipients":["soc@ns8-ci.test"]}
+    ${result} =    Run action    list-customers
+    ${robot} =    Evaluate    [c for c in $result['customers'] if c['name'] == 'robot'][0]
+    Should Be Equal    ${robot}[zones]    ${{ ['@EU', 'CA'] }}
+    Should Be Equal    ${robot}[recipients]    ${{ ['soc@ns8-ci.test'] }}
+    Should Contain    ${result}[countries]    FR
+    Should Be Equal    ${result}[continents][EU]    Europe
+    Use the install node
+    ${mode} =    Execute Command    stat -c %a /home/${module_id}/.config/state/customers.json
+    Should Be Equal As Strings    ${mode}    600
+    # The zones reach the engine as a KVDB the login zone decoder reads
+    ${output} =    Execute Command
+    ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' https://localhost:9200/wazuh-threatintel-kvdbs/_search -d '{"query":{"match_phrase":{"document.metadata.title":"ns8-login-zones"}}}'
+    Should Contain    ${output}    ,robot,list
+    Should Contain    ${output}    ,robot,@EU
+
+Check if the zones of a customer are checked
+    Run action that fails    set-customer    {"name":"robot","zones":["XYZ"],"recipients":[]}
+    Run action that fails    set-customer    {"name":"robot","zones":["@XX"],"recipients":[]}
+    Run action that fails    set-customer    {"name":"robot","zones":[],"recipients":["not-an-address"]}
+    ${output} =    Run action that fails    set-customer    {"name":"nobody","zones":["FR"],"recipients":[]}
+    Should Contain    ${output}    customer_not_found
+
+Check if the agent can change customer
+    ${agents} =    Run action    list-agents
+    ${ids} =    Evaluate    [a['id'] for a in $agents['agents'] if a['name'] == '${AGENT_NAME}']
+    Set Suite Variable    ${agent_id}    ${ids}[0]
+    # A customer that does not exist yet is created on the way
+    Run action    set-agent-customer    {"id":"${agent_id}","customer":"robot-moved"}
+    Customer of the agent should be    robot-moved
+    Customer should be listed    robot-moved    1
+    Customer should be listed    robot    0
+    Run action that fails    set-agent-customer    {"id":"${agent_id}","customer":"default"}
+    # It keeps its key: no new enrollment
+    Wait Until Keyword Succeeds    2 min    10 s    Agent status should be    active
+
+Check the pages of the module and take screenshots
+    [Tags]    ui
+    Import Library    Browser
+    New Browser    chromium    headless=True
+    New Context    ignoreHTTPSErrors=True    viewport={'width': 1440, 'height': 900}
+    Login to cluster-admin
+    Open the module page    status    Status
+    Take Screenshot    filename=${SCREENSHOTS}/1._Status.png
+    Open the module page    agents    Agents
+    Wait For Elements State    iframe >>> text="${AGENT_NAME}"    visible    timeout=20s
+    Get Text    iframe >>> tbody    contains    robot-moved
+    Take Screenshot    filename=${SCREENSHOTS}/2._Agents.png
+    # The agent menu offers the move to another customer, the modal opens empty
+    Click    iframe >>> tbody tr:has(td:text-is("${AGENT_NAME}")) >> .bx--overflow-menu
+    Click    iframe >>> .bx--overflow-menu-options__btn >> text="Change customer"
+    Wait For Elements State    iframe >>> .bx--modal.is-visible >> text=Its customer is now robot-moved    visible    timeout=10s
+    Get Property    iframe >>> .bx--modal.is-visible input    value    ==    ${EMPTY}
+    Take Screenshot    filename=${SCREENSHOTS}/3._Change_customer.png
+    Click    iframe >>> .bx--modal.is-visible button >> text="Cancel"
+    Click    iframe >>> text="Enrollment"
+    Wait For Elements State    iframe >>> button >> text="Create a token"    visible    timeout=10s
+    Take Screenshot    filename=${SCREENSHOTS}/4._Enrollment.png
+    Open the module page    customers    Customers
+    Wait For Elements State    iframe >>> text="Europe (continent)"    visible    timeout=20s
+    Get Text    iframe >>> tbody    contains    soc@ns8-ci.test
+    Take Screenshot    filename=${SCREENSHOTS}/5._Customers.png
+    # The customer with zones opens with them, and the picker offers the continents first
+    # Exact name: robot-moved also holds robot
+    Click    iframe >>> tbody tr:has(td:text-is("robot")) >> .bx--overflow-menu
+    Click    iframe >>> .bx--overflow-menu-options__btn >> text="Edit"
+    Wait For Elements State    iframe >>> .bx--modal.is-visible >> text="Canada (CA)"    visible    timeout=10s
+    Take Screenshot    filename=${SCREENSHOTS}/6._Edit_customer.png
+    Click    iframe >>> .bx--modal.is-visible button >> text="Cancel"
+    Open the module page    settings    Settings
+    # The longest page: the whole of it, not only the screen
+    Take Screenshot    filename=${SCREENSHOTS}/7._Settings.png    fullPage=True
+    Open the module page    about    About
+    Take Screenshot    filename=${SCREENSHOTS}/8._About.png
+    Close Browser
+
+Check if a failed move leaves no customer behind
+    Run action that fails    set-agent-customer    {"id":"999","customer":"robot-typo"}
+    Customer should not be listed    robot-typo
+
+Check if a customer with agents cannot be removed
+    ${output} =    Run action that fails    remove-customer    {"name":"robot-moved"}
+    Should Contain    ${output}    customer_has_agents
+    Customer should be listed    robot-moved    1
+
+Check if an empty customer can be removed
+    Run action    set-agent-customer    {"id":"${agent_id}","customer":"robot"}
+    Customer of the agent should be    robot
+    Run action    remove-customer    {"name":"robot-moved"}
+    Customer should not be listed    robot-moved
+    ${output} =    Run action that fails    remove-customer    {"name":"robot-moved"}
+    Should Contain    ${output}    customer_not_found
+    # Its settings go with it, the ones of the other customer stay
+    ${result} =    Run action    list-customers
+    ${robot} =    Evaluate    [c for c in $result['customers'] if c['name'] == 'robot'][0]
+    Should Be Equal    ${robot}[zones]    ${{ ['@EU', 'CA'] }}
 
 Check if the agent can be revoked
     ${agents} =    Run action    list-agents

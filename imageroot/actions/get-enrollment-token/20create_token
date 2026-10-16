@@ -10,7 +10,7 @@ import os
 import sys
 
 import agent
-from wazuh_api import manager_api
+from wazuh_api import ensure_group, manager_api
 
 data = json.load(sys.stdin)
 host = os.environ.get("TRAEFIK_HOST", "")
@@ -29,12 +29,11 @@ if data.get("description"):
 # An agent that declares a group missing on the manager is refused at enrollment
 # Every agent belongs to a customer: its login zones are set per customer
 group = data["group"]
-existing = manager_api("GET", f"groups?groups_list={group}")
-if not existing.get("data", {}).get("affected_items"):
-    created = manager_api("POST", "groups", {"group_id": group})
-    if created.get("error", 1) != 0:
-        print(agent.SD_ERR + f"group {group} refused: {created.get('detail') or created.get('message')}", file=sys.stderr)
-        sys.exit(2)
+try:
+    ensure_group(group)
+except RuntimeError as error:
+    print(agent.SD_ERR + str(error), file=sys.stderr)
+    sys.exit(2)
 
 response = manager_api("POST", "agents/enrollment-tokens", body)
 if response.get("error", 1) != 0:
