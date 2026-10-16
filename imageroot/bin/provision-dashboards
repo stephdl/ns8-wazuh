@@ -104,11 +104,14 @@ def default_settings():
 def set_default_settings():
     """Set the dashboard settings of the module, unless the administrator already chose a value."""
     current = dashboard_api("GET", "api/opensearch-dashboards/settings").get("settings", {})
-    changes = {key: value for key, value in default_settings().items()
-               if current.get(key, {}).get("userValue") is None}
-    if changes:
-        checked(dashboard_api("POST", "api/opensearch-dashboards/settings", {"changes": changes}),
-                "settings " + ", ".join(sorted(changes)))
+    for key, value in default_settings().items():
+        if current.get(key, {}).get("userValue") is not None:
+            continue
+        # One at a time: a setting this version refuses must not stop the others
+        try:
+            checked(dashboard_api("POST", "api/opensearch-dashboards/settings", {"changes": {key: value}}), key)
+        except RuntimeError as error:
+            print(f"Warning: {key} is not set: {error}", file=sys.stderr)
 
 
 try:
