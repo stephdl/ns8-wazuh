@@ -396,9 +396,11 @@ write("50-system-changes.ndjson", dashboard("ns8-system-changes", "NS8 - System 
 MAIL = "service.type:(postfix or rspamd)"
 DELIVERY = "service.type:postfix and event.action:(sent or bounced or deferred or expired)"
 REJECTED = "event.action:mail-rejected"
+# Greylisting answers 4xx and the sender retries: only a 5xx refuses the mail for good
+REFUSED = f"{REJECTED} and event.code:5*"
 SPAM = "service.type:rspamd"
 write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
-    "Sent and rejected mail, spam, viruses, and where accepted and rejected mail comes from", [
+    "Sent and rejected mail, spam, viruses, and where inbound and rejected mail comes from", [
     (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
          metric(group=terms("2", "event.action", "group", size=5))), 24, 8),
     (vis("ns8-mail-rejected-count", "Rejected messages", APPS, REJECTED,
@@ -421,12 +423,12 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
     # Rspamd scans sent mail too, but users mostly send from the LAN, which has no country
     # The maps side by side, each table under its map
     (vis("ns8-mail-source-map", "Inbound mail sources map", APPS, SPAM, geo_map()), 24, 14),
-    (vis("ns8-mail-rejected-map", "Rejected mail sources map", APPS, REJECTED, geo_map()), 24, 14),
+    (vis("ns8-mail-rejected-map", "Rejected mail sources map", APPS, REFUSED, geo_map()), 24, 14),
     (vis("ns8-mail-source-countries", "Inbound mail sources by country", APPS, SPAM,
          table(terms("2", "source.geo.country_name", "bucket", size=30, label="Country"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "cardinality", "schema": "metric",
                                "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 24, 14),
-    (vis("ns8-mail-rejected-countries", "Rejected mail sources by country", APPS, REJECTED,
+    (vis("ns8-mail-rejected-countries", "Rejected mail sources by country", APPS, REFUSED,
          table(terms("2", "source.geo.country_name", "bucket", size=30, label="Country"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "cardinality", "schema": "metric",
                                "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 24, 14),
