@@ -94,11 +94,13 @@ else
 fi
 
 # Wazuh takes the short host name by default, the FQDN is easier to recognize
-if [ -z "${AGENT_NAME}" ]; then
+if [ -z "${AGENT_NAME}" ] && [ "${UPDATE}" -ne 1 ]; then
     fqdn="$(timeout 5 hostname -f 2>/dev/null || true)"
+    fqdn="${fqdn%.}"
+    # Loopback names are shared by many hosts, Wazuh refuses names over 128 characters
     case "${fqdn}" in
-        localhost.*|*[!A-Za-z0-9._-]*) ;;
-        *.*) AGENT_NAME="${fqdn}" ;;
+        localhost*|*.localdomain*|*[!A-Za-z0-9._-]*) ;;
+        *.*) [ "${#fqdn}" -gt 128 ] || AGENT_NAME="${fqdn}" ;;
     esac
 fi
 
@@ -530,8 +532,13 @@ if [ -n "${AGENT_NAME}" ] || [ -n "${AGENT_GROUP}" ]; then
     enrollment="<enrollment>"
     [ -z "${AGENT_NAME}" ] || enrollment="${enrollment}\n      <agent_name>${AGENT_NAME}</agent_name>"
     [ -z "${AGENT_GROUP}" ] || enrollment="${enrollment}\n      <groups>${AGENT_GROUP}</groups>"
-    sed -i '/<enrollment>/,/<\/enrollment>/d' "${CONFIG}"
-    sed -i "0,/<manager>/ s#<manager>#${enrollment}\n    </enrollment>\n    <manager>#" "${CONFIG}"
+    # Keep the other settings of an existing block, only the name and the group are replaced
+    if grep -q "<enrollment>" "${CONFIG}"; then
+        sed -i '/<enrollment>/,/<\/enrollment>/ { /<agent_name>/d; /<groups>/d }' "${CONFIG}"
+        sed -i "0,/<enrollment>/ s#<enrollment>#${enrollment}#" "${CONFIG}"
+    else
+        sed -i "0,/<manager>/ s#<manager>#${enrollment}\n    </enrollment>\n    <manager>#" "${CONFIG}"
+    fi
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the configuration, see ${CONFIG}"
 fi
 

@@ -134,7 +134,7 @@ curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/inst
 The script installs the Wazuh 5 agent package, checks that port 1517 of the server answers, writes the server address, enrolls the agent and starts it. The agent reads the system journal by default. Pass options after `bash -s --`:
 
 - `--token-file FILE`: read the token from a file instead of the environment.
-- `--name NAME`: agent name, the host name by default.
+- `--name NAME`: agent name, the FQDN of the server by default, else its host name.
 - `--group GROUP`: customer of the server, see [Customers](#customers). The Agents page adds it to the command.
 - `--version VERSION`, `--package-url URL`: install another agent package.
 - `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
