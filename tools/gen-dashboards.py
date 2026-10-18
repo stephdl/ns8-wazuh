@@ -330,8 +330,9 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
 ], site=True, country=True))
 
 CROWDSEC = "event.action:crowdsec-alert"
+CROWDSEC_BAN = "event.action:crowdsec-ban"
 write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
-    "Attacks blocked by CrowdSec, and where they come from", [
+    "Attacks detected and IP addresses banned by CrowdSec, and where they come from", [
     (vis("ns8-crowdsec-total", "Alerts", APPS, CROWDSEC,
          metric(extra_metrics=[{"id": "2", "enabled": True, "type": "cardinality", "schema": "metric",
                                 "params": {"field": "source.ip", "customLabel": "Distinct IPs"}}])), 16, 8),
@@ -344,7 +345,12 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True),
                terms("4", "event.reason", "bucket", size=3, label="Scenario"))), 32, 14),
-    (vis("ns8-crowdsec-map", "Alerts map", APPS, CROWDSEC, geo_map()), 48, 14),
+    (markdown("ns8-crowdsec-help", "How to read it",
+              "**Attacks**: an IP address triggered a CrowdSec scenario, such as too many failed logins. "
+              "**Bans**: CrowdSec blocked the address in the firewall for a while. "
+              "Most attacks lead to a ban, but not all."), 48, 3),
+    (vis("ns8-crowdsec-map", "Attacks map", APPS, CROWDSEC, geo_map()), 24, 14),
+    (vis("ns8-crowdsec-ban-map", "Bans map", APPS, CROWDSEC_BAN, geo_map()), 24, 14),
 ], country=True))
 
 NOT_INFO = "not wazuh.rule.level:informational"
