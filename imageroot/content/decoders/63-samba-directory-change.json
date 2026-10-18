@@ -91,6 +91,14 @@
             "event.action": "directory-object-modified"
           }
         ]
+      },
+      {
+        "check": "string_equal($_samba.dsdbChange.operation, 'Modify') AND (exists($_samba.dsdbChange.attributes.repsTo) OR exists($_samba.dsdbChange.attributes.repsFrom) OR exists($_samba.dsdbChange.attributes.lastLogon) OR exists($_samba.dsdbChange.attributes.lastLogonTimestamp) OR exists($_samba.dsdbChange.attributes.logonCount) OR exists($_samba.dsdbChange.attributes.badPwdCount) OR exists($_samba.dsdbChange.attributes.badPasswordTime))",
+        "map": [
+          {
+            "event.action": "directory-state-updated"
+          }
+        ]
       }
     ]
   }

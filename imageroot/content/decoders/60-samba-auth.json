@@ -70,6 +70,24 @@
         ]
       },
       {
+        "check": "exists($_samba.Authentication.clientAccount) AND NOT string_equal($_samba.Authentication.clientAccount, '')",
+        "parse|_samba.Authentication.clientAccount": [
+          "CN=<user.name>,<~>",
+          "cn=<user.name>,<~>",
+          "<user.name>@<~>",
+          "<~>\\\\<user.name>",
+          "<~>"
+        ]
+      },
+      {
+        "check": "is_string($_samba.Authentication.becameAccount) AND NOT string_equal($_samba.Authentication.becameAccount, '')",
+        "map": [
+          {
+            "user.name": "$_samba.Authentication.becameAccount"
+          }
+        ]
+      },
+      {
         "parse|_samba.Authentication.remoteAddress": [
           "ipv4:<source.ip>:<~>",
           "<~>"
@@ -88,6 +106,22 @@
           },
           {
             "event.outcome": "success"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK') AND ends_with($user.name, '$')",
+        "map": [
+          {
+            "event.action": "machine-logon"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK') AND regex_match($user.name, '(?i)^ldapservice$')",
+        "map": [
+          {
+            "event.action": "service-logon"
           }
         ]
       },
