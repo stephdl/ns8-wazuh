@@ -103,16 +103,9 @@ def default_settings():
     return settings
 
 
-# Present once the 5000 lines set by older versions were raised, so a 5000 chosen later is kept
-SAMPLE_SIZE_RAISED = "discover-sample-size-raised"
-
-
 def set_default_settings():
     """Set the dashboard settings of the module, unless the administrator already chose a value."""
     current = dashboard_api("GET", "api/opensearch-dashboards/settings").get("settings", {})
-    if not os.path.exists(SAMPLE_SIZE_RAISED) and current.get("discover:sampleSize", {}).get("userValue") == 5000:
-        current.pop("discover:sampleSize")
-    raised = True
     for key, value in default_settings().items():
         if current.get(key, {}).get("userValue") is not None:
             continue
@@ -121,9 +114,6 @@ def set_default_settings():
             checked(dashboard_api("POST", "api/opensearch-dashboards/settings", {"changes": {key: value}}), key)
         except RuntimeError as error:
             print(f"Warning: {key} is not set: {error}", file=sys.stderr)
-            raised = raised and key != "discover:sampleSize"
-    if raised:
-        open(SAMPLE_SIZE_RAISED, "w").close()
 
 
 try:
