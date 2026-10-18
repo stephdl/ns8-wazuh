@@ -98,9 +98,9 @@ One server often watches the servers of several customers. Give the customer whe
 
 A customer can have allowed login zones, see [Login zones](#login-zones).
 
-A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. A token always needs a customer. An agent installed without `--group` goes in the `default` group.
+A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. A token always needs a customer, and the Agents page adds its `--group` to the command. An agent installed by hand without `--group` goes in the `default` group, which has no login zones.
 
-To move a server to another customer, use Change customer in the menu of its agent on the Agents page. The agent keeps its id, and its past events keep the old customer. A customer without agents can be removed on the Customers page.
+To move a server to another customer, use Change customer in the menu of its agent on the Agents page. The agent keeps its id, and its past events keep the old customer. A customer can be removed on the Customers page once it has no agents left, it is refused before.
 
 The same is available with `api-cli`:
 
@@ -223,7 +223,8 @@ Twelve rules raise findings:
 | NS8 Proxmox guest destroyed | high |
 | NS8 Proxmox backup failed | medium |
 | NS8 login from outside the allowed zones | medium |
- Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads them at each configuration and update, through the Content Manager API, and runs the rules every minute.
+
+Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads its decoders and rules at each configuration and update, through the Content Manager API, and runs the rules every minute.
 
 To watch something specific:
 
@@ -260,7 +261,7 @@ The module adds ten dashboards to the Wazuh dashboard, under Explore > Dashboard
 | NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
 | NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |
 
-The log tables load the 10000 newest lines of the chosen time range, 50 per page. Narrow the time range or the pickers to see older lines. A value set by an administrator in Dashboards Management > Advanced settings (`discover:sampleSize`) is kept.
+The log tables of NS8 - Journal, Logins, System changes, Mail, Directory and Proxmox load the 10000 newest lines of the chosen time range, 50 per page. Narrow the time range or the pickers to see older lines. A value set by an administrator in Dashboards Management > Advanced settings (`discover:sampleSize`) is kept.
 
 The country and the city come from the GeoIP database of the manager, so they show for public IP addresses only. The maps color each country by count, and its name shows on hover. They load the country shapes from the OpenSearch maps service, so the browser needs Internet access. The Logins, Web, CrowdSec and Telephony dashboards also have a Country picker. To see every country but one, pick it, then click its filter and choose Exclude results. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 
