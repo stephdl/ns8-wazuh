@@ -105,7 +105,15 @@
     "level_low": "Low",
     "level_medium": "Medium",
     "level_high": "High",
-    "level_critical": "Critical"
+    "level_critical": "Critical",
+    "export_url_pattern": "The address must start with https://",
+    "export_token_pattern": "The token cannot contain spaces or line breaks",
+    "admin_password_minLength": "Password too short",
+    "admin_password_maxLength": "Password too long",
+    "retention_days_minimum": "Enter a number of days between 30 and 3650",
+    "retention_days_maximum": "Enter a number of days between 30 and 3650",
+    "notify_recipients_format": "Each line must be a valid email address",
+    "notify_min_level_enum": "Choose a level from the list"
   },
   "about": {
     "title": "About"
