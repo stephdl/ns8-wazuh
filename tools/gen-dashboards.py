@@ -434,11 +434,19 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))
 
-SAMBA_AUTH = "service.type:samba and event.category:authentication"
+# Each LDAP login binds the samba service account first, and computers log in every few minutes.
+# Their failures stay: a broken service account or a computer out of the domain.
+SAMBA_AUTH = ('service.type:samba and event.category:authentication'
+              ' and not (event.outcome:success and (user.name:ldapservice or user.name:*$))')
 SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
-SAMBA_IAM = "service.type:samba and event.category:iam and not event.action:primary-group-set"
+# Replication between domain controllers and logon counters change the directory every few minutes
+SAMBA_IAM = ("service.type:samba and event.category:iam"
+             " and not event.action:(primary-group-set or directory-state-updated)")
 write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
     "Domain logins and account changes on Samba. Needs the Samba audit, see the README", [
+    (markdown("ns8-directory-help", "How to fill it",
+              "**Empty?** Turn on the [Samba audit](https://github.com/stephdl/ns8-wazuh#samba-audit) "
+              "on the node that runs samba."), 48, 3),
     (vis("ns8-directory-outcome", "Domain logins by outcome", APPS, SAMBA_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-directory-timeline", "Domain logins over time", APPS, SAMBA_AUTH,
