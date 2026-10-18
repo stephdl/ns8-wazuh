@@ -49,7 +49,7 @@ The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
 
   --token TOKEN        Enrollment token (visible in the process list, prefer the variable)
   --token-file FILE    Read the enrollment token from FILE
-  --name NAME          Agent name (default: the host name)
+  --name NAME          Agent name (default: the FQDN, else the host name)
   --group GROUP        Agent group, the customer of this host (default: default)
   --version VERSION    Agent version to install (default: 5.0.0-rc1)
   --package-url URL    Download this package instead of the default one
@@ -91,6 +91,15 @@ if [ "${UPDATE}" -eq 1 ]; then
     [ "${FORCE}" -eq 0 ] || die "--update and --force cannot be used together"
 else
     [ -n "${TOKEN}" ] || { usage; die "no enrollment token: set WAZUH_ENROLLMENT_TOKEN"; }
+fi
+
+# Wazuh takes the short host name by default, the FQDN is easier to recognize
+if [ -z "${AGENT_NAME}" ]; then
+    fqdn="$(timeout 5 hostname -f 2>/dev/null || true)"
+    case "${fqdn}" in
+        localhost.*|*[!A-Za-z0-9._-]*) ;;
+        *.*) AGENT_NAME="${fqdn}" ;;
+    esac
 fi
 
 # The agent name goes into the XML configuration
