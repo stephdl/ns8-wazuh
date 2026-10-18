@@ -8,21 +8,23 @@ The module is not ready for production. It runs Wazuh `5.0.0-rc1`. The plan and 
 
 ## How it works
 
-```
- Watched servers                          NS8 node running this module
- ┌──────────────────────┐                 ┌──────────────────────────────────────┐
- │ journald, files      │  1514 events    │ manager  ── decoders, rules ──┐      │
- │        ▼             │ ──────────────▶ │   ▲ API 55000 (pod only)      ▼      │
- │ wazuh-agent (deb/rpm)│  1517 enroll    │   └────── dashboard ◀──── indexer   │
- └──────────────────────┘                 └───────────────┬──────────────────────┘
-                                                          │ Traefik, HTTPS
-                                                          ▼
-                                              Wazuh dashboard, LDAP login
+```text
+ Watched servers                     NS8 node running this module
+┌────────────────────┐              ┌──────────────────────────────────────┐
+│ journald, files    │  1514, 1515  │ manager ───▶ indexer ◀─── dashboard  │
+│         │          │  1517, TLS   │              decodes,        ▲       │
+│         ▼          │ ───────────▶ │              raises alerts,  │       │
+│ wazuh-agent        │              │              stores          │       │
+└────────────────────┘              └──────────────┬───────────────┼───────┘
+                                                   │               │
+                                                   ▼               │
+                                     findings: email, HTTPS    Traefik, HTTPS,
+                                                               LDAP login
 ```
 
 The agent runs on each watched server. It reads the journal, watches file changes, lists packages and checks the configuration. It sends everything to the manager over an encrypted channel.
 
-The manager turns each line into fields, such as user, source IP or URL. The indexer stores it as an event. When a rule matches an event, the indexer stores a finding: that is the alert. The dashboard shows events, findings and agents.
+The manager receives the lines. The Wazuh engine, in the indexer container, turns each line into fields, such as user, source IP or URL. The indexer stores it as an event. When a rule matches an event, the indexer stores a finding: that is the alert. The dashboard shows events, findings and agents.
 
 The agent always connects to the server, never the opposite. Only the Wazuh node needs open inbound ports.
 
