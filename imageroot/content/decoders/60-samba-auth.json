@@ -110,6 +110,22 @@
         ]
       },
       {
+        "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK') AND ends_with($user.name, '$')",
+        "map": [
+          {
+            "event.action": "machine-logon"
+          }
+        ]
+      },
+      {
+        "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK') AND regex_match($user.name, '(?i)^ldapservice$')",
+        "map": [
+          {
+            "event.action": "service-logon"
+          }
+        ]
+      },
+      {
         "check": "exists($_samba.Authentication.status) AND NOT string_equal($_samba.Authentication.status, 'NT_STATUS_OK')",
         "map": [
           {

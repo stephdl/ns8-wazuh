@@ -147,8 +147,8 @@ def vis(id, title, pattern, query, spec):
             "references": index_ref(pattern)}
 
 
-def markdown(id, title, text):
-    params = {"markdown": text, "fontSize": 12, "openLinksInNewTab": False}
+def markdown(id, title, text, new_tab=False):
+    params = {"markdown": text, "fontSize": 12, "openLinksInNewTab": new_tab}
     return {"id": id, "type": "visualization",
             "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
                            "visState": json.dumps({"title": title, "type": "markdown", "params": params, "aggs": []}),
@@ -227,7 +227,9 @@ def write(name, objects):
 
 # The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
 AUTH = ("event.category:authentication"
-        " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")")
+        " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")"
+        # The samba service account and the computers log in every few minutes: their failures stay
+        " and not event.action:(service-logon or machine-logon)")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
 # Only the login zone decoder writes a reason that starts so
@@ -434,11 +436,9 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))
 
-# Each LDAP login binds the samba service account first, and computers log in every few minutes.
-# Their failures stay: a broken service account or a computer out of the domain.
-SAMBA_AUTH = ('service.type:samba and event.category:authentication'
-              ' and not (event.outcome:success and (user.name:ldapservice or user.name:*$))')
-SAMBA_FAIL = f"{SAMBA_AUTH} and event.outcome:failure"
+SAMBA_AUTH = ("service.type:samba and event.category:authentication"
+              " and not event.action:(service-logon or machine-logon)")
+SAMBA_FAIL = "service.type:samba and event.category:authentication and event.outcome:failure"
 # Replication between domain controllers and logon counters change the directory every few minutes
 SAMBA_IAM = ("service.type:samba and event.category:iam"
              " and not event.action:(primary-group-set or directory-state-updated)")
@@ -446,7 +446,7 @@ write("70-directory.ndjson", dashboard("ns8-directory", "NS8 - Directory",
     "Domain logins and account changes on Samba. Needs the Samba audit, see the README", [
     (markdown("ns8-directory-help", "How to fill it",
               "**Empty?** Turn on the [Samba audit](https://github.com/stephdl/ns8-wazuh#samba-audit) "
-              "on the node that runs samba."), 48, 3),
+              "on the node that runs samba.", new_tab=True), 48, 3),
     (vis("ns8-directory-outcome", "Domain logins by outcome", APPS, SAMBA_AUTH,
          metric(group=terms("2", "event.outcome", "group", size=3))), 16, 8),
     (vis("ns8-directory-timeline", "Domain logins over time", APPS, SAMBA_AUTH,
