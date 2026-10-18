@@ -168,6 +168,13 @@
             ref="recipients"
           />
           <NsInlineNotification
+            v-if="!zones.length && recipientList.length"
+            kind="warning"
+            :title="$t('customers.no_zones_title')"
+            :description="$t('customers.no_zones_description')"
+            :showCloseButton="false"
+          />
+          <NsInlineNotification
             v-if="!smarthostEnabled && recipientList.length"
             kind="warning"
             :title="$t('settings.smarthost_missing_title')"
