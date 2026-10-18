@@ -203,6 +203,8 @@ Check if ns8-journal ends when its output is cut
     Use the install node
     # The agent runs ns8-journal too and would move the cursor during the check
     Execute Command    systemctl stop wazuh-agent
+    # A first run saves the cursor if the agent never ran the command yet
+    Execute Command    /var/ossec/bin/ns8-journal >/dev/null
     ${before} =    Execute Command    cat /var/ossec/var/ns8-journal.cursor
     # More lines than a pipe holds, so journalctl blocks when nobody reads them
     Execute Command    for i in $(seq 1500); do logger -t robot "ns8-journal check line $i"; done
