@@ -75,7 +75,16 @@
           "CN=<user.name>,<~>",
           "cn=<user.name>,<~>",
           "<user.name>@<~>",
+          "<~>\\\\<user.name>",
           "<~>"
+        ]
+      },
+      {
+        "check": "is_string($_samba.Authentication.becameAccount) AND NOT string_equal($_samba.Authentication.becameAccount, '')",
+        "map": [
+          {
+            "user.name": "$_samba.Authentication.becameAccount"
+          }
         ]
       },
       {
