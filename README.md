@@ -6,8 +6,6 @@ It is meant to run on its own node, outside the clusters it watches. Wazuh agent
 
 The module is not ready for production: it targets Wazuh `5.0.0-rc1`. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
-The work happens on the `docs-plan` branch until it is merged. Until then, replace `main` with `docs-plan` in the script address below.
-
 ## How it works
 
 ```
@@ -59,6 +57,7 @@ Launch `configure-module` with:
 - `notify_recipients`: email addresses that receive this summary. They are kept when the emails are disabled.
 - `notify_sender`: sender address of these emails. Empty means `wazuh@` followed by the host name.
 - `notify_min_level`: only the findings at this level or above are mailed: `low`, `medium` (default), `high` or `critical`.
+- `retention_days`: how long events and findings are kept, from 30 to 3650 days, 365 by default. See [Retention](#retention).
 
 Example:
 
@@ -99,9 +98,18 @@ One server often watches the servers of several customers. Give the customer whe
 
 A customer can have allowed login zones, see [Login zones](#login-zones).
 
-A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. Without a customer the agent goes in the `default` group.
+A customer name holds letters, digits, dots, dashes and underscores. The page lists the known customers under the field, because `acme` and `Acme` are two different customers. A token always needs a customer, and the Agents page adds its `--group` to the command. An agent installed by hand without `--group` goes in the `default` group, which has no login zones.
 
-The customer is set at enrollment and cannot change after. To move a server to another customer, revoke its agent, then enroll it again with a token of the new customer and `--force`. It gets a new id, and its past events keep the old customer.
+To move a server to another customer, use Change customer in the menu of its agent on the Agents page. The agent keeps its id, and its past events keep the old customer. A customer can be removed on the Customers page once it has no agents left, it is refused before.
+
+The same is available with `api-cli`:
+
+```
+api-cli run module/wazuh1/list-customers --data '{}'
+api-cli run module/wazuh1/set-agent-customer --data '{"id":"001","customer":"acme"}'
+api-cli run module/wazuh1/set-customer --data '{"name":"acme","zones":["@EU","CA"],"recipients":["soc@acme.example"]}'
+api-cli run module/wazuh1/remove-customer --data '{"name":"acme"}'
+```
 
 ### Login zones
 
@@ -140,7 +148,8 @@ The script installs the Wazuh 5 agent package, checks that port 1517 of the serv
 - `--sha256 HASH`: expected checksum of the package. The rpm signature is always checked, a deb is only checked with this option.
 - `--no-start`: configure the agent without starting it.
 - `--force`: enroll again an agent that already has a key, for example after it was revoked.
-- `--update`: update an enrolled agent to `--version`, without a token.
+- `--update`: update an enrolled agent to `--version`, without a token. It cannot be used with `--force`.
+- `--help`: list the options.
 
 The server must be reachable on TCP ports 1514, 1515 and 1517, and its host name must resolve on the agent.
 
@@ -158,7 +167,7 @@ An agent older than its server keeps working. The Agents page tags it as Outdate
 curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh | sudo bash -s -- --update --version 5.0.0-rc1
 ```
 
-`--update` installs the package of the server version and restarts the agent. It keeps the key and the settings, so no token is needed.
+`--update` installs the package of `--version`, `5.0.0-rc1` by default, and restarts the agent. It keeps the key and the settings, so no token is needed.
 
 ### NS8 nodes
 
@@ -185,15 +194,37 @@ The script covers Linux only. Install the Wazuh 5 agent following the [Wazuh doc
 
 Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node needs Internet access. They cover common Linux services (sshd, sudo, auditd, systemd...), but not the NS8 applications. The module adds its own content, in `imageroot/content/`:
 
-| Source | Decoded fields |
+| Source | Decoded lines |
 |---|---|
-| Dovecot login, success and failure | user, source IP |
-| NS8 API server login, success and failure | user, source IP |
-| Traefik access log | source IP, method, path, status |
-| CrowdSec alerts | scenario, source IP |
-| CrowdSec bans | scenario, source IP |
+| SSH, Dovecot, NS8 API server | logins and failed logins, with user and source IP |
+| Postfix, Rspamd | SMTP logins, rejected mail, deliveries, spam results |
+| Traefik, nginx, apache | access lines: source IP, method, path, status, user agent |
+| CrowdSec | alerts and bans, with scenario and source IP |
+| Samba AD | domain logins, group, password, account and password policy changes |
+| SOGo, Roundcube, Nextcloud, WebTop, Matrix, Ejabberd, Mattermost | logins or failed logins |
+| NethVoice | failed SIP, CTI and reports logins |
+| Proxmox VE | logins, failed logins and tasks |
 
-Two rules raise findings: `NS8 authentication failure` (level low) and `NS8 CrowdSec scenario triggered` (level low, CrowdSec has already banned the address). Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads them at each configuration and update, through the Content Manager API, and runs the rules every minute.
+A last decoder checks the country of each login against the zones of its customer, see [Login zones](#login-zones).
+
+Twelve rules raise findings:
+
+| Rule | Level |
+|---|---|
+| NS8 authentication failure | low |
+| NS8 CrowdSec scenario triggered (CrowdSec has already banned the address) | low |
+| NS8 mail virus found | high |
+| NS8 mail relay denied | low |
+| NS8 domain account locked | medium |
+| NS8 domain admin group changed | high |
+| NS8 domain password reset | low |
+| NS8 domain password policy changed | medium |
+| NS8 web scan | informational |
+| NS8 Proxmox guest destroyed | high |
+| NS8 Proxmox backup failed | medium |
+| NS8 login from outside the allowed zones | medium |
+
+Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads its decoders and rules at each configuration and update, through the Content Manager API, and runs the rules every minute.
 
 To watch something specific:
 
@@ -215,7 +246,7 @@ The Status page warns once the disk of the indexer is 80% full. At 95% the index
 
 ## Dashboards
 
-The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashboards:
+The module adds ten dashboards to the Wazuh dashboard, under Explore > Dashboards:
 
 | Dashboard | Content |
 |---|---|
@@ -229,6 +260,8 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 | NS8 - Directory | Samba domain logins, failures by account and workstation, account and group changes. Needs the Samba audit below |
 | NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
 | NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |
+
+The log tables of NS8 - Journal, Logins, System changes, Mail, Directory and Proxmox load the 10000 newest lines of the chosen time range, 50 per page. Narrow the time range or the pickers to see older lines. An administrator can change it in Dashboards Management > Advanced settings (`discover:sampleSize`), the module keeps that value.
 
 The country and the city come from the GeoIP database of the manager, so they show for public IP addresses only. The maps color each country by count, and its name shows on hover. They load the country shapes from the OpenSearch maps service, so the browser needs Internet access. The Logins, Web, CrowdSec and Telephony dashboards also have a Country picker. To see every country but one, pick it, then click its filter and choose Exclude results. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 
@@ -307,7 +340,7 @@ Let's Encrypt, when enabled, only covers the dashboard behind Traefik.
 
 ## Backup
 
-The module is backed up by the NS8 backup. Before each backup the indexer writes a snapshot of the user data (events, findings, dashboards). The backup also holds the settings, the certificate authority, the agent keys and the API configuration. It leaves out the vulnerability feed of the manager, about 7 GB, which is downloaded again. The detection content comes back by itself from the Wazuh CTI at start and from this module.
+The module is backed up by the NS8 backup. Before each backup the indexer writes a snapshot of the user data (events, findings, dashboards). The backup also holds the settings, the customers and their zones, the certificate authority, the agent keys and the API configuration. It leaves out the vulnerability feed of the manager, about 7 GB, which is downloaded again. The detection content comes back by itself from the Wazuh CTI at start and from this module.
 
 A restore or a clone on another node gives back the same server: same host name, same certificate authority, same agents and history. To move the server, restore it on the new node, then point the DNS record of the host name to it: the agents reconnect by themselves, without a new token. Only one instance can run on a node.
 
@@ -317,7 +350,7 @@ A restore or a clone on another node gives back the same server: same host name,
 
 ## Test
 
-The Robot tests are in `tests/`. They install the module, configure it, install an agent on the same node with the script of this repository, then check the enrollment, the locked host name, `--update`, `renew-certificates`, the revocation and the removal. The node needs Internet access for the agent package.
+The Robot tests are in `tests/`. They install the module, configure it, install an agent on the same node with the script of this repository, then check the enrollment, the locked host name, `--update`, `ns8-journal`, the retention, the customers and their zones, `renew-certificates`, the revocation and the removal. The `ui` tag adds screenshots of the pages. The node needs Internet access for the agent package.
 
     ./test-module.sh <leader address> ghcr.io/stephdl/wazuh:latest
 
