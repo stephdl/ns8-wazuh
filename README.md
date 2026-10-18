@@ -11,9 +11,9 @@ The module is not ready for production. It runs Wazuh `5.0.0-rc1`. The plan and 
 ```text
  Watched servers                     NS8 node running this module
 ┌────────────────────┐              ┌──────────────────────────────────────┐
-│ journald, files    │  1514, 1515  │ manager ───▶ indexer ◀─── dashboard  │
+│ journald, files    │  1514, 1515  │ manager ───▶ indexer ◀─── dashboard│
 │         │          │  1517, TLS   │              decodes,        ▲       │
-│         ▼          │ ───────────▶ │              raises alerts,  │       │
+│         ▼          │ ───────────▶│               raises alerts, │       │
 │ wazuh-agent        │              │              stores          │       │
 └────────────────────┘              └──────────────┬───────────────┼───────┘
                                                    │               │
