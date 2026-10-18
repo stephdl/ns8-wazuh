@@ -87,7 +87,7 @@ def default_settings():
         ("now-24h", "now", "Last 24 hours"), ("now-7d", "now", "Last 7 days"),
         ("now-30d", "now", "Last 30 days"), ("now-90d", "now", "Last 90 days")]]
     settings = {
-        # The default 500 lines run out quickly on the journal. 10000 is the most the indexer returns at once
+        # The default 500 lines run out quickly on the journal. 10000 is the default limit of the indexer for one search
         "discover:sampleSize": 10000,
         # Each user picks the light or dark mode in the Appearance menu, instead of one mode for all
         "theme:enableUserControl": True,
@@ -103,22 +103,27 @@ def default_settings():
     return settings
 
 
-# Values the module set before: they are replaced like an unset value
-OLD_DEFAULTS = {"discover:sampleSize": 5000}
+# Present once the 5000 lines set by older versions were raised, so a 5000 chosen later is kept
+SAMPLE_SIZE_RAISED = "discover-sample-size-raised"
 
 
 def set_default_settings():
     """Set the dashboard settings of the module, unless the administrator already chose a value."""
     current = dashboard_api("GET", "api/opensearch-dashboards/settings").get("settings", {})
+    if not os.path.exists(SAMPLE_SIZE_RAISED) and current.get("discover:sampleSize", {}).get("userValue") == 5000:
+        current.pop("discover:sampleSize")
+    raised = True
     for key, value in default_settings().items():
-        user_value = current.get(key, {}).get("userValue")
-        if user_value is not None and user_value != OLD_DEFAULTS.get(key):
+        if current.get(key, {}).get("userValue") is not None:
             continue
         # One at a time: a setting this version refuses must not stop the others
         try:
             checked(dashboard_api("POST", "api/opensearch-dashboards/settings", {"changes": {key: value}}), key)
         except RuntimeError as error:
             print(f"Warning: {key} is not set: {error}", file=sys.stderr)
+            raised = raised and key != "discover:sampleSize"
+    if raised:
+        open(SAMPLE_SIZE_RAISED, "w").close()
 
 
 try:
