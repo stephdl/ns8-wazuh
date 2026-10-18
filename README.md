@@ -191,6 +191,7 @@ Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node n
 | NS8 API server login, success and failure | user, source IP |
 | Traefik access log | source IP, method, path, status |
 | CrowdSec alerts | scenario, source IP |
+| CrowdSec bans | scenario, source IP |
 
 Two rules raise findings: `NS8 authentication failure` (level low) and `NS8 CrowdSec scenario triggered` (level low, CrowdSec has already banned the address). Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads them at each configuration and update, through the Content Manager API, and runs the rules every minute.
 
