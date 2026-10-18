@@ -397,9 +397,8 @@ MAIL = "service.type:(postfix or rspamd)"
 DELIVERY = "service.type:postfix and event.action:(sent or bounced or deferred or expired)"
 REJECTED = "event.action:mail-rejected"
 SPAM = "service.type:rspamd"
-SASL = "service.type:postfix and event.action:logon-failed"
 write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
-    "Sent and rejected mail, spam, viruses and failed mail logins", [
+    "Sent and rejected mail, spam, viruses, and where accepted and rejected mail comes from", [
     (vis("ns8-mail-delivery-count", "Deliveries by status", APPS, DELIVERY,
          metric(group=terms("2", "event.action", "group", size=5))), 24, 8),
     (vis("ns8-mail-rejected-count", "Rejected messages", APPS, REJECTED,
@@ -421,17 +420,16 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
                terms("3", "event.action", "bucket", size=2, label="Status"))), 16, 14),
     # Rspamd scans sent mail too, but users mostly send from the LAN, which has no country
     # The maps side by side, each table under its map
-    (vis("ns8-mail-source-map", "Mail sources map", APPS, SPAM, geo_map()), 24, 14),
-    (vis("ns8-mail-sasl-map", "SMTP login failures map", APPS, SASL, geo_map()), 24, 14),
-    (vis("ns8-mail-source-countries", "Mail sources by country", APPS, SPAM,
+    (vis("ns8-mail-source-map", "Inbound mail sources map", APPS, SPAM, geo_map()), 24, 14),
+    (vis("ns8-mail-rejected-map", "Rejected mail sources map", APPS, REJECTED, geo_map()), 24, 14),
+    (vis("ns8-mail-source-countries", "Inbound mail sources by country", APPS, SPAM,
          table(terms("2", "source.geo.country_name", "bucket", size=30, label="Country"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "cardinality", "schema": "metric",
                                "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 24, 14),
-    (vis("ns8-mail-sasl-sources", "SMTP login failures", APPS, SASL,
-         table(terms("2", "source.ip", "bucket", size=30, label="Source IP"),
-               terms("3", "user.name", "bucket", size=3, label="User", missing=True),
-               terms("4", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
-               terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 24, 14),
+    (vis("ns8-mail-rejected-countries", "Rejected mail sources by country", APPS, REJECTED,
+         table(terms("2", "source.geo.country_name", "bucket", size=30, label="Country"),
+               extra_metrics=[{"id": "3", "enabled": True, "type": "cardinality", "schema": "metric",
+                               "params": {"field": "source.ip", "customLabel": "IP addresses"}}])), 24, 14),
     (search("ns8-mail-viruses", "NS8 - Mail viruses", APPS, f'{REJECTED} and event.reason:*virus*',
             ["source.ip", "email.from.address", "email.to.address", "event.reason"]), 48, 12),
 ]))

@@ -225,7 +225,7 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 | NS8 - CrowdSec | attacks detected and IP addresses banned by CrowdSec, with a map for each |
 | NS8 - Fleet | alerts of every server by level, rule and MITRE tactic, and when each server last reported |
 | NS8 - System changes | accounts, groups, services and firewall rules changed on the servers |
-| NS8 - Mail | sent and rejected mail, spam, viruses and failed mail logins, and the countries the mail comes from, with a map |
+| NS8 - Mail | sent and rejected mail, spam, viruses, and the countries accepted and rejected mail comes from, with a map for each |
 | NS8 - Directory | Samba domain logins, failures by account and workstation, account and group changes. Needs the Samba audit below |
 | NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
 | NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |

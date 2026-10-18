@@ -25,7 +25,9 @@ CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_I
 FINDINGS_DASHBOARD = "ns8-fleet"
 FINDINGS_INDEX_PATTERN = "wazuh-findings-v5*"
 # Overwriting never deletes: objects dropped from the dashboards would stay in Visualize forever
-RETIRED = [("visualization", "ns8-logins-countries")]
+RETIRED = [("visualization", "ns8-logins-countries"),
+           ("visualization", "ns8-mail-sasl-map"),
+           ("visualization", "ns8-mail-sasl-sources")]
 
 
 def wait_ready():
