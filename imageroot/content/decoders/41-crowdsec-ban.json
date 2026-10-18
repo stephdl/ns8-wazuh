@@ -1,0 +1,54 @@
+{
+  "resource": {
+    "name": "decoder/ns8-crowdsec-ban/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "CrowdSec ban",
+      "description": "IP addresses banned by a CrowdSec decision",
+      "author": "NethServer",
+      "module": "crowdsec",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\" ban on Ip \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>msg=\"\\(<~>\\) <event.reason> by ip <~> ban on Ip <source.ip>\"<~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "intrusion_detection"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "crowdsec-ban"
+          },
+          {
+            "service.type": "crowdsec"
+          }
+        ]
+      }
+    ]
+  }
+}

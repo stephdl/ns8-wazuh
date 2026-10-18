@@ -191,6 +191,7 @@ Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node n
 | NS8 API server login, success and failure | user, source IP |
 | Traefik access log | source IP, method, path, status |
 | CrowdSec alerts | scenario, source IP |
+| CrowdSec bans | scenario, source IP |
 
 Two rules raise findings: `NS8 authentication failure` (level low) and `NS8 CrowdSec scenario triggered` (level low, CrowdSec has already banned the address). Mail spam senders (`crowdsecurity/postfix-spam`) raise no finding: thousands a day, already refused by the mail server, they stay in the NS8 - CrowdSec dashboard. The module loads them at each configuration and update, through the Content Manager API, and runs the rules every minute.
 
@@ -221,7 +222,7 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 | NS8 - Journal | every log line, like `journalctl`. Pick a server, an application and a program, or type a word in the search bar, any case |
 | NS8 - Logins | successful and failed logins on every service and server, with a map of each. The successful logins table shows who logged in from where. Click a service, such as sogo, to see only its logins |
 | NS8 - Web | web traffic of every site: status codes, errors, probed paths and scanners, with a map |
-| NS8 - CrowdSec | attacks blocked by CrowdSec and where they come from, with a map |
+| NS8 - CrowdSec | attacks detected and IP addresses banned by CrowdSec, with a map for each |
 | NS8 - Fleet | alerts of every server by level, rule and MITRE tactic, and when each server last reported |
 | NS8 - System changes | accounts, groups, services and firewall rules changed on the servers |
 | NS8 - Mail | sent and rejected mail, spam, viruses and failed mail logins, and the countries the mail comes from, with a map |
