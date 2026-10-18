@@ -217,11 +217,11 @@ Also in #5: customers (see Per customer view), the dashboards loaded at each con
 
 To do: download the install script of the module version instead of `main`, so a new option such as `--group` works before the merge.
 
-**Agents to update after #23.** On each NS8 node, run the install script again with `--update`, from `main`. Done on the three agents of wazuh.sdl: they stay active and the cursor of rockylinux.sdl moves. ns8-leader and pve are production servers: checked only from the manager (status and keepalive), not by SSH. To check there: no `ns8-journal` run older than a minute, and the cursor file changing.
+**Agents updated after #23, done.** Every NS8 node runs the install script again with `--update`, from `main`. The agents stay active and their cursor moves.
 
 **Agents to update after #5.** On each NS8 node, run the install script again with `--update`: the agent switches to `ns8-journal` and its lines get their module. Done on the two test nodes, r1-node1 and debian13. The burst is checked, see #15 above.
 
-**Next.** Open the Wazuh issue on the anacron line above. Delete the doubled Nextcloud lines of ns8-leader from 14 October with a delete by query, or let the retention do it. Find why `ns8-journal` stopped moving on ns8-leader between 16:47 and 17:45 the same day, before the fix of #15 was complete. The Robot tests above. A test on a real NethVoice and a real Proxmox VE 9, and the locked domain account rule on a domain with a lockout policy. The certificate expiry watch below.
+**Next.** Open the Wazuh issue on the anacron line above. The Robot tests above. A test on a real NethVoice and a real Proxmox VE 9, and the locked domain account rule on a domain with a lockout policy. The certificate expiry watch below.
 
 Other systems the customers run next to NS8, each with its own decoders, rules and dashboard:
 - Proxmox VE, done in #5 (merged): the Wazuh 5 CTI has no Proxmox integration, so the decoders are ported from the Wazuh 4 one (`0440-proxmox-ve_decoders.xml`). Web and API logins, tasks from their UPID with type, guest, user and result, rules for a deleted guest and a failed backup, an NS8 - Proxmox dashboard. Tested on sample lines only, check on a real Proxmox VE 9. Later: quorum (`corosync`, `pmxcfs`), ZFS and Ceph errors.
@@ -269,8 +269,7 @@ Test with a short certificate uploaded through the `upload-certificate` action o
 - Rootless: uid 101 permissions, `memlock`. `vm.max_map_count` is a host setting that a rootless module cannot change.
 - Consistency of the indexer snapshot and `path.repo`.
 - OpenLDAP log level: no bind is traced in journald today.
-- Login failures and admin actions of the core in journald.
-- GeoIP enrichment enabled in the default policy.
+- Admin actions of the core in journald: the api-server logins and their failures are decoded, the actions run through it are not.
 
 ## 9. End to end check
 
