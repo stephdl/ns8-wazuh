@@ -70,6 +70,15 @@
         ]
       },
       {
+        "check": "exists($_samba.Authentication.clientAccount) AND NOT string_equal($_samba.Authentication.clientAccount, '')",
+        "parse|_samba.Authentication.clientAccount": [
+          "CN=<user.name>,<~>",
+          "cn=<user.name>,<~>",
+          "<user.name>@<~>",
+          "<~>"
+        ]
+      },
+      {
         "parse|_samba.Authentication.remoteAddress": [
           "ipv4:<source.ip>:<~>",
           "<~>"
