@@ -346,9 +346,8 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True),
                terms("4", "event.reason", "bucket", size=3, label="Scenario"))), 32, 14),
     (markdown("ns8-crowdsec-help", "How to read it",
-              "**Attacks**: an IP address triggered a CrowdSec scenario, such as too many failed logins. "
-              "**Bans**: CrowdSec blocked the address in the firewall for a while. "
-              "Most attacks lead to a ban, but not all."), 48, 3),
+              "**Attacks**: an address triggered a CrowdSec scenario.\n\n"
+              "**Bans**: CrowdSec blocked the address for a while. Not every attack leads to a ban."), 48, 5),
     (vis("ns8-crowdsec-map", "Attacks map", APPS, CROWDSEC, geo_map()), 24, 14),
     (vis("ns8-crowdsec-ban-map", "Bans map", APPS, CROWDSEC_BAN, geo_map()), 24, 14),
 ], country=True))
