@@ -159,7 +159,7 @@
     "customer_helper": "Pick a customer or type a new one. It groups its servers in the list and the dashboards, and holds their login zones.",
     "agent_name": "Agent name",
     "agent_name_placeholder": "mail.example.com",
-    "agent_name_helper": "Optional. The host name of the server when empty.",
+    "agent_name_helper": "Optional. The FQDN of the server when empty, else its host name.",
     "name_invalid": "Only letters, digits, dots, dashes and underscores",
     "create_token": "Create a token",
     "token_ready": "Token ready",
