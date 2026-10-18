@@ -230,6 +230,8 @@ The module adds twelve dashboards to the Wazuh dashboard, under Explore > Dashbo
 | NS8 - Telephony | failed SIP, CTI and reports logins of NethVoice, by source and extension |
 | NS8 - Proxmox | Proxmox VE logins, virtual machine tasks, failed tasks and backups, deleted guests |
 
+The log tables load the 10000 newest lines of the chosen time range, 50 per page. Narrow the time range or the pickers to see older lines. A value set by an administrator in Dashboards Management > Advanced settings (`discover:sampleSize`) is kept.
+
 The country and the city come from the GeoIP database of the manager, so they show for public IP addresses only. The maps color each country by count, and its name shows on hover. They load the country shapes from the OpenSearch maps service, so the browser needs Internet access. The Logins, Web, CrowdSec and Telephony dashboards also have a Country picker. To see every country but one, pick it, then click its filter and choose Exclude results. The dashboards live in `imageroot/content/dashboards/` and are loaded at each configuration and update with fixed ids: a change made in the interface is lost. To customize one, clone it first.
 
 ### Samba audit

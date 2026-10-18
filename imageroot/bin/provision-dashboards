@@ -87,8 +87,8 @@ def default_settings():
         ("now-24h", "now", "Last 24 hours"), ("now-7d", "now", "Last 7 days"),
         ("now-30d", "now", "Last 30 days"), ("now-90d", "now", "Last 90 days")]]
     settings = {
-        # The default 500 lines run out quickly on the journal, 5000 stays fast
-        "discover:sampleSize": 5000,
+        # The default 500 lines run out quickly on the journal. 10000 is the most the indexer returns at once
+        "discover:sampleSize": 10000,
         # Each user picks the light or dark mode in the Appearance menu, instead of one mode for all
         "theme:enableUserControl": True,
         # The same color for the same outcome on every dashboard
@@ -103,11 +103,16 @@ def default_settings():
     return settings
 
 
+# Values the module set before: they are replaced like an unset value
+OLD_DEFAULTS = {"discover:sampleSize": 5000}
+
+
 def set_default_settings():
     """Set the dashboard settings of the module, unless the administrator already chose a value."""
     current = dashboard_api("GET", "api/opensearch-dashboards/settings").get("settings", {})
     for key, value in default_settings().items():
-        if current.get(key, {}).get("userValue") is not None:
+        user_value = current.get(key, {}).get("userValue")
+        if user_value is not None and user_value != OLD_DEFAULTS.get(key):
             continue
         # One at a time: a setting this version refuses must not stop the others
         try:
