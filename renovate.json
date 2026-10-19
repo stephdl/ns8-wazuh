@@ -15,6 +15,7 @@
         "wazuh/wazuh-dashboard"
       ],
       "groupName": "wazuh",
+      "versioning": "semver",
       "automerge": false
     }
   ]
