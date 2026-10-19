@@ -1,7 +1,14 @@
 {
   "name": "wazuh",
   "description": {
-    "en": "Central Wazuh server: collects the logs of your servers, raises alerts and keeps them searchable"
+    "en": "Central Wazuh server: collects the logs of your servers, raises alerts and keeps them searchable.",
+    "fr": "Serveur Wazuh central : collecte les journaux de vos serveurs, lève des alertes et les rend consultables.",
+    "it": "Server Wazuh centrale: raccoglie i log dei tuoi server, genera avvisi e li rende ricercabili.",
+    "de": "Zentraler Wazuh-Server: sammelt die Logs Ihrer Server, löst Warnungen aus und macht sie durchsuchbar.",
+    "es": "Servidor Wazuh central: recoge los registros de sus servidores, genera alertas y permite buscarlos.",
+    "pt": "Servidor Wazuh central: recolhe os registos dos seus servidores, gera alertas e torna-os pesquisáveis.",
+    "pt_BR": "Servidor Wazuh central: coleta os logs dos seus servidores, gera alertas e os torna pesquisáveis.",
+    "eu": "Wazuh zerbitzari zentrala: zure zerbitzarien erregistroak biltzen ditu, alertak sortzen ditu eta bilagarri uzten ditu."
   },
   "categories": [
     "security"
@@ -13,8 +20,8 @@
     }
   ],
   "docs": {
-    "documentation_url": "https://documentation.wazuh.com/",
-    "bug_url": "https://github.com/stephdl/ns8-wazuh/issues",
+    "documentation_url": "https://github.com/stephdl/ns8-wazuh#readme",
+    "bug_url": "https://github.com/stephdl/dev/issues",
     "code_url": "https://github.com/stephdl/ns8-wazuh"
   },
   "source": "ghcr.io/stephdl/wazuh"
