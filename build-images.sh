@@ -39,7 +39,7 @@ buildah config --entrypoint=/ \
     --label="org.nethserver.authorizations=node:fwadm traefik@node:routeadm cluster:accountconsumer" \
     --label="org.nethserver.max-per-node=1" \
     --label="org.nethserver.tcp-ports-demand=1" \
-    --label="org.nethserver.volumes=wazuh-indexer-data" \
+    --label="org.nethserver.volumes=wazuh-indexer-data wazuh-snapshots wazuh-logs" \
     --label="org.nethserver.rootfull=0" \
     --label="org.nethserver.min-core=3.20.1" \
     --label="org.nethserver.images=docker.io/wazuh/wazuh-manager:5.0.0-rc1 docker.io/wazuh/wazuh-indexer:5.0.0-rc1 docker.io/wazuh/wazuh-dashboard:5.0.0-rc1" \
