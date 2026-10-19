@@ -24,7 +24,8 @@
             "retention_days": 365,
             "telegram_enabled": true,
             "telegram_chat_id": "-1001234567890",
-            "telegram_token_set": true
+            "telegram_token_set": true,
+            "telegram_admin_enabled": true
         }
     ],
     "type": "object",
@@ -45,6 +46,7 @@
         "notify_enabled",
         "retention_days",
         "telegram_enabled",
+        "telegram_admin_enabled",
         "telegram_chat_id",
         "telegram_token_set"
     ],
@@ -143,8 +145,13 @@
         },
         "telegram_enabled": {
             "type": "boolean",
-            "title": "Telegram notifications",
-            "description": "Send the summary of the new findings to a Telegram chat every 5 minutes."
+            "title": "Telegram bot",
+            "description": "Notifications are sent to Telegram at all."
+        },
+        "telegram_admin_enabled": {
+            "type": "boolean",
+            "title": "Telegram admin notifications",
+            "description": "The summary of the new findings goes to the admin chat every 5 minutes."
         },
         "telegram_chat_id": {
             "type": "string",

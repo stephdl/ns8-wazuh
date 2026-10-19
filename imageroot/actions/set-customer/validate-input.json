@@ -8,6 +8,7 @@
             "name": "acme",
             "zones": ["@EU", "CA"],
             "recipients": ["soc@acme.example"],
+            "telegram_enabled": true,
             "telegram_chat_id": "-1001234567890"
         }
     ],
@@ -43,10 +44,15 @@
             },
             "uniqueItems": true
         },
+        "telegram_enabled": {
+            "type": "boolean",
+            "title": "Telegram alerts",
+            "description": "Send the logins from outside the allowed zones to the Telegram chat of the customer, while the bot of the module is on"
+        },
         "telegram_chat_id": {
             "type": "string",
             "title": "Telegram chat ID",
-            "description": "Telegram chat of the customer that receives its logins from outside the allowed zones, through the bot of the module. Empty or omitted to send none.",
+            "description": "Telegram chat of the customer, kept while its alerts are off. Empty or omitted when it has none.",
             "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})?$"
         }
     }

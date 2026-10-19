@@ -26,6 +26,7 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "notify_sender": renv.get("NOTIFY_SENDER", ""),
     "notify_min_level": renv.get("NOTIFY_MIN_LEVEL", "medium"),
     "telegram_enabled": renv.get("TELEGRAM_ENABLED") == "True",
+    "telegram_admin_enabled": renv.get("TELEGRAM_ADMIN_ENABLED") == "True",
     "telegram_chat_id": renv.get("TELEGRAM_CHAT_ID", ""),
     "retention_days": int(renv.get("LOG_RETENTION_DAYS", "365")),
 })

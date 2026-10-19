@@ -20,7 +20,8 @@
             "notify_enabled": true,
             "retention_days": 365,
             "telegram_enabled": true,
-            "telegram_chat_id": "-1001234567890"
+            "telegram_chat_id": "-1001234567890",
+            "telegram_admin_enabled": true
         }
     ],
     "type": "object",
@@ -126,8 +127,13 @@
         },
         "telegram_enabled": {
             "type": "boolean",
-            "title": "Telegram notifications",
-            "description": "Send the summary of the new findings to a Telegram chat every 5 minutes, at the same minimum level as the emails. Needs the bot token and the chat ID."
+            "title": "Telegram bot",
+            "description": "Send notifications to Telegram at all. Off, no chat gets anything, neither the admin one nor those of the customers. Needs the bot token."
+        },
+        "telegram_admin_enabled": {
+            "type": "boolean",
+            "title": "Telegram admin notifications",
+            "description": "Send the summary of the new findings to the admin chat every 5 minutes, at the same minimum level as the emails. Needs the chat ID."
         },
         "telegram_token": {
             "type": "string",
@@ -138,7 +144,7 @@
         "telegram_chat_id": {
             "type": "string",
             "title": "Telegram chat ID",
-            "description": "Chat that receives the summary: a group ID like -1001234567890, a user ID, or a public channel like @name. Empty when disabled.",
+            "description": "Admin chat: a group ID like -1001234567890, a user ID, or a public channel like @name. Empty when not used.",
             "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})?$"
         }
     },
@@ -170,10 +176,14 @@
                 "properties": {
                     "telegram_enabled": {
                         "const": true
+                    },
+                    "telegram_admin_enabled": {
+                        "const": true
                     }
                 },
                 "required": [
-                    "telegram_enabled"
+                    "telegram_enabled",
+                    "telegram_admin_enabled"
                 ]
             },
             "then": {

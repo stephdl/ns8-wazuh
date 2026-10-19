@@ -105,6 +105,7 @@ Check if wazuh configuration reads back
     Should Be Equal    ${config}[ldap_domain]    ${EMPTY}
     Should Be Equal    ${config}[notify_enabled]    ${False}
     Should Be Equal    ${config}[telegram_enabled]    ${False}
+    Should Be Equal    ${config}[telegram_admin_enabled]    ${False}
     Should Be Equal    ${config}[telegram_token_set]    ${False}
     Should Be Equal As Integers    ${config}[retention_days]    365
     Should Be Equal As Integers    ${config}[agents_enrolled]    0
@@ -112,12 +113,13 @@ Check if wazuh configuration reads back
 Check if the Telegram token stays secret
     # Enabled without a token: nothing could be sent
     ${output} =    Run action that fails    configure-module
-    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_chat_id":"-100123"}
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_admin_enabled":true,"telegram_chat_id":"-100123"}
     Should Contain    ${output}    telegram_token_required
     Run action    configure-module
-    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_chat_id":"-100123","telegram_token":"123456:robot-token"}
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_admin_enabled":true,"telegram_chat_id":"-100123","telegram_token":"123456:robot-token"}
     ${config} =    Run action    get-configuration
     Should Be Equal    ${config}[telegram_enabled]    ${True}
+    Should Be Equal    ${config}[telegram_admin_enabled]    ${True}
     Should Be Equal    ${config}[telegram_chat_id]    -100123
     Should Be Equal    ${config}[telegram_token_set]    ${True}
     Should Not Contain    ${config}    robot-token
@@ -268,11 +270,12 @@ Check if a token needs a customer
 
 Check if the customer has login zones
     Customer should be listed    robot    1
-    Run action    set-customer    {"name":"robot","zones":["@EU","CA"],"recipients":["soc@ns8-ci.test"],"telegram_chat_id":"-100456"}
+    Run action    set-customer    {"name":"robot","zones":["@EU","CA"],"recipients":["soc@ns8-ci.test"],"telegram_enabled":true,"telegram_chat_id":"-100456"}
     ${result} =    Run action    list-customers
     ${robot} =    Evaluate    [c for c in $result['customers'] if c['name'] == 'robot'][0]
     Should Be Equal    ${robot}[zones]    ${{ ['@EU', 'CA'] }}
     Should Be Equal    ${robot}[recipients]    ${{ ['soc@ns8-ci.test'] }}
+    Should Be Equal    ${robot}[telegram_enabled]    ${True}
     Should Be Equal    ${robot}[telegram_chat_id]    -100456
     Should Contain    ${result}[countries]    FR
     Should Be Equal    ${result}[continents][EU]    Europe

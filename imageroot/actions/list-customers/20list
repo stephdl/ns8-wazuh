@@ -28,11 +28,13 @@ for group in response["data"]["affected_items"]:
         "agents": group.get("count", 0),
         "zones": customer.get("zones", []),
         "recipients": customer.get("recipients", []),
+        "telegram_enabled": customer.get("telegram_enabled", False),
         "telegram_chat_id": customer.get("telegram_chat_id", ""),
     })
 # Settings left by a removal cut short: shown without agents, so that the page can remove them again
 groups = {c["name"] for c in customers}
 customers += [{"name": name, "agents": 0, "zones": c.get("zones", []), "recipients": c.get("recipients", []),
+               "telegram_enabled": c.get("telegram_enabled", False),
                "telegram_chat_id": c.get("telegram_chat_id", "")} for name, c in settings.items() if name not in groups]
 # The zones the backend knows: the page offers these only, with the country names of the browser
 json.dump({"customers": sorted(customers, key=lambda c: c["name"]),

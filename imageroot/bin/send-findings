@@ -324,11 +324,14 @@ def admin_report(cursor, seen_file, target, deliver):
     cursor.save(ts, ids)
 
 
-def zone_report(cursor, seen_file, field, deliver):
-    """Send each customer its logins from outside its allowed zones, once a day per user, address and service."""
-    customers = wazuh_zones.load()["customers"]
+def zone_report(cursor, seen_file, target, deliver):
+    """Send each customer its logins from outside its allowed zones, once a day per user, address and service.
+
+    target gives the address or chat of a customer, empty when it gets nothing on this channel.
+    """
+    customers = {name: c for name, c in wazuh_zones.load()["customers"].items() if target(c)}
     host = os.environ.get("TRAEFIK_HOST", "")
-    if not (deliver and any(c.get(field) for c in customers.values())):
+    if not (deliver and customers):
         cursor.forget()
         return
     seen = SeenLogins(seen_file)
@@ -343,20 +346,29 @@ def zone_report(cursor, seen_file, field, deliver):
             source = hit["_source"]
             customer = wazuh_zones.customer_of(source.get("wazuh", {}).get("agent", {}).get("groups"))
             key = zone_key(customer, source)
-            if customers.get(customer, {}).get(field) and not seen.known(key):
+            if customer in customers and not seen.known(key):
                 alerts.setdefault(customer, {}).setdefault(key, zone_line(source))
+    failed = []
     for customer, logins in sorted(alerts.items()):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
         lines = ([("head", f"Logins of {customer} from outside its allowed zones ({zones}):"), ("text", "")] +
                  [("text", line) for line in logins.values()] +
                  [("text", ""), ("text", "Each user, address and service is reported once a day."),
                   ("link", "Open the logins dashboard", f"https://{host}{LOGINS_DASHBOARD}")])
-        deliver(customers[customer][field],
-                f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", lines)
-        # Saved per customer: a failure on the next one must not send this one again
+        # One customer whose chat or mailbox refuses must not hold back the others
+        try:
+            deliver(target(customers[customer]),
+                    f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", lines)
+        except Exception as error:
+            log(f"zone alert to {customer} failed: {error}")
+            failed.append(customer)
+            continue
+        # Saved per customer: the next run sends again only to those that failed
         seen.add(logins)
         seen.save()
         log(f"zone alert sent to {customer}, {len(logins)} logins")
+    if failed:
+        raise RuntimeError(f"zone alerts not sent to {', '.join(failed)}")
     cursor.save(ts, ids)
 
 
@@ -433,18 +445,31 @@ def main():
         # Before the switch existed, a recipient was enough to send emails
         if os.environ.get("NOTIFY_ENABLED", str(bool(recipients))) != "True":
             recipients = []
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "") if os.environ.get("TELEGRAM_ENABLED") == "True" else ""
+        # The bot switch stops every chat, the admin one and those of the customers
+        bot_on = os.environ.get("TELEGRAM_ENABLED") == "True"
+        admin_on = bot_on and os.environ.get("TELEGRAM_ADMIN_ENABLED") == "True"
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "") if admin_on else ""
+
+        def customer_chat(customer):
+            return customer.get("telegram_chat_id", "") if bot_on and customer.get("telegram_enabled") else ""
+
+        status = 0
+        try:
+            mail = mailer()
+        except Exception as error:
+            log(f"email failed: {error}")
+            mail, status = None, 1
+        chat = telegram() if bot_on else None
         runs = [
             ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
-                                                 recipients, mailer())),
+                                                 recipients, mail)),
             ("customer email", lambda: zone_report(Cursor("send-findings-zones.cursor"), ZONE_SEEN_FILE,
-                                                   "recipients", mailer())),
+                                                   lambda c: c.get("recipients"), mail)),
             ("admin telegram", lambda: admin_report(Cursor("send-findings-telegram.cursor"),
-                                                    ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, telegram())),
+                                                    ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, chat)),
             ("customer telegram", lambda: zone_report(Cursor("send-findings-zones-telegram.cursor"),
-                                                      ZONE_TELEGRAM_SEEN_FILE, "telegram_chat_id", telegram())),
+                                                      ZONE_TELEGRAM_SEEN_FILE, customer_chat, chat)),
         ]
-        status = 0
         # A channel that fails must not stop the others: it tries again at the next run
         for name, run in runs:
             try:

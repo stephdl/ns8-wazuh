@@ -98,7 +98,7 @@
                   row.recipients.join(", ") || "-"
                 }}</cv-data-table-cell>
                 <cv-data-table-cell>{{
-                  row.telegram_chat_id || "-"
+                  (row.telegram_enabled && row.telegram_chat_id) || "-"
                 }}</cv-data-table-cell>
                 <cv-data-table-cell class="table-overflow-menu-cell">
                   <cv-overflow-menu flip-menu class="table-overflow-menu">
@@ -170,102 +170,40 @@
             class="mg-bottom"
             ref="recipients"
           />
-          <template v-if="telegramTokenSet">
-            <div class="chat-picker">
-              <cv-dropdown
-                v-if="!telegramManual"
-                v-model="telegramChatId"
-                :label="$t('customers.telegram_chat_id')"
-                :placeholder="
-                  telegramChats.length
-                    ? $t('settings.telegram_choose_chat')
-                    : $t('settings.telegram_click_find')
-                "
-                :invalid-message="$t(error.telegram_chat_id)"
-                :disabled="loading.setCustomer || !telegramChats.length"
-                class="chat-field"
-                ref="telegram_chat_id"
-              >
-                <cv-dropdown-item
-                  v-for="chat in telegramChats"
-                  :key="chat.id"
-                  :value="chat.id"
-                  >{{ chat.title }} ({{
-                    $t("settings.telegram_chat_" + chat.type)
-                  }})</cv-dropdown-item
-                >
-              </cv-dropdown>
-              <NsTextInput
-                v-else
-                v-model.trim="telegramChatId"
-                :label="$t('customers.telegram_chat_id')"
-                placeholder="-1001234567890"
-                :invalid-message="$t(error.telegram_chat_id)"
-                :disabled="loading.setCustomer"
-                class="chat-field"
-                ref="telegram_chat_id"
-              />
-              <NsButton
-                kind="tertiary"
-                size="field"
-                :loading="loading.listTelegramChats"
-                :disabled="loading.setCustomer || loading.listTelegramChats"
-                @click="findTelegramChats(false)"
-                class="find-chats"
-                >{{ $t("settings.telegram_find_chats") }}</NsButton
-              >
-            </div>
-            <div class="chat-helper mg-bottom">
-              {{ $t("customers.telegram_chat_id_helper") }}
-              <cv-link @click="telegramManual = !telegramManual">{{
-                telegramManual
-                  ? $t("settings.telegram_pick_from_list")
-                  : $t("settings.telegram_type_id")
-              }}</cv-link>
-            </div>
-            <NsInlineNotification
-              v-if="telegramChatsEmpty"
-              kind="info"
-              :title="$t('settings.telegram_no_chats_title')"
-              :description="$t('settings.telegram_no_chats_description')"
-              :showCloseButton="false"
-            />
-            <NsInlineNotification
-              v-if="error.listTelegramChats"
-              kind="error"
-              :title="$t('action.list-telegram-chats')"
-              :description="error.listTelegramChats"
-              :showCloseButton="false"
-            />
-            <NsButton
-              v-if="telegramChatId"
-              kind="secondary"
-              size="field"
-              :loading="loading.testTelegram"
-              :disabled="loading.setCustomer || loading.testTelegram"
-              @click="sendTelegramTest"
+          <template v-if="telegramReady">
+            <NsToggle
+              value="telegramEnabled"
+              :label="$t('customers.telegram_enabled')"
+              v-model="telegramEnabled"
+              :disabled="loading.setCustomer"
               class="mg-bottom"
-              >{{ $t("settings.telegram_test") }}</NsButton
             >
-            <NsInlineNotification
-              v-if="telegramTestSent"
-              kind="success"
-              :title="$t('settings.telegram_test_sent')"
-              :showCloseButton="false"
-            />
-            <NsInlineNotification
-              v-if="error.testTelegram"
-              kind="error"
-              :title="$t('action.test-telegram')"
-              :description="error.testTelegram"
-              :showCloseButton="false"
+              <template slot="text-left">{{
+                $t("settings.disabled")
+              }}</template>
+              <template slot="text-right">{{
+                $t("settings.enabled")
+              }}</template>
+            </NsToggle>
+            <TelegramChat
+              v-if="telegramEnabled"
+              :key="customerToEdit ? customerToEdit.name : ''"
+              v-model="telegramChatId"
+              :label="$t('customers.telegram_chat_id')"
+              :helper="$t('customers.telegram_chat_id_helper')"
+              :disabled="loading.setCustomer"
+              :invalidMessage="$t(error.telegram_chat_id)"
+              ref="telegram_chat_id"
             />
           </template>
           <p v-else class="mg-bottom muted">
             {{ $t("customers.telegram_no_token") }}
           </p>
           <NsInlineNotification
-            v-if="!zones.length && (recipientList.length || telegramChatId)"
+            v-if="
+              !zones.length &&
+              (recipientList.length || (telegramEnabled && telegramChatId))
+            "
             kind="warning"
             :title="$t('customers.no_zones_title')"
             :description="$t('customers.no_zones_description')"
@@ -321,11 +259,8 @@ import {
   PageTitleService,
 } from "@nethserver/ns8-ui-lib";
 import { zoneLabel, zoneOptions } from "../lib/countries";
-import {
-  CHAT_ID_PATTERN,
-  listTelegramChats,
-  testTelegram,
-} from "../lib/telegram";
+import { CHAT_ID_PATTERN } from "../lib/telegram";
+import TelegramChat from "@/components/TelegramChat.vue";
 
 export default {
   name: "Customers",
@@ -336,6 +271,7 @@ export default {
     QueryParamService,
     PageTitleService,
   ],
+  components: { TelegramChat },
   pageTitle() {
     return this.$t("customers.title") + " - " + this.appName;
   },
@@ -355,19 +291,15 @@ export default {
       customerToRemove: null,
       zones: [],
       recipients: "",
+      telegramEnabled: false,
       telegramChatId: "",
-      telegramTestSent: false,
-      telegramChats: [],
-      telegramChatsEmpty: false,
-      telegramManual: false,
       smarthostEnabled: true,
-      telegramTokenSet: false,
+      // The bot of the module is on and has a token: a customer chat can get alerts
+      telegramReady: false,
       loading: {
         listCustomers: false,
         setCustomer: false,
         removeCustomer: false,
-        testTelegram: false,
-        listTelegramChats: false,
       },
       error: {
         listCustomers: "",
@@ -376,8 +308,6 @@ export default {
         zones: "",
         recipients: "",
         telegram_chat_id: "",
-        testTelegram: "",
-        listTelegramChats: "",
       },
     };
   },
@@ -437,15 +367,9 @@ export default {
       this.customerToEdit = customer;
       this.zones = [...customer.zones];
       this.recipients = customer.recipients.join("\n");
+      this.telegramEnabled = customer.telegram_enabled;
       this.telegramChatId = customer.telegram_chat_id;
-      this.telegramTestSent = false;
-      this.telegramChats = [];
-      this.telegramChatsEmpty = false;
-      this.telegramManual = false;
-      this.error.listTelegramChats = "";
-      if (this.telegramTokenSet && this.telegramChatId) {
-        this.findTelegramChats(true);
-      }
+      this.error.telegram_chat_id = "";
     },
     hideEditModal() {
       this.customerToEdit = null;
@@ -499,7 +423,9 @@ export default {
         `${taskAction}-completed-${eventId}`,
         (taskContext, taskResult) => {
           this.smarthostEnabled = taskResult.output.smarthost_enabled;
-          this.telegramTokenSet = taskResult.output.telegram_token_set;
+          this.telegramReady =
+            taskResult.output.telegram_enabled &&
+            taskResult.output.telegram_token_set;
         }
       );
       await to(
@@ -520,55 +446,14 @@ export default {
         this.focusElement("recipients");
         return false;
       }
-      if (this.telegramChatId && !CHAT_ID_PATTERN.test(this.telegramChatId)) {
-        this.error.telegram_chat_id = "settings.telegram_chat_id_invalid";
-        this.focusElement("telegram_chat_id");
+      if (this.telegramEnabled && !CHAT_ID_PATTERN.test(this.telegramChatId)) {
+        this.error.telegram_chat_id = this.telegramChatId
+          ? "settings.telegram_chat_id_invalid"
+          : "common.required";
+        this.$refs.telegram_chat_id.focus();
         return false;
       }
       return true;
-    },
-    async sendTelegramTest() {
-      this.telegramTestSent = false;
-      this.error.testTelegram = "";
-      this.error.telegram_chat_id = "";
-      if (!CHAT_ID_PATTERN.test(this.telegramChatId)) {
-        this.error.telegram_chat_id = "settings.telegram_chat_id_invalid";
-        this.focusElement("telegram_chat_id");
-        return;
-      }
-      this.loading.testTelegram = true;
-      const result = await testTelegram(this, {
-        chat_id: this.telegramChatId,
-      });
-      this.loading.testTelegram = false;
-      if ("output" in result) {
-        this.telegramTestSent = true;
-      } else if (result.parameter === "chat_id") {
-        this.error.telegram_chat_id = result.message;
-      } else {
-        this.error.testTelegram = result.message;
-      }
-    },
-    // Silent when the page opens: only the saved chat is shown, errors wait for a click
-    async findTelegramChats(silent) {
-      this.telegramChatsEmpty = false;
-      this.error.listTelegramChats = "";
-      this.loading.listTelegramChats = true;
-      const data = CHAT_ID_PATTERN.test(this.telegramChatId)
-        ? { chat_ids: [this.telegramChatId] }
-        : {};
-      const result = await listTelegramChats(this, data);
-      this.loading.listTelegramChats = false;
-      if ("output" in result) {
-        this.telegramChats = result.output.chats;
-        this.telegramChatsEmpty = !silent && !this.telegramChats.length;
-      } else if (!silent) {
-        this.error.listTelegramChats = result.message;
-      }
-      // A chat the bot cannot see stays editable instead of vanishing from the list
-      this.telegramManual =
-        !!this.telegramChatId &&
-        !this.telegramChats.some((chat) => chat.id === this.telegramChatId);
     },
     async setCustomer() {
       if (!this.validateSetCustomer()) {
@@ -596,6 +481,7 @@ export default {
             name: this.customerToEdit.name,
             zones: this.zones,
             recipients: [...new Set(this.recipientList)],
+            telegram_enabled: this.telegramEnabled,
             telegram_chat_id: this.telegramChatId,
           },
           extra: {
@@ -710,27 +596,6 @@ export default {
   margin-bottom: $spacing-06;
 }
 
-.chat-picker {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: $spacing-05;
-}
-
-.chat-field {
-  flex: 0 1 20rem;
-}
-
-// Level with the field, not with its label or its error below
-.find-chats {
-  margin-top: $spacing-06;
-}
-
-.chat-helper {
-  margin-top: $spacing-03;
-  font-size: 0.75rem;
-  color: $text-02;
-}
 .toolbar {
   margin-bottom: $spacing-05;
 }
