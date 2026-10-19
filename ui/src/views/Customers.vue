@@ -99,7 +99,11 @@
                 }}</cv-data-table-cell>
                 <cv-data-table-cell>
                   <span
-                    v-if="row.telegram_enabled && row.telegram_chat_id"
+                    v-if="
+                      telegramReady &&
+                      row.telegram_enabled &&
+                      row.telegram_chat_id
+                    "
                     :title="row.telegram_chat_id"
                     >{{ row.telegram_chat_title || row.telegram_chat_id }}</span
                   >
