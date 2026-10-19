@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+
+import agent
+
+import wazuh_telegram
+
+agent.set_weight(os.path.basename(__file__), 0) # Validation step, no task progress at all
+
+data = json.load(sys.stdin)
+# An omitted token keeps the saved one, an empty one removes it
+token = data["telegram_token"].strip() if "telegram_token" in data else wazuh_telegram.token()
+
+if data.get("telegram_enabled") and not token:
+    agent.set_status('validation-failed')
+    json.dump([{'field': 'telegram_token', 'parameter': 'telegram_token', 'value': '', 'error': 'telegram_token_required'}],
+              fp=sys.stdout)
+    sys.exit(3)

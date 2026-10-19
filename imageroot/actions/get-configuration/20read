@@ -31,6 +31,9 @@ config["notify_recipients"] = [r for r in os.getenv("NOTIFY_RECIPIENTS", "").spl
 config["notify_enabled"] = os.getenv("NOTIFY_ENABLED", str(bool(config["notify_recipients"]))) == "True"
 config["notify_sender"] = os.getenv("NOTIFY_SENDER", "")
 config["notify_min_level"] = os.getenv("NOTIFY_MIN_LEVEL", "medium")
+config["telegram_enabled"] = os.getenv("TELEGRAM_ENABLED") == "True"
+config["telegram_chat_id"] = os.getenv("TELEGRAM_CHAT_ID", "")
+config["telegram_token_set"] = os.path.exists("secrets/telegram.env")
 config["smarthost_enabled"] = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))["enabled"]
 config["export_token_set"] = os.path.exists("secrets/export.env")
 config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"

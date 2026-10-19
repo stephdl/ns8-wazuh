@@ -1,0 +1,31 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Test Telegram",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/test-telegram",
+    "description": "Send a test message to a Telegram chat through the bot of the module, to check the token and the chat ID",
+    "examples": [
+        {
+            "chat_id": "-1001234567890"
+        },
+        {
+            "chat_id": "@acme_alerts",
+            "token": "123456789:AAH-example"
+        }
+    ],
+    "type": "object",
+    "required": ["chat_id"],
+    "properties": {
+        "chat_id": {
+            "type": "string",
+            "title": "Telegram chat ID",
+            "description": "A group ID like -1001234567890, a user ID, or a public channel like @name",
+            "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})$"
+        },
+        "token": {
+            "type": "string",
+            "title": "Telegram bot token",
+            "description": "Token to test before it is saved. Omit to use the saved one.",
+            "pattern": "^([0-9]+:[A-Za-z0-9_-]+)?$"
+        }
+    }
+}

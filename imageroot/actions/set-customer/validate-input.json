@@ -2,12 +2,13 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Set a customer",
     "$id": "http://nethserver.org/json-schema/task/input/wazuh/set-customer",
-    "description": "Set the zones the users of a customer may log in from, and who receives the alerts of the logins from outside them",
+    "description": "Set the zones the users of a customer may log in from, and who receives the alerts of the logins from outside them, by email and Telegram",
     "examples": [
         {
             "name": "acme",
             "zones": ["@EU", "CA"],
-            "recipients": ["soc@acme.example"]
+            "recipients": ["soc@acme.example"],
+            "telegram_chat_id": "-1001234567890"
         }
     ],
     "type": "object",
@@ -41,6 +42,12 @@
                 "format": "email"
             },
             "uniqueItems": true
+        },
+        "telegram_chat_id": {
+            "type": "string",
+            "title": "Telegram chat ID",
+            "description": "Telegram chat of the customer that receives its logins from outside the allowed zones, through the bot of the module. Empty or omitted to send none.",
+            "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})?$"
         }
     }
 }

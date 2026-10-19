@@ -15,7 +15,8 @@
                     ],
                     "recipients": [
                         "soc@acme.example"
-                    ]
+                    ],
+                    "telegram_chat_id": "-1001234567890"
                 }
             ],
             "countries": [
@@ -43,7 +44,8 @@
                     "name",
                     "agents",
                     "zones",
-                    "recipients"
+                    "recipients",
+                    "telegram_chat_id"
                 ],
                 "properties": {
                     "name": {
@@ -64,6 +66,10 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "telegram_chat_id": {
+                        "type": "string",
+                        "description": "Telegram chat of the customer, empty when none"
                     }
                 }
             }

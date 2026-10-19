@@ -5,13 +5,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-# Send the new findings to the export endpoint (--export) or by email (--email). With --email,
-# each customer also gets its logins from outside its allowed zones, at its own addresses.
+# Send the new findings to the export endpoint (--export) or notify them (--email). --email covers
+# every notification channel, email and Telegram: the admin gets a summary of the new findings, and
+# each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
 # catches up. The cursor moves only after a successful delivery, so a finding may be sent
-# twice after a partial failure, never zero times.
+# twice after a partial failure, never zero times. Each channel has its own cursor: one that
+# is down never makes another one send twice. A notification channel catches up one day at most.
 
 import fcntl
 import json
@@ -28,6 +30,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_telegram
 import wazuh_zones
 from wazuh_api import api
 from wazuh_noise import NOISE
@@ -40,12 +43,16 @@ SETTLE = timedelta(minutes=1)
 LEVELS = ["informational", "low", "medium", "high", "critical"]
 ZONE_TITLE = "NS8 login from outside the allowed zones"
 ZONE_SEEN_FILE = "login-zone-alerts.json"
-# Apart from the customer one: each email reports a user, address and service once a day on its own
+# Apart from the customer one, and one per channel: each reports a user, address and service once a day on its own
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
+ZONE_TELEGRAM_SEEN_FILE = "login-zone-alerts-telegram.json"
+ZONE_ADMIN_TELEGRAM_SEEN_FILE = "login-zone-admin-telegram.json"
 # A traveling user logs in again every few minutes: one email a day per user, address and service.
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
 ZONE_REPEAT = timedelta(days=1)
+# A channel down for days would flood its chat when it comes back: the older findings are only counted
+MAX_CATCH_UP = timedelta(days=1)
 # The logins of the last day, where the zone table lists every application a user reached
 LOGINS_DASHBOARD = "/app/dashboards#/view/ns8-logins?_g=(time:(from:now-24h,to:now))"
 
@@ -84,6 +91,23 @@ class Cursor:
             os.remove(self.path)
 
 
+def catch_up(cursor, filters, must_not):
+    """Load the cursor, moved to a day ago at most. Return the count of the findings skipped that way."""
+    ts, ids = cursor.load()
+    start = iso(datetime.now(timezone.utc) - MAX_CATCH_UP)
+    # Compared on the seconds: the fraction of an @timestamp may have more digits than iso() writes
+    if ts[:19] >= start[:19]:
+        return ts, ids, 0
+    query = {"bool": {
+        "filter": [{"range": {"@timestamp": {"gte": ts, "lt": start}}}] + filters,
+        "must_not": must_not + ([{"ids": {"values": sorted(ids)}}] if ids else []),
+    }}
+    answer = api("POST", f"{INDICES}/_count", {"query": query})
+    if "count" not in answer:
+        raise RuntimeError(f"count failed: {json.dumps(answer)[:300]}")
+    return start, set(), answer["count"]
+
+
 def pages(cursor_ts, cursor_ids, filters, must_not):
     """Yield the pages of findings after the cursor, oldest first, up to the settle time."""
     until = iso(datetime.now(timezone.utc) - SETTLE)
@@ -108,17 +132,6 @@ def pages(cursor_ts, cursor_ids, filters, must_not):
             return
 
 
-def read_secret(path, key):
-    try:
-        with open(path) as f:
-            for line in f:
-                if line.startswith(f"{key}="):
-                    return line.rstrip("\n").split("=", 1)[1]
-    except FileNotFoundError:
-        pass
-    return ""
-
-
 def post(url, token, hits):
     body = json.dumps({"source": "ns8-wazuh", "host": os.environ.get("TRAEFIK_HOST", ""), "findings": hits}).encode()
     request = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json"})
@@ -134,7 +147,7 @@ def export(cursor):
     if not url:
         cursor.forget()
         return 0
-    token = read_secret(os.environ.get("EXPORT_SECRETS", "secrets/export.env"), "EXPORT_TOKEN")
+    token = wazuh_telegram.read_secret(os.environ.get("EXPORT_SECRETS", "secrets/export.env"), "EXPORT_TOKEN")
     ts, ids = cursor.load()
     sent = 0
     for hits, ts, ids in pages(ts, ids, [], []):
@@ -214,27 +227,54 @@ def summary_lines(found):
     return lines
 
 
-def email(cursor):
+# A message is a list of lines, each a kind and its text, so that each channel renders it its own way
+def as_text(lines):
+    return "\n".join(f"{line[1]}: {line[2]}" if line[0] == "link" else line[1] for line in lines)
+
+
+def as_html(lines):
+    escape = wazuh_telegram.escape
+    rendered = {"head": lambda line: f"<b>{escape(line[1])}</b>",
+                "text": lambda line: escape(line[1]),
+                "link": lambda line: f'<a href="{escape(line[2])}">{escape(line[1])}</a>'}
+    return "\n".join(rendered[line[0]](line) for line in lines)
+
+
+def mailer():
+    """Deliver by email, or None without the cluster smarthost."""
     host = os.environ.get("TRAEFIK_HOST", "")
-    recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
-    # Before the switch existed, a recipient was enough to send emails
-    enabled = os.environ.get("NOTIFY_ENABLED", str(bool(recipients))) == "True"
     smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
-    if not (enabled and recipients and host and smtp["enabled"] and smtp["host"]):
+    if not (host and smtp["enabled"] and smtp["host"]):
+        return None
+    sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
+    return lambda recipients, subject, lines: send_mail(smtp, sender, recipients, subject, as_text(lines))
+
+
+def telegram():
+    """Deliver to a Telegram chat, or None without the bot token."""
+    bot = wazuh_telegram.token()
+    if not (os.environ.get("TRAEFIK_HOST") and bot):
+        return None
+    return lambda chat_id, subject, lines: wazuh_telegram.send(bot, chat_id, as_html(lines))
+
+
+def admin_report(cursor, seen_file, target, deliver):
+    """Send the admin a summary of the new findings and of the logins from outside the allowed zones."""
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not (target and deliver):
         cursor.forget()
-        return 0
+        return
     min_level = os.environ.get("NOTIFY_MIN_LEVEL", "medium")
     levels = LEVELS[LEVELS.index(min_level):] if min_level in LEVELS else LEVELS[2:]
-    sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
 
     zone_settings = wazuh_zones.load()["customers"]
-    seen = SeenLogins(ZONE_ADMIN_SEEN_FILE)
-    ts, ids = cursor.load()
+    seen = SeenLogins(seen_file)
     counts = Counter()
     zone_logins = {}
     # The zone logins come whatever the minimum level: the customers get them, so must the admin
     wanted = [{"bool": {"should": [{"terms": {"wazuh.rule.level": levels}},
                                    {"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], "minimum_should_match": 1}}]
+    ts, ids, skipped = catch_up(cursor, wanted, NOISE)
     for hits, ts, ids in pages(ts, ids, wanted, NOISE):
         for hit in hits:
             source = hit["_source"]["wazuh"]
@@ -248,73 +288,75 @@ def email(cursor):
             counts[(customer, wazuh_agent.get("name", "?"), title)] += 1
     findings = sum(counts.values())
     logins = sum(len(z) for z in zone_logins.values())
-    if findings or logins:
+    if findings or logins or skipped:
         summary = [plural(logins, "login") + " from outside the allowed zones" if logins else "",
                    plural(findings, "new finding") if findings else ""]
-        summary = " and ".join(part for part in summary if part)
+        summary = " and ".join(part for part in summary if part) or "findings not sent during an outage"
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
-        lines = [f"{summary[0].upper()}{summary[1:]}.", ""]
+        lines = [("head", f"{summary[0].upper()}{summary[1:]}."), ("text", "")]
         customers = sorted({c for c, _, _ in counts} | set(zone_logins))
         for customer in customers:
             if customer:
-                lines += [f"Customer {customer}", ""]
+                lines += [("head", f"Customer {customer}"), ("text", "")]
             elif len(customers) > 1:
-                lines += ["No customer", ""]
+                lines += [("head", "No customer"), ("text", "")]
             # Apart from the other findings and in full: the detail is the alert, a cut line would hide it
             if customer in zone_logins:
                 zones = zone_settings.get(customer, {}).get("zones", [])
-                lines += ["Logins from outside the allowed zones",
-                          f"  Allowed: {', '.join(wazuh_zones.zone_name(z) for z in zones)}"]
-                lines += [f"  {line}" for line in zone_logins[customer]]
-                lines.append("")
+                lines += [("head", "Logins from outside the allowed zones"),
+                          ("text", f"  Allowed: {', '.join(wazuh_zones.zone_name(z) for z in zones)}")]
+                lines += [("text", f"  {line}") for line in zone_logins[customer]]
+                lines.append(("text", ""))
             for agent_name in sorted({a for c, a, _ in counts if c == customer}):
-                lines.append(agent_name)
-                lines += summary_lines(Counter({r: n for (c, a, r), n in counts.items()
-                                                if c == customer and a == agent_name}))
-                lines.append("")
-        lines.append(f"Open the dashboard: https://{host}/")
-        send_mail(smtp, sender, recipients, f"Wazuh: {summary} on {host}", "\n".join(lines))
-        log(f"email sent, {findings} findings, {logins} zone logins")
-    # Saved after the email only: a failed delivery is sent again at the next run
+                lines.append(("head", agent_name))
+                lines += [("text", line) for line in summary_lines(Counter({r: n for (c, a, r), n in counts.items()
+                                                                            if c == customer and a == agent_name}))]
+                lines.append(("text", ""))
+        if skipped:
+            lines += [("text", f"{plural(skipped, 'older finding')} not sent: this channel was down for more"
+                               " than a day."), ("text", "")]
+        lines.append(("link", "Open the dashboard", f"https://{host}/"))
+        deliver(target, f"Wazuh: {summary} on {host}", lines)
+        log(f"summary sent, {findings} findings, {logins} zone logins, {skipped} skipped")
+    # Saved after the delivery only: a failed one is sent again at the next run
     seen.save()
     cursor.save(ts, ids)
-    return 0
 
 
-def zone_alerts(cursor):
-    """Mail each customer its logins from outside its allowed zones, once a day per user, address and service."""
+def zone_report(cursor, seen_file, field, deliver):
+    """Send each customer its logins from outside its allowed zones, once a day per user, address and service."""
     customers = wazuh_zones.load()["customers"]
     host = os.environ.get("TRAEFIK_HOST", "")
-    smtp = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))
-    if not (host and smtp["enabled"] and smtp["host"] and any(c.get("recipients") for c in customers.values())):
+    if not (deliver and any(c.get(field) for c in customers.values())):
         cursor.forget()
-        return 0
-    sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
-    seen = SeenLogins(ZONE_SEEN_FILE)
+        return
+    seen = SeenLogins(seen_file)
 
-    ts, ids = cursor.load()
+    filters = [{"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}]
+    ts, ids, skipped = catch_up(cursor, filters, [])
+    if skipped:
+        log(f"{skipped} zone logins older than a day skipped")
     alerts = {}
-    for hits, ts, ids in pages(ts, ids, [{"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], []):
+    for hits, ts, ids in pages(ts, ids, filters, []):
         for hit in hits:
             source = hit["_source"]
             customer = wazuh_zones.customer_of(source.get("wazuh", {}).get("agent", {}).get("groups"))
             key = zone_key(customer, source)
-            if customers.get(customer, {}).get("recipients") and not seen.known(key):
+            if customers.get(customer, {}).get(field) and not seen.known(key):
                 alerts.setdefault(customer, {}).setdefault(key, zone_line(source))
     for customer, logins in sorted(alerts.items()):
         zones = ", ".join(wazuh_zones.zone_name(z) for z in customers[customer].get("zones", []))
-        text = "\n".join([f"Logins of {customer} from outside its allowed zones ({zones}):", ""] +
-                         list(logins.values()) +
-                         ["", "Each user, address and service is reported once a day.",
-                          f"Open the logins dashboard: https://{host}{LOGINS_DASHBOARD}"])
-        send_mail(smtp, sender, customers[customer]["recipients"],
-                  f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", text)
+        lines = ([("head", f"Logins of {customer} from outside its allowed zones ({zones}):"), ("text", "")] +
+                 [("text", line) for line in logins.values()] +
+                 [("text", ""), ("text", "Each user, address and service is reported once a day."),
+                  ("link", "Open the logins dashboard", f"https://{host}{LOGINS_DASHBOARD}")])
+        deliver(customers[customer][field],
+                f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", lines)
         # Saved per customer: a failure on the next one must not send this one again
         seen.add(logins)
         seen.save()
         log(f"zone alert sent to {customer}, {len(logins)} logins")
     cursor.save(ts, ids)
-    return 0
 
 
 def zone_key(customer, source):
@@ -384,11 +426,32 @@ def main():
         except BlockingIOError:
             log("previous run still going")
             return 0
-        cursor = Cursor(f"send-findings-{output}.cursor")
         if output == "export":
-            return export(cursor)
-        email(cursor)
-        return zone_alerts(Cursor("send-findings-zones.cursor"))
+            return export(Cursor("send-findings-export.cursor"))
+        recipients = [r for r in os.environ.get("NOTIFY_RECIPIENTS", "").split(",") if r]
+        # Before the switch existed, a recipient was enough to send emails
+        if os.environ.get("NOTIFY_ENABLED", str(bool(recipients))) != "True":
+            recipients = []
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "") if os.environ.get("TELEGRAM_ENABLED") == "True" else ""
+        runs = [
+            ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
+                                                 recipients, mailer())),
+            ("customer email", lambda: zone_report(Cursor("send-findings-zones.cursor"), ZONE_SEEN_FILE,
+                                                   "recipients", mailer())),
+            ("admin telegram", lambda: admin_report(Cursor("send-findings-telegram.cursor"),
+                                                    ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, telegram())),
+            ("customer telegram", lambda: zone_report(Cursor("send-findings-zones-telegram.cursor"),
+                                                      ZONE_TELEGRAM_SEEN_FILE, "telegram_chat_id", telegram())),
+        ]
+        status = 0
+        # A channel that fails must not stop the others: it tries again at the next run
+        for name, run in runs:
+            try:
+                run()
+            except Exception as error:
+                log(f"{name} failed: {error}")
+                status = 1
+        return status
 
 
 sys.exit(main())

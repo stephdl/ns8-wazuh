@@ -27,7 +27,8 @@ if name == "default" or not response.get("data", {}).get("affected_items"):
 with open(wazuh_zones.CUSTOMERS_FILE + ".lock", "w") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
     settings = wazuh_zones.load()
-    settings["customers"][name] = {"zones": data.get("zones", []), "recipients": data.get("recipients", [])}
+    settings["customers"][name] = {"zones": data.get("zones", []), "recipients": data.get("recipients", []),
+                                   "telegram_chat_id": data.get("telegram_chat_id", "")}
     wazuh_zones.save(settings)
     applied = agent.run_helper("runagent", "provision-zones").returncode == 0
 

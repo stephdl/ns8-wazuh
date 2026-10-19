@@ -21,7 +21,10 @@
             "notify_min_level": "medium",
             "smarthost_enabled": true,
             "notify_enabled": true,
-            "retention_days": 365
+            "retention_days": 365,
+            "telegram_enabled": true,
+            "telegram_chat_id": "-1001234567890",
+            "telegram_token_set": true
         }
     ],
     "type": "object",
@@ -40,7 +43,10 @@
         "notify_min_level",
         "smarthost_enabled",
         "notify_enabled",
-        "retention_days"
+        "retention_days",
+        "telegram_enabled",
+        "telegram_chat_id",
+        "telegram_token_set"
     ],
     "properties": {
         "host": {
@@ -134,6 +140,21 @@
                 "high",
                 "critical"
             ]
+        },
+        "telegram_enabled": {
+            "type": "boolean",
+            "title": "Telegram notifications",
+            "description": "Send the summary of the new findings to a Telegram chat every 5 minutes."
+        },
+        "telegram_chat_id": {
+            "type": "string",
+            "title": "Telegram chat ID",
+            "description": "Chat that receives the summary. Empty when disabled."
+        },
+        "telegram_token_set": {
+            "type": "boolean",
+            "title": "Telegram bot token set",
+            "description": "True when a bot token is stored. The token itself is never returned."
         },
         "smarthost_enabled": {
             "type": "boolean",
