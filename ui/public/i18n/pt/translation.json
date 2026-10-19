@@ -109,7 +109,7 @@
     "telegram_token_set": "Existe um token guardado",
     "telegram_remove_token": "Remover o token",
     "telegram_remove_token_title": "Remover o token do bot",
-    "telegram_remove_token_description": "O Telegram para para o administrador e para todos os clientes. Os seus chats são mantidos e voltam a funcionar com um novo token. Para bloquear o próprio bot, revogue o token no BotFather.",
+    "telegram_remove_token_description": "O Telegram para para o administrador e para todos os clientes, e os seus chats são apagados. Para bloquear o próprio bot, revogue o token no BotFather.",
     "telegram_admin_enabled": "Enviar as deteções para o chat do administrador",
     "telegram_chat_id": "ID do chat",
     "telegram_chat_id_helper": "Adicione o bot ao grupo, depois clique em Procurar chats e escolha-o.",

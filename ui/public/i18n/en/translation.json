@@ -109,7 +109,7 @@
     "telegram_token_set": "A token is stored",
     "telegram_remove_token": "Remove token",
     "telegram_remove_token_title": "Remove the bot token",
-    "telegram_remove_token_description": "Telegram stops for the admin and for every customer. Their chats are kept and start again with a new token. To block the bot itself, revoke the token in BotFather.",
+    "telegram_remove_token_description": "Telegram stops for the admin and for every customer, and their chats are cleared. To block the bot itself, revoke the token in BotFather.",
     "telegram_admin_enabled": "Send the findings to the admin chat",
     "telegram_chat_id": "Chat ID",
     "telegram_chat_id_helper": "Add the bot to the group, then click Find chats and pick it.",

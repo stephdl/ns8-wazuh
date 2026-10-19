@@ -109,7 +109,7 @@
     "telegram_token_set": "Ein Token ist gespeichert",
     "telegram_remove_token": "Token entfernen",
     "telegram_remove_token_title": "Bot-Token entfernen",
-    "telegram_remove_token_description": "Telegram stoppt für den Admin und für alle Kunden. Ihre Chats bleiben erhalten und starten mit einem neuen Token wieder. Um den Bot selbst zu sperren, widerrufen Sie das Token in BotFather.",
+    "telegram_remove_token_description": "Telegram stoppt für den Admin und für alle Kunden, und ihre Chats werden gelöscht. Um den Bot selbst zu sperren, widerrufen Sie das Token in BotFather.",
     "telegram_admin_enabled": "Befunde an den Admin-Chat senden",
     "telegram_chat_id": "Chat-ID",
     "telegram_chat_id_helper": "Fügen Sie den Bot zur Gruppe hinzu, klicken Sie dann auf Chats suchen und wählen Sie sie aus.",

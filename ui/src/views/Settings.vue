@@ -334,7 +334,7 @@
                       value="telegramAdminEnabled"
                       :label="$t('settings.telegram_admin_enabled')"
                       v-model="telegramAdminEnabled"
-                      :disabled="stillLoading"
+                      :disabled="stillLoading || !telegramHasToken"
                       class="mg-bottom"
                     >
                       <template slot="text-left">{{
@@ -351,7 +351,7 @@
                       :label="$t('settings.telegram_chat_id')"
                       :helper="$t('settings.telegram_chat_id_helper')"
                       :token="telegramToken"
-                      :ready="telegramTokenSet || !!telegramToken"
+                      :ready="telegramHasToken"
                       :invalidMessage="$t(error.telegram_chat_id)"
                       ref="telegram_chat_id"
                     />
@@ -561,6 +561,12 @@ export default {
     };
   },
   watch: {
+    // No admin chat without a bot to write to it
+    telegramHasToken(hasToken) {
+      if (!hasToken) {
+        this.telegramAdminEnabled = false;
+      }
+    },
     adminPassword() {
       this.error.admin_password = "";
       this.error.admin_password_confirm = "";
@@ -573,6 +579,9 @@ export default {
   },
   computed: {
     ...mapState(["instanceName", "core", "appName"]),
+    telegramHasToken() {
+      return this.telegramTokenSet || !!this.telegramToken;
+    },
     stillLoading() {
       return (
         this.loading.getConfiguration ||
@@ -846,7 +855,8 @@ export default {
       this.exportTokenSet = config.export_token_set;
       this.exportToken = "";
       this.telegramEnabled = config.telegram_enabled;
-      this.telegramAdminEnabled = config.telegram_admin_enabled;
+      this.telegramAdminEnabled =
+        config.telegram_admin_enabled && config.telegram_token_set;
       this.telegramChatId = config.telegram_chat_id;
       this.telegramTokenSet = config.telegram_token_set;
       this.telegramToken = "";

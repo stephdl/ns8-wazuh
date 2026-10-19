@@ -109,7 +109,7 @@
     "telegram_token_set": "Un jeton est enregistré",
     "telegram_remove_token": "Supprimer le jeton",
     "telegram_remove_token_title": "Supprimer le jeton du bot",
-    "telegram_remove_token_description": "Telegram s'arrête pour l'admin et pour tous les clients. Leurs chats sont conservés et repartent avec un nouveau jeton. Pour bloquer le bot lui-même, révoquez le jeton dans BotFather.",
+    "telegram_remove_token_description": "Telegram s'arrête pour l'admin et pour tous les clients, et leurs chats sont effacés. Pour bloquer le bot lui-même, révoquez le jeton dans BotFather.",
     "telegram_admin_enabled": "Envoyer les alertes dans le chat admin",
     "telegram_chat_id": "ID du chat",
     "telegram_chat_id_helper": "Ajoutez le bot au groupe, puis cliquez sur Trouver les chats et choisissez-le.",

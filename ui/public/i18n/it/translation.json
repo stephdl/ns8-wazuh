@@ -109,7 +109,7 @@
     "telegram_token_set": "Un token è memorizzato",
     "telegram_remove_token": "Rimuovi token",
     "telegram_remove_token_title": "Rimuovi il token del bot",
-    "telegram_remove_token_description": "Telegram si ferma per l'amministratore e per tutti i clienti. Le loro chat vengono mantenute e ripartono con un nuovo token. Per bloccare il bot stesso, revoca il token in BotFather.",
+    "telegram_remove_token_description": "Telegram si ferma per l'amministratore e per tutti i clienti, e le loro chat vengono cancellate. Per bloccare il bot stesso, revoca il token in BotFather.",
     "telegram_admin_enabled": "Invia i rilevamenti alla chat dell'amministratore",
     "telegram_chat_id": "ID della chat",
     "telegram_chat_id_helper": "Aggiungi il bot al gruppo, poi fai clic su Trova chat e sceglilo.",

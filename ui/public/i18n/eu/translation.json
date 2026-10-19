@@ -109,7 +109,7 @@
     "telegram_token_set": "Token bat gordeta dago",
     "telegram_remove_token": "Kendu tokena",
     "telegram_remove_token_title": "Kendu bot-aren tokena",
-    "telegram_remove_token_description": "Telegram gelditu egiten da administratzailearentzat eta bezero guztientzat. Haien txatak gorde egiten dira eta token berri batekin berriro abiatzen dira. Bot-a bera blokeatzeko, baliogabetu tokena BotFather-en.",
+    "telegram_remove_token_description": "Telegram gelditu egiten da administratzailearentzat eta bezero guztientzat, eta haien txatak ezabatu egiten dira. Bot-a bera blokeatzeko, baliogabetu tokena BotFather-en.",
     "telegram_admin_enabled": "Bidali aurkikuntzak administratzailearen txatera",
     "telegram_chat_id": "Txataren IDa",
     "telegram_chat_id_helper": "Gehitu bot-a taldera, egin klik Bilatu txatak aukeran eta aukeratu.",
