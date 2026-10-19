@@ -316,17 +316,20 @@
                       class="mg-bottom"
                       ref="telegram_token"
                     />
-                    <div class="chat-picker mg-bottom">
+                    <div class="chat-picker">
                       <cv-dropdown
+                        v-if="!telegramManual"
                         v-model="telegramChatId"
-                        :label="$t('settings.telegram_found_chats')"
+                        :label="$t('settings.telegram_chat_id')"
                         :placeholder="
                           telegramChats.length
                             ? $t('settings.telegram_choose_chat')
                             : $t('settings.telegram_click_find')
                         "
+                        :invalid-message="$t(error.telegram_chat_id)"
                         :disabled="stillLoading || !telegramChats.length"
-                        class="chat-dropdown"
+                        class="chat-field"
+                        ref="telegram_chat_id"
                       >
                         <cv-dropdown-item
                           v-for="chat in telegramChats"
@@ -337,14 +340,33 @@
                           }})</cv-dropdown-item
                         >
                       </cv-dropdown>
+                      <NsTextInput
+                        v-else
+                        v-model.trim="telegramChatId"
+                        :label="$t('settings.telegram_chat_id')"
+                        placeholder="-1001234567890"
+                        :invalid-message="$t(error.telegram_chat_id)"
+                        :disabled="stillLoading"
+                        class="chat-field"
+                        ref="telegram_chat_id"
+                      />
                       <NsButton
                         kind="tertiary"
                         size="field"
                         :loading="loading.listTelegramChats"
                         :disabled="stillLoading || loading.listTelegramChats"
-                        @click="findTelegramChats"
+                        @click="findTelegramChats(false)"
+                        class="find-chats"
                         >{{ $t("settings.telegram_find_chats") }}</NsButton
                       >
+                    </div>
+                    <div class="chat-helper mg-bottom">
+                      {{ $t("settings.telegram_chat_id_helper") }}
+                      <cv-link @click="telegramManual = !telegramManual">{{
+                        telegramManual
+                          ? $t("settings.telegram_pick_from_list")
+                          : $t("settings.telegram_type_id")
+                      }}</cv-link>
                     </div>
                     <NsInlineNotification
                       v-if="telegramChatsEmpty"
@@ -361,16 +383,6 @@
                       :title="$t('action.list-telegram-chats')"
                       :description="error.listTelegramChats"
                       :showCloseButton="false"
-                    />
-                    <NsTextInput
-                      v-model.trim="telegramChatId"
-                      :label="$t('settings.telegram_chat_id')"
-                      placeholder="-1001234567890"
-                      :helper-text="$t('settings.telegram_chat_id_helper')"
-                      :invalid-message="$t(error.telegram_chat_id)"
-                      :disabled="stillLoading"
-                      class="mg-bottom"
-                      ref="telegram_chat_id"
                     />
                     <NsButton
                       kind="secondary"
@@ -549,6 +561,7 @@ export default {
       telegramTestSent: false,
       telegramChats: [],
       telegramChatsEmpty: false,
+      telegramManual: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
@@ -870,6 +883,11 @@ export default {
       this.telegramTokenSet = config.telegram_token_set;
       this.telegramToken = "";
       this.telegramTestSent = false;
+      this.telegramChats = [];
+      this.telegramManual = false;
+      if (this.telegramTokenSet && this.telegramChatId) {
+        this.findTelegramChats(true);
+      }
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -1043,25 +1061,37 @@ export default {
         this.error.testTelegram = result.message;
       }
     },
-    async findTelegramChats() {
+    // Silent when the page opens: only the saved chat is shown, errors wait for a click
+    async findTelegramChats(silent) {
       this.telegramChatsEmpty = false;
       this.error.listTelegramChats = "";
-      this.error.telegram_token = "";
+      if (!silent) {
+        this.error.telegram_token = "";
+      }
       this.loading.listTelegramChats = true;
+      const data = CHAT_ID_PATTERN.test(this.telegramChatId)
+        ? { chat_ids: [this.telegramChatId] }
+        : {};
       // A token typed but not saved yet is the one to use
-      const result = await listTelegramChats(
-        this,
-        this.telegramToken ? { token: this.telegramToken } : {}
-      );
+      if (this.telegramToken) {
+        data.token = this.telegramToken;
+      }
+      const result = await listTelegramChats(this, data);
       this.loading.listTelegramChats = false;
       if ("output" in result) {
         this.telegramChats = result.output.chats;
-        this.telegramChatsEmpty = !this.telegramChats.length;
-      } else if (result.parameter === "token") {
-        this.error.telegram_token = result.message;
-      } else {
-        this.error.listTelegramChats = result.message;
+        this.telegramChatsEmpty = !silent && !this.telegramChats.length;
+      } else if (!silent) {
+        if (result.parameter === "token") {
+          this.error.telegram_token = result.message;
+        } else {
+          this.error.listTelegramChats = result.message;
+        }
       }
+      // A chat the bot cannot see stays editable instead of vanishing from the list
+      this.telegramManual =
+        !!this.telegramChatId &&
+        !this.telegramChats.some((chat) => chat.id === this.telegramChatId);
     },
     async configureModule() {
       this.error.test_imap = false;
@@ -1177,13 +1207,24 @@ export default {
 
 .chat-picker {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: $spacing-05;
 }
 
-.chat-dropdown {
+.chat-field {
   flex: 0 1 20rem;
+}
+
+// Level with the field, not with its label or its error below
+.find-chats {
+  margin-top: $spacing-06;
+}
+
+.chat-helper {
+  margin-top: $spacing-03;
+  font-size: 0.75rem;
+  color: $text-02;
 }
 
 .maxwidth {

@@ -84,6 +84,23 @@ def send(bot_token, chat_id, text):
                                         "disable_web_page_preview": True})
 
 
+def describe(chat):
+    name = chat.get("title") or " ".join(p for p in (chat.get("first_name"), chat.get("last_name")) if p)
+    return {"id": str(chat["id"]), "title": name or chat.get("username", ""), "type": chat.get("type", "")}
+
+
+def known_chat(bot_token, chat_id):
+    """The chat behind an ID, or None when the bot cannot see it."""
+    try:
+        # Under the ID as saved: a public channel stays @name, as the field holds it
+        return dict(describe(call(bot_token, "getChat", {"chat_id": chat_id})), id=chat_id)
+    except TelegramError as error:
+        # A wrong token is not a chat problem: the caller must hear about it
+        if error.status in (401, 404):
+            raise
+        return None
+
+
 def recent_chats(bot_token):
     """The chats the bot heard from lately, newest first: Telegram keeps the updates a day."""
     chats = {}
@@ -92,9 +109,7 @@ def recent_chats(bot_token):
         for kind in ("message", "edited_message", "channel_post", "my_chat_member", "chat_member"):
             chat = update.get(kind, {}).get("chat")
             if chat:
-                name = chat.get("title") or " ".join(p for p in (chat.get("first_name"), chat.get("last_name")) if p)
                 # Moved to the end: the last update of a chat gives its place in the list
                 chats.pop(chat["id"], None)
-                chats[chat["id"]] = {"id": str(chat["id"]), "title": name or chat.get("username", ""),
-                                     "type": chat.get("type", "")}
+                chats[chat["id"]] = describe(chat)
     return list(reversed(chats.values()))
