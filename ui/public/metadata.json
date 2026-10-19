@@ -1,5 +1,6 @@
 {
   "name": "wazuh",
+  "upstream_name": "Wazuh (version set automatically)",
   "description": {
     "en": "Central Wazuh server: collects the logs of your servers, raises alerts and keeps them searchable.",
     "fr": "Serveur Wazuh central : collecte les journaux de vos serveurs, lève des alertes et les rend consultables.",

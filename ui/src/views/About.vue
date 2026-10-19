@@ -70,7 +70,7 @@
                   class="version-skeleton"
                 ></cv-skeleton-text>
                 <span v-else>
-                  {{ version }}
+                  {{ version }} ({{ app.upstream_name }})
                 </span>
               </span>
             </div>
