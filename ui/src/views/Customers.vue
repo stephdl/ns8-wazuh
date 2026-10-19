@@ -97,9 +97,14 @@
                 <cv-data-table-cell>{{
                   row.recipients.join(", ") || "-"
                 }}</cv-data-table-cell>
-                <cv-data-table-cell>{{
-                  (row.telegram_enabled && row.telegram_chat_id) || "-"
-                }}</cv-data-table-cell>
+                <cv-data-table-cell>
+                  <span
+                    v-if="row.telegram_enabled && row.telegram_chat_id"
+                    :title="row.telegram_chat_id"
+                    >{{ row.telegram_chat_title || row.telegram_chat_id }}</span
+                  >
+                  <span v-else>-</span>
+                </cv-data-table-cell>
                 <cv-data-table-cell class="table-overflow-menu-cell">
                   <cv-overflow-menu flip-menu class="table-overflow-menu">
                     <cv-overflow-menu-item @click="showEditModal(row)">
