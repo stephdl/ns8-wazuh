@@ -14,6 +14,26 @@ images=()
 repobase="${REPOBASE:-ghcr.io/nethserver}"
 # Configure the image name
 reponame="wazuh"
+wazuh_manager_image="docker.io/wazuh/wazuh-manager:5.0.0-rc1"
+wazuh_indexer_image="docker.io/wazuh/wazuh-indexer:5.0.0-rc1"
+wazuh_dashboard_image="docker.io/wazuh/wazuh-dashboard:5.0.0-rc1"
+
+# Extract the upstream version from the image tag, to set it in the metadata
+wazuh_upstream_version="${wazuh_manager_image##*:}"
+metadata_file="ui/public/metadata.json"
+metadata_backup=$(mktemp)
+
+cleanup() {
+    cp "${metadata_backup}" "${metadata_file}"
+    rm -f "${metadata_backup}"
+}
+
+cp "${metadata_file}" "${metadata_backup}"
+trap cleanup EXIT
+
+jq --arg v "${wazuh_upstream_version}" \
+   '.upstream_name |= gsub("version set automatically"; $v)' \
+   "${metadata_file}" > "${metadata_file}.tmp" && mv "${metadata_file}.tmp" "${metadata_file}"
 
 # Create a new empty container image
 container=$(buildah from scratch)
@@ -42,7 +62,7 @@ buildah config --entrypoint=/ \
     --label="org.nethserver.volumes=wazuh-indexer-data wazuh-snapshots wazuh-logs" \
     --label="org.nethserver.rootfull=0" \
     --label="org.nethserver.min-core=3.20.1" \
-    --label="org.nethserver.images=docker.io/wazuh/wazuh-manager:5.0.0-rc1 docker.io/wazuh/wazuh-indexer:5.0.0-rc1 docker.io/wazuh/wazuh-dashboard:5.0.0-rc1" \
+    --label="org.nethserver.images=${wazuh_manager_image} ${wazuh_indexer_image} ${wazuh_dashboard_image}" \
     "${container}"
 # Commit the image
 buildah commit "${container}" "${repobase}/${reponame}"
