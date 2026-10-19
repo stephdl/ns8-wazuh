@@ -97,6 +97,9 @@
                 <cv-data-table-cell>{{
                   row.recipients.join(", ") || "-"
                 }}</cv-data-table-cell>
+                <cv-data-table-cell>{{
+                  row.telegram_chat_id || "-"
+                }}</cv-data-table-cell>
                 <cv-data-table-cell class="table-overflow-menu-cell">
                   <cv-overflow-menu flip-menu class="table-overflow-menu">
                     <cv-overflow-menu-item @click="showEditModal(row)">
@@ -167,8 +170,46 @@
             class="mg-bottom"
             ref="recipients"
           />
+          <template v-if="telegramTokenSet">
+            <NsTextInput
+              v-model.trim="telegramChatId"
+              :label="$t('customers.telegram_chat_id')"
+              placeholder="-1001234567890"
+              :helper-text="$t('customers.telegram_chat_id_helper')"
+              :invalid-message="$t(error.telegram_chat_id)"
+              :disabled="loading.setCustomer"
+              class="mg-bottom"
+              ref="telegram_chat_id"
+            />
+            <NsButton
+              v-if="telegramChatId"
+              kind="secondary"
+              size="field"
+              :loading="loading.testTelegram"
+              :disabled="loading.setCustomer || loading.testTelegram"
+              @click="sendTelegramTest"
+              class="mg-bottom"
+              >{{ $t("settings.telegram_test") }}</NsButton
+            >
+            <NsInlineNotification
+              v-if="telegramTestSent"
+              kind="success"
+              :title="$t('settings.telegram_test_sent')"
+              :showCloseButton="false"
+            />
+            <NsInlineNotification
+              v-if="error.testTelegram"
+              kind="error"
+              :title="$t('action.test-telegram')"
+              :description="error.testTelegram"
+              :showCloseButton="false"
+            />
+          </template>
+          <p v-else class="mg-bottom muted">
+            {{ $t("customers.telegram_no_token") }}
+          </p>
           <NsInlineNotification
-            v-if="!zones.length && recipientList.length"
+            v-if="!zones.length && (recipientList.length || telegramChatId)"
             kind="warning"
             :title="$t('customers.no_zones_title')"
             :description="$t('customers.no_zones_description')"
@@ -224,6 +265,7 @@ import {
   PageTitleService,
 } from "@nethserver/ns8-ui-lib";
 import { zoneLabel, zoneOptions } from "../lib/countries";
+import { CHAT_ID_PATTERN, testTelegram } from "../lib/telegram";
 
 export default {
   name: "Customers",
@@ -248,16 +290,20 @@ export default {
       countries: [],
       continents: {},
       tablePage: [],
-      tableColumns: ["name", "agents", "zones", "recipients"],
+      tableColumns: ["name", "agents", "zones", "recipients", "telegram"],
       customerToEdit: null,
       customerToRemove: null,
       zones: [],
       recipients: "",
+      telegramChatId: "",
+      telegramTestSent: false,
       smarthostEnabled: true,
+      telegramTokenSet: false,
       loading: {
         listCustomers: false,
         setCustomer: false,
         removeCustomer: false,
+        testTelegram: false,
       },
       error: {
         listCustomers: "",
@@ -265,6 +311,8 @@ export default {
         removeCustomer: "",
         zones: "",
         recipients: "",
+        telegram_chat_id: "",
+        testTelegram: "",
       },
     };
   },
@@ -324,6 +372,8 @@ export default {
       this.customerToEdit = customer;
       this.zones = [...customer.zones];
       this.recipients = customer.recipients.join("\n");
+      this.telegramChatId = customer.telegram_chat_id;
+      this.telegramTestSent = false;
     },
     hideEditModal() {
       this.customerToEdit = null;
@@ -369,7 +419,7 @@ export default {
       this.continents = taskResult.output.continents;
       this.loading.listCustomers = false;
     },
-    // Only to warn that the emails need the cluster smarthost
+    // Only to warn that the emails need the cluster smarthost, and Telegram the bot token
     async getConfiguration() {
       const taskAction = "get-configuration";
       const eventId = this.getUuid();
@@ -377,6 +427,7 @@ export default {
         `${taskAction}-completed-${eventId}`,
         (taskContext, taskResult) => {
           this.smarthostEnabled = taskResult.output.smarthost_enabled;
+          this.telegramTokenSet = taskResult.output.telegram_token_set;
         }
       );
       await to(
@@ -397,7 +448,34 @@ export default {
         this.focusElement("recipients");
         return false;
       }
+      if (this.telegramChatId && !CHAT_ID_PATTERN.test(this.telegramChatId)) {
+        this.error.telegram_chat_id = "settings.telegram_chat_id_invalid";
+        this.focusElement("telegram_chat_id");
+        return false;
+      }
       return true;
+    },
+    async sendTelegramTest() {
+      this.telegramTestSent = false;
+      this.error.testTelegram = "";
+      this.error.telegram_chat_id = "";
+      if (!CHAT_ID_PATTERN.test(this.telegramChatId)) {
+        this.error.telegram_chat_id = "settings.telegram_chat_id_invalid";
+        this.focusElement("telegram_chat_id");
+        return;
+      }
+      this.loading.testTelegram = true;
+      const failure = await testTelegram(this, {
+        chat_id: this.telegramChatId,
+      });
+      this.loading.testTelegram = false;
+      if (!failure) {
+        this.telegramTestSent = true;
+      } else if (failure.parameter === "chat_id") {
+        this.error.telegram_chat_id = failure.message;
+      } else {
+        this.error.testTelegram = failure.message;
+      }
     },
     async setCustomer() {
       if (!this.validateSetCustomer()) {
@@ -425,6 +503,7 @@ export default {
             name: this.customerToEdit.name,
             zones: this.zones,
             recipients: [...new Set(this.recipientList)],
+            telegram_chat_id: this.telegramChatId,
           },
           extra: {
             title: this.$t("customers.save_task", {
