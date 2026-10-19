@@ -124,7 +124,7 @@
     "telegram_chat_channel": "kanala",
     "telegram_no_chats_title": "Ez da txatik aurkitu",
     "telegram_no_chats_description": "Telegramek azken eguna soilik gordetzen du. Gehitu berriro bot-a taldera, edo bidali mezu bat, eta egin klik Bilatu txatak aukeran.",
-    "telegram_bot_has_webhook": "Bot honek webhook batera bidaltzen ditu dagoeneko bere mezuak, beraz ezin dira bere txatak zerrendatu. Idatzi txataren IDa horren ordez.",
+    "telegram_bot_in_use": "Beste aplikazio batek edo webhook batek irakurtzen ditu dagoeneko bot honen mezuak, beraz ezin dira bere txatak zerrendatu. Idatzi txataren IDa horren ordez, edo erabili Wazuh-erako soilik den bot bat.",
     "telegram_chat_id_invalid": "Idatzi -1001234567890 bezalako txat-ID bat, edo @izena bezalako kanal bat",
     "telegram_test": "Bidali proba-mezu bat",
     "telegram_test_sent": "Proba-mezua bidali da. Begiratu txata.",

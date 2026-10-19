@@ -128,9 +128,9 @@ Check if the Telegram token stays secret
     Should Not Contain    ${output}    robot-token
     ${mode} =    Execute Command    stat -c %a /home/${module_id}/.config/state/secrets/telegram.env
     Should Be Equal As Strings    ${mode}    600
-    # Telegram does not know this token: the test says so on the token field
+    # Telegram does not know this token, or is out of reach of the test runner
     ${output} =    Run action that fails    test-telegram    {"chat_id":"-100123"}
-    Should Contain    ${output}    telegram_token
+    Should Match Regexp    ${output}    telegram_token_invalid|telegram_unreachable
     Should Not Contain    ${output}    robot-token
     # Omitted, the token is kept. Empty, it is removed
     Run action    configure-module

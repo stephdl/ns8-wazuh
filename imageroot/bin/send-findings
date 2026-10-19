@@ -254,9 +254,12 @@ def mailer():
 def telegram():
     """Deliver to a Telegram chat, or None without the bot token."""
     bot = wazuh_telegram.token()
-    if not (os.environ.get("TRAEFIK_HOST") and bot):
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not (host and bot):
         return None
-    return lambda chat_id, subject, lines: wazuh_telegram.send(bot, chat_id, as_html(lines))
+    # A chat may get the alerts of several servers: the email names this one in its subject
+    return lambda chat_id, subject, lines: wazuh_telegram.send(bot, chat_id,
+                                                               as_html([("text", f"Wazuh on {host}")] + lines))
 
 
 def admin_report(cursor, seen_file, target, deliver):
@@ -359,6 +362,14 @@ def zone_report(cursor, seen_file, target, deliver):
         try:
             deliver(target(customers[customer]),
                     f"Wazuh: {plural(len(logins), 'login')} from outside the allowed zones ({customer})", lines)
+        except wazuh_telegram.TelegramError as error:
+            if not error.lasting:
+                log(f"zone alert to {customer} failed, retried at the next run: {error}")
+                failed.append(customer)
+                continue
+            # Retrying cannot help until the chat is fixed: skipped, so the others move on
+            log(f"zone alert to {customer} dropped, check its Telegram chat: {error}")
+            continue
         except Exception as error:
             log(f"zone alert to {customer} failed: {error}")
             failed.append(customer)

@@ -124,7 +124,7 @@
     "telegram_chat_channel": "Kanal",
     "telegram_no_chats_title": "Kein Chat gefunden",
     "telegram_no_chats_description": "Telegram behält nur den letzten Tag. Fügen Sie den Bot erneut zur Gruppe hinzu oder senden Sie ihm eine Nachricht, und klicken Sie dann auf Chats suchen.",
-    "telegram_bot_has_webhook": "Dieser Bot sendet seine Nachrichten bereits an einen Webhook, daher können seine Chats nicht aufgelistet werden. Geben Sie stattdessen die Chat-ID ein.",
+    "telegram_bot_in_use": "Eine andere App oder ein Webhook liest bereits die Nachrichten dieses Bots, daher können seine Chats nicht aufgelistet werden. Geben Sie stattdessen die Chat-ID ein oder verwenden Sie einen Bot nur für Wazuh.",
     "telegram_chat_id_invalid": "Geben Sie eine Chat-ID wie -1001234567890 oder einen Kanal wie @name ein",
     "telegram_test": "Testnachricht senden",
     "telegram_test_sent": "Testnachricht gesendet. Prüfen Sie den Chat.",

@@ -23,12 +23,20 @@ MAX_PARTS = 5
 MAX_RETRY_AFTER = 30
 
 
+# Telegram refuses these the same way until someone fixes the chat or the token
+LASTING = (400, 401, 403, 404)
+
+
 class TelegramError(Exception):
     def __init__(self, status, description, retry_after=0):
         super().__init__(f"Telegram answered {status}: {description}")
         self.status = status
         self.description = description
         self.retry_after = retry_after
+
+    @property
+    def lasting(self):
+        return self.status in LASTING
 
 
 def token():
@@ -55,23 +63,23 @@ def chunks(text):
     return parts + ([current] if current.strip() else [])
 
 
-def call(bot_token, method, payload, retried=False):
+def call(bot_token, method, payload, retried=False, timeout=30):
     """Call a method of the Bot API and return its result. A flood limit is waited out once."""
     try:
-        return _call(bot_token, method, payload)
+        return _call(bot_token, method, payload, timeout)
     except TelegramError as error:
         if error.status != 429 or retried or error.retry_after > MAX_RETRY_AFTER:
             raise
         time.sleep(error.retry_after or 1)
-        return call(bot_token, method, payload, retried=True)
+        return call(bot_token, method, payload, True, timeout)
 
 
-def _call(bot_token, method, payload):
+def _call(bot_token, method, payload, timeout):
     request = urllib.request.Request(f"https://api.telegram.org/bot{bot_token}/{method}",
                                      data=json.dumps(payload).encode(), method="POST",
                                      headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=30) as answer:
+        with urllib.request.urlopen(request, timeout=timeout) as answer:
             return json.load(answer).get("result")
     except urllib.error.HTTPError as error:
         try:
@@ -102,24 +110,24 @@ def describe(chat):
             "type": chat.get("type", "")}
 
 
-def known_chat(bot_token, chat_id):
-    """The chat behind an ID, or None when the bot cannot see it."""
+def known_chat(bot_token, chat_id, quick=False):
+    """The chat behind an ID, or None when the bot cannot see it. quick: no wait on a slow Telegram."""
     try:
+        chat = call(bot_token, "getChat", {"chat_id": chat_id}, retried=quick, timeout=5 if quick else 30)
         # Under the ID as saved: a public channel stays @name, as the field holds it
-        return dict(describe(call(bot_token, "getChat", {"chat_id": chat_id})), id=chat_id)
+        return dict(describe(chat), id=chat_id)
     except TelegramError as error:
-        # A wrong token is not a chat problem: the caller must hear about it
-        if error.status in (401, 404):
-            raise
-        return None
+        # Only a chat the bot cannot see is an answer: a wrong token or no network must reach the caller
+        if error.status in (400, 403):
+            return None
+        raise
 
 
 def recent_chats(bot_token):
-    """The chats of the last 100 updates the bot got, newest first: Telegram keeps the updates a day."""
+    """The chats of the updates the bot got, newest first: Telegram keeps the updates a day."""
     chats = {}
-    # A negative offset gives the newest updates. It also confirms the older ones: nothing else reads them
-    for update in call(bot_token, "getUpdates", {"offset": -100, "limit": 100,
-                                                 "allowed_updates": ["message", "channel_post", "my_chat_member"]}):
+    # No offset and no allowed_updates: either would change the bot for another app that reads its updates
+    for update in call(bot_token, "getUpdates", {"limit": 100}):
         for kind in ("message", "edited_message", "channel_post", "my_chat_member", "chat_member"):
             chat = update.get(kind, {}).get("chat")
             if chat:

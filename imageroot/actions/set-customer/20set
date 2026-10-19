@@ -24,14 +24,18 @@ if name == "default" or not response.get("data", {}).get("affected_items"):
     json.dump([{"field": "name", "parameter": "name", "value": name, "error": "customer_not_found"}], fp=sys.stdout)
     sys.exit(3)
 
-chat_id = data.get("telegram_chat_id", "")
+# The pattern lets a final line break through
+chat_id = data.get("telegram_chat_id", "").strip()
 chat_title = ""
 bot = wazuh_telegram.token()
 # Only for the customers table: a chat the bot cannot see yet is shown by its ID
 if chat_id and bot:
     try:
-        chat = wazuh_telegram.known_chat(bot, chat_id)
+        # The save must not wait on Telegram
+        chat = wazuh_telegram.known_chat(bot, chat_id, quick=True)
         chat_title = chat["title"] if chat else ""
+        if not chat:
+            print(agent.SD_WARNING + f"Telegram chat {chat_id} is not visible to the bot", file=sys.stderr)
     except wazuh_telegram.TelegramError as error:
         print(agent.SD_WARNING + f"cannot read the name of Telegram chat {chat_id}: {error}", file=sys.stderr)
 

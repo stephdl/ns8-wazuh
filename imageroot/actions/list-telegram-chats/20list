@@ -38,11 +38,11 @@ except wazuh_telegram.TelegramError as error:
     print(agent.SD_WARNING + f"cannot list the Telegram chats: {error}", file=sys.stderr)
     if error.status in (401, 404):
         fail("telegram_token_invalid")
-    # 409: the bot already gives its updates to a webhook, getUpdates is refused
+    # 409: a webhook or another app already reads the updates of this bot
     if error.status == 429:
         fail("telegram_rate_limited")
     if error.status == 409 and not chats:
-        fail("telegram_bot_has_webhook")
+        fail("telegram_bot_in_use")
     if error.status == 409:
         json.dump({"chats": [{k: c[k] for k in ("id", "title", "type")} for c in chats]}, fp=sys.stdout)
         sys.exit(0)
