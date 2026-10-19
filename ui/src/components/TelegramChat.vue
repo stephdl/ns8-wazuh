@@ -117,6 +117,8 @@ export default {
     // A token typed but not saved yet: the lookups and the test use it
     token: { type: String, default: "" },
     disabled: { type: Boolean, default: false },
+    // False without a token: there is no bot to ask
+    ready: { type: Boolean, default: true },
     // Set by the parent when the saved form refused the chat ID
     invalidMessage: { type: String, default: "" },
   },
@@ -147,7 +149,7 @@ export default {
   },
   created() {
     // Only the saved chat is resolved here, to show its name: errors wait for a click
-    if (this.value) {
+    if (this.value && this.ready) {
       this.findChats(true);
     }
   },

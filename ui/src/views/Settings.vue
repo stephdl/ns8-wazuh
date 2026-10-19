@@ -351,6 +351,7 @@
                       :label="$t('settings.telegram_chat_id')"
                       :helper="$t('settings.telegram_chat_id_helper')"
                       :token="telegramToken"
+                      :ready="telegramTokenSet || !!telegramToken"
                       :invalidMessage="$t(error.telegram_chat_id)"
                       ref="telegram_chat_id"
                     />
@@ -1004,6 +1005,9 @@ export default {
       this.telegramRemoveToken = true;
       this.telegramEnabled = false;
       this.telegramToken = "";
+      // The admin chat goes with the bot: the next token starts from an empty field
+      this.telegramAdminEnabled = false;
+      this.telegramChatId = "";
       this.configureModule();
     },
     async configureModule() {
