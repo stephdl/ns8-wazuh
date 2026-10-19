@@ -280,21 +280,98 @@
                       class="mg-bottom"
                       ref="notify_sender"
                     />
-                    <cv-dropdown
-                      v-model="notifyMinLevel"
-                      :label="$t('settings.notify_min_level')"
-                      :helper-text="$t('settings.notify_min_level_helper')"
-                      :disabled="stillLoading || !smarthostEnabled"
+                  </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.telegram_title") }}
+                  </h6>
+                  <NsToggle
+                    value="telegramEnabled"
+                    :label="$t('settings.telegram_enabled')"
+                    v-model="telegramEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="telegramEnabled">
+                    <div class="token-row">
+                      <NsTextInput
+                        type="password"
+                        v-model.trim="telegramToken"
+                        :label="$t('settings.telegram_token')"
+                        :placeholder="
+                          telegramTokenSet
+                            ? $t('settings.telegram_token_set')
+                            : ''
+                        "
+                        :invalid-message="$t(error.telegram_token)"
+                        :passwordShowLabel="$t('settings.show')"
+                        :passwordHideLabel="$t('settings.hide')"
+                        :disabled="stillLoading"
+                        class="token-field"
+                        ref="telegram_token"
+                      />
+                      <NsButton
+                        type="button"
+                        v-if="telegramTokenSet"
+                        kind="danger--tertiary"
+                        size="field"
+                        :disabled="stillLoading"
+                        @click="isShownRemoveTokenModal = true"
+                        class="side-button"
+                        >{{ $t("settings.telegram_remove_token") }}</NsButton
+                      >
+                    </div>
+                    <div class="field-helper mg-bottom">
+                      {{ $t("settings.telegram_token_helper") }}
+                    </div>
+                    <NsToggle
+                      value="telegramAdminEnabled"
+                      :label="$t('settings.telegram_admin_enabled')"
+                      v-model="telegramAdminEnabled"
+                      :disabled="stillLoading || !telegramHasToken"
                       class="mg-bottom"
                     >
-                      <cv-dropdown-item
-                        v-for="level in notifyLevels"
-                        :key="level"
-                        :value="level"
-                        >{{ $t("settings.level_" + level) }}</cv-dropdown-item
-                      >
-                    </cv-dropdown>
+                      <template slot="text-left">{{
+                        $t("settings.disabled")
+                      }}</template>
+                      <template slot="text-right">{{
+                        $t("settings.enabled")
+                      }}</template>
+                    </NsToggle>
+                    <TelegramChat
+                      v-if="telegramAdminEnabled && !stillLoading"
+                      :key="telegramChatKey"
+                      v-model="telegramChatId"
+                      :label="$t('settings.telegram_chat_id')"
+                      :helper="$t('settings.telegram_chat_id_helper')"
+                      :token="telegramToken"
+                      :ready="telegramHasToken"
+                      :invalidMessage="$t(error.telegram_chat_id)"
+                      ref="telegram_chat_id"
+                    />
                   </template>
+                  <!-- One level for every channel: the same findings reach the mailbox and the chat -->
+                  <cv-dropdown
+                    v-if="notifyEnabled || telegramEnabled"
+                    v-model="notifyMinLevel"
+                    :label="$t('settings.notify_min_level')"
+                    :helper-text="$t('settings.notify_min_level_helper')"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <cv-dropdown-item
+                      v-for="level in notifyLevels"
+                      :key="level"
+                      :value="level"
+                      >{{ $t("settings.level_" + level) }}</cv-dropdown-item
+                    >
+                  </cv-dropdown>
                 </template>
               </cv-accordion-item>
             </cv-accordion>
@@ -359,12 +436,37 @@
         </cv-tile>
       </cv-column>
     </cv-row>
+    <NsModal
+      size="default"
+      kind="danger"
+      :visible="isShownRemoveTokenModal"
+      :primary-button-disabled="loading.configureModule"
+      @modal-hidden="isShownRemoveTokenModal = false"
+      @primary-click="removeTelegramToken"
+    >
+      <template slot="title">{{
+        $t("settings.telegram_remove_token_title")
+      }}</template>
+      <template slot="content">
+        <p>
+          {{ $t("settings.telegram_remove_token_description") }}
+        </p>
+      </template>
+      <template slot="secondary-button">{{
+        core.$t("common.cancel")
+      }}</template>
+      <template slot="primary-button">{{
+        $t("settings.telegram_remove_token")
+      }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
 <script>
 import to from "await-to-js";
 import { mapState } from "vuex";
+import { CHAT_ID_PATTERN, TOKEN_PATTERN } from "../lib/telegram";
+import TelegramChat from "@/components/TelegramChat.vue";
 import {
   QueryParamService,
   UtilService,
@@ -382,6 +484,7 @@ export default {
     QueryParamService,
     PageTitleService,
   ],
+  components: { TelegramChat },
   pageTitle() {
     return this.$t("settings.title") + " - " + this.appName;
   },
@@ -421,6 +524,15 @@ export default {
       smarthostEnabled: true,
       exportToken: "",
       exportTokenSet: false,
+      telegramEnabled: false,
+      telegramToken: "",
+      telegramTokenSet: false,
+      telegramAdminEnabled: false,
+      telegramChatId: "",
+      // Changed on each load: the chat field starts over with the saved chat
+      telegramChatKey: 0,
+      telegramRemoveToken: false,
+      isShownRemoveTokenModal: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
@@ -437,6 +549,8 @@ export default {
         export_url: "",
         notify_recipients: "",
         notify_sender: "",
+        telegram_token: "",
+        telegram_chat_id: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -447,6 +561,12 @@ export default {
     };
   },
   watch: {
+    // No admin chat without a bot to write to it
+    telegramHasToken(hasToken) {
+      if (!hasToken) {
+        this.telegramAdminEnabled = false;
+      }
+    },
     adminPassword() {
       this.error.admin_password = "";
       this.error.admin_password_confirm = "";
@@ -459,6 +579,9 @@ export default {
   },
   computed: {
     ...mapState(["instanceName", "core", "appName"]),
+    telegramHasToken() {
+      return this.telegramTokenSet || !!this.telegramToken;
+    },
     stillLoading() {
       return (
         this.loading.getConfiguration ||
@@ -731,13 +854,22 @@ export default {
       this.smarthostEnabled = config.smarthost_enabled;
       this.exportTokenSet = config.export_token_set;
       this.exportToken = "";
+      this.telegramEnabled = config.telegram_enabled;
+      this.telegramAdminEnabled =
+        config.telegram_admin_enabled && config.telegram_token_set;
+      this.telegramChatId = config.telegram_chat_id;
+      this.telegramTokenSet = config.telegram_token_set;
+      this.telegramToken = "";
+      this.telegramRemoveToken = false;
+      this.telegramChatKey++;
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
         config.index_unclassified_events ||
         config.retention_days !== 365 ||
         config.export_url !== "" ||
-        config.notify_enabled;
+        config.notify_enabled ||
+        config.telegram_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -808,6 +940,37 @@ export default {
         }
         isValidationOk = false;
       }
+      if (this.telegramToken && !TOKEN_PATTERN.test(this.telegramToken)) {
+        this.error.telegram_token = "settings.telegram_token_pattern";
+        if (isValidationOk) {
+          this.focusElement("telegram_token");
+        }
+        isValidationOk = false;
+      }
+      if (
+        this.telegramEnabled &&
+        !this.telegramToken &&
+        !this.telegramTokenSet
+      ) {
+        this.error.telegram_token = "common.required";
+        if (isValidationOk) {
+          this.focusElement("telegram_token");
+        }
+        isValidationOk = false;
+      }
+      if (
+        this.telegramEnabled &&
+        this.telegramAdminEnabled &&
+        !CHAT_ID_PATTERN.test(this.telegramChatId)
+      ) {
+        this.error.telegram_chat_id = this.telegramChatId
+          ? "settings.telegram_chat_id_invalid"
+          : "common.required";
+        if (isValidationOk) {
+          this.$refs.telegram_chat_id.focus();
+        }
+        isValidationOk = false;
+      }
       if (
         !Number.isInteger(this.retentionDays) ||
         this.retentionDays < 30 ||
@@ -852,6 +1015,17 @@ export default {
           }
         }
       }
+    },
+    removeTelegramToken() {
+      this.isShownRemoveTokenModal = false;
+      // Without a token nothing could be sent: the bot switch goes off with it
+      this.telegramRemoveToken = true;
+      this.telegramEnabled = false;
+      this.telegramToken = "";
+      // The admin chat goes with the bot: the next token starts from an empty field
+      this.telegramAdminEnabled = false;
+      this.telegramChatId = "";
+      this.configureModule();
     },
     async configureModule() {
       this.error.test_imap = false;
@@ -899,6 +1073,12 @@ export default {
         ],
         notify_sender: this.isEmail(this.notifySender) ? this.notifySender : "",
         notify_min_level: this.notifyMinLevel,
+        telegram_enabled: this.telegramEnabled,
+        telegram_admin_enabled: this.telegramAdminEnabled,
+        // While Telegram is off the field is hidden: keep only what the backend accepts
+        telegram_chat_id: CHAT_ID_PATTERN.test(this.telegramChatId)
+          ? this.telegramChatId
+          : "",
       };
       // Without a new password the backend keeps the current one
       if (this.isPasswordActive) {
@@ -909,6 +1089,12 @@ export default {
         data.export_token = this.exportToken;
       } else if (!this.exportUrl) {
         data.export_token = "";
+      }
+      // Same for the bot token: turning Telegram off keeps it for later
+      if (this.telegramToken) {
+        data.telegram_token = this.telegramToken;
+      } else if (this.telegramRemoveToken) {
+        data.telegram_token = "";
       }
       const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
@@ -954,6 +1140,28 @@ export default {
 @import "../styles/carbon-utils";
 .mg-bottom {
   margin-bottom: $spacing-06;
+}
+
+.token-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: $spacing-05;
+}
+
+.token-field {
+  flex: 0 1 20rem;
+}
+
+// Level with the field, not with its label or its error below
+.side-button {
+  margin-top: $spacing-06;
+}
+
+.field-helper {
+  margin-top: $spacing-03;
+  font-size: 0.75rem;
+  color: $text-02;
 }
 
 .maxwidth {

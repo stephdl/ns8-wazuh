@@ -1,0 +1,36 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "List Telegram chats",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/list-telegram-chats",
+    "description": "List the chats the bot of the module can write to: the given chat IDs, then the chats it was added to or got a message from during the last day",
+    "examples": [
+        {},
+        {
+            "token": "123456789:AAH-example"
+        },
+        {
+            "chat_ids": [
+                "-1001234567890"
+            ]
+        }
+    ],
+    "type": "object",
+    "properties": {
+        "token": {
+            "type": "string",
+            "title": "Telegram bot token",
+            "description": "Token to use before it is saved. Omit to use the saved one.",
+            "pattern": "^([0-9]+:[A-Za-z0-9_-]+)?$"
+        },
+        "chat_ids": {
+            "type": "array",
+            "title": "Known chat IDs",
+            "description": "Chat IDs already saved, to show their names. Those the bot cannot see are left out.",
+            "items": {
+                "type": "string",
+                "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})$"
+            },
+            "maxItems": 50
+        }
+    }
+}

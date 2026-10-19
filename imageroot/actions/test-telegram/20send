@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+
+import agent
+
+import wazuh_telegram
+
+data = json.load(sys.stdin)
+chat_id = data["chat_id"]
+token = data.get("token", "").strip() or wazuh_telegram.token()
+
+
+def fail(field, error):
+    agent.set_status("validation-failed")
+    # The value is left empty for the token: a secret must never be echoed back
+    value = chat_id if field == "chat_id" else ""
+    json.dump([{"field": field, "parameter": field, "value": value, "error": error}], fp=sys.stdout)
+    sys.exit(3)
+
+
+if not token:
+    fail("token", "telegram_token_required")
+host = os.environ.get("TRAEFIK_HOST", "") or os.environ["MODULE_ID"]
+try:
+    wazuh_telegram.send(token, chat_id, f"Test message from Wazuh on <b>{wazuh_telegram.escape(host)}</b>."
+                                        " The alerts will come here.")
+except wazuh_telegram.TelegramError as error:
+    print(agent.SD_WARNING + f"test message to {chat_id} failed: {error}", file=sys.stderr)
+    # Telegram answers 404 to a token it does not know, and 400 or 403 to a chat the bot cannot write to
+    if error.status in (401, 404):
+        fail("token", "telegram_token_invalid")
+    if error.status == 403:
+        fail("chat_id", "telegram_bot_not_member")
+    if error.status == 429:
+        fail("chat_id", "telegram_rate_limited")
+    if error.status == 400:
+        fail("chat_id", "telegram_chat_not_found")
+    fail("chat_id", "telegram_unreachable")

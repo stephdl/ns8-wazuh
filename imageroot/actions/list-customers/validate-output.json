@@ -15,7 +15,10 @@
                     ],
                     "recipients": [
                         "soc@acme.example"
-                    ]
+                    ],
+                    "telegram_enabled": true,
+                    "telegram_chat_id": "-1001234567890",
+                    "telegram_chat_title": "Acme security"
                 }
             ],
             "countries": [
@@ -43,7 +46,10 @@
                     "name",
                     "agents",
                     "zones",
-                    "recipients"
+                    "recipients",
+                    "telegram_enabled",
+                    "telegram_chat_id",
+                    "telegram_chat_title"
                 ],
                 "properties": {
                     "name": {
@@ -64,6 +70,18 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "telegram_enabled": {
+                        "type": "boolean",
+                        "description": "Its zone alerts go to its Telegram chat"
+                    },
+                    "telegram_chat_id": {
+                        "type": "string",
+                        "description": "Telegram chat of the customer, empty when none"
+                    },
+                    "telegram_chat_title": {
+                        "type": "string",
+                        "description": "Name of the Telegram chat when it was saved, empty when unknown"
                     }
                 }
             }

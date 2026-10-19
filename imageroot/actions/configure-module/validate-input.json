@@ -18,7 +18,10 @@
             "notify_sender": "",
             "notify_min_level": "medium",
             "notify_enabled": true,
-            "retention_days": 365
+            "retention_days": 365,
+            "telegram_enabled": true,
+            "telegram_chat_id": "-1001234567890",
+            "telegram_admin_enabled": true
         }
     ],
     "type": "object",
@@ -121,26 +124,78 @@
                 "high",
                 "critical"
             ]
+        },
+        "telegram_enabled": {
+            "type": "boolean",
+            "title": "Telegram bot",
+            "description": "Send notifications to Telegram at all. Off, no chat gets anything, neither the admin one nor those of the customers. Needs the bot token."
+        },
+        "telegram_admin_enabled": {
+            "type": "boolean",
+            "title": "Telegram admin notifications",
+            "description": "Send the summary of the new findings to the admin chat every 5 minutes, at the same minimum level as the emails. Needs the chat ID."
+        },
+        "telegram_token": {
+            "type": "string",
+            "title": "Telegram bot token",
+            "description": "Token of the bot that sends every Telegram message of this instance, as given by BotFather. Omit to keep the current one, send an empty string to remove it.",
+            "pattern": "^([0-9]+:[A-Za-z0-9_-]+)?$"
+        },
+        "telegram_chat_id": {
+            "type": "string",
+            "title": "Telegram chat ID",
+            "description": "Admin chat: a group ID like -1001234567890, a user ID, or a public channel like @name. Empty when not used.",
+            "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})?$"
         }
     },
-    "if": {
-        "properties": {
-            "notify_enabled": {
-                "const": true
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "notify_enabled": {
+                        "const": true
+                    }
+                },
+                "required": [
+                    "notify_enabled"
+                ]
+            },
+            "then": {
+                "required": [
+                    "notify_recipients"
+                ],
+                "properties": {
+                    "notify_recipients": {
+                        "minItems": 1
+                    }
+                }
             }
         },
-        "required": [
-            "notify_enabled"
-        ]
-    },
-    "then": {
-        "required": [
-            "notify_recipients"
-        ],
-        "properties": {
-            "notify_recipients": {
-                "minItems": 1
+        {
+            "if": {
+                "properties": {
+                    "telegram_enabled": {
+                        "const": true
+                    },
+                    "telegram_admin_enabled": {
+                        "const": true
+                    }
+                },
+                "required": [
+                    "telegram_enabled",
+                    "telegram_admin_enabled"
+                ]
+            },
+            "then": {
+                "required": [
+                    "telegram_chat_id"
+                ],
+                "properties": {
+                    "telegram_chat_id": {
+                        "minLength": 1
+                    }
+                }
             }
         }
-    }
+    ]
 }

@@ -104,8 +104,43 @@ Check if wazuh configuration reads back
     Should Be Equal    ${config}[host]    ${TEST_HOST}
     Should Be Equal    ${config}[ldap_domain]    ${EMPTY}
     Should Be Equal    ${config}[notify_enabled]    ${False}
+    Should Be Equal    ${config}[telegram_enabled]    ${False}
+    Should Be Equal    ${config}[telegram_admin_enabled]    ${False}
+    Should Be Equal    ${config}[telegram_token_set]    ${False}
     Should Be Equal As Integers    ${config}[retention_days]    365
     Should Be Equal As Integers    ${config}[agents_enrolled]    0
+
+Check if the Telegram token stays secret
+    # Enabled without a token: nothing could be sent
+    ${output} =    Run action that fails    configure-module
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_admin_enabled":true,"telegram_chat_id":"-100123"}
+    Should Contain    ${output}    telegram_token_required
+    Run action    configure-module
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":true,"telegram_admin_enabled":true,"telegram_chat_id":"-100123","telegram_token":"123456:robot-token"}
+    ${config} =    Run action    get-configuration
+    Should Be Equal    ${config}[telegram_enabled]    ${True}
+    Should Be Equal    ${config}[telegram_admin_enabled]    ${True}
+    Should Be Equal    ${config}[telegram_chat_id]    -100123
+    Should Be Equal    ${config}[telegram_token_set]    ${True}
+    Should Not Contain    ${config}    robot-token
+    Use the install node
+    ${output} =    Execute Command    runagent -m ${module_id} env
+    Should Not Contain    ${output}    robot-token
+    ${mode} =    Execute Command    stat -c %a /home/${module_id}/.config/state/secrets/telegram.env
+    Should Be Equal As Strings    ${mode}    600
+    # Telegram does not know this token, or is out of reach of the test runner
+    ${output} =    Run action that fails    test-telegram    {"chat_id":"-100123"}
+    Should Match Regexp    ${output}    telegram_token_invalid|telegram_unreachable
+    Should Not Contain    ${output}    robot-token
+    # Omitted, the token is kept. Empty, it is removed
+    Run action    configure-module
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":false,"telegram_chat_id":""}
+    ${config} =    Run action    get-configuration
+    Should Be Equal    ${config}[telegram_token_set]    ${True}
+    Run action    configure-module
+    ...    {"host":"${TEST_HOST}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false,"telegram_enabled":false,"telegram_chat_id":"","telegram_token":""}
+    ${config} =    Run action    get-configuration
+    Should Be Equal    ${config}[telegram_token_set]    ${False}
 
 Check if the three services are running
     Use the install node
@@ -235,11 +270,13 @@ Check if a token needs a customer
 
 Check if the customer has login zones
     Customer should be listed    robot    1
-    Run action    set-customer    {"name":"robot","zones":["@EU","CA"],"recipients":["soc@ns8-ci.test"]}
+    Run action    set-customer    {"name":"robot","zones":["@EU","CA"],"recipients":["soc@ns8-ci.test"],"telegram_enabled":true,"telegram_chat_id":"-100456"}
     ${result} =    Run action    list-customers
     ${robot} =    Evaluate    [c for c in $result['customers'] if c['name'] == 'robot'][0]
     Should Be Equal    ${robot}[zones]    ${{ ['@EU', 'CA'] }}
     Should Be Equal    ${robot}[recipients]    ${{ ['soc@ns8-ci.test'] }}
+    Should Be Equal    ${robot}[telegram_enabled]    ${True}
+    Should Be Equal    ${robot}[telegram_chat_id]    -100456
     Should Contain    ${result}[countries]    FR
     Should Be Equal    ${result}[continents][EU]    Europe
     Use the install node
@@ -255,6 +292,7 @@ Check if the zones of a customer are checked
     Run action that fails    set-customer    {"name":"robot","zones":["XYZ"],"recipients":[]}
     Run action that fails    set-customer    {"name":"robot","zones":["@XX"],"recipients":[]}
     Run action that fails    set-customer    {"name":"robot","zones":[],"recipients":["not-an-address"]}
+    Run action that fails    set-customer    {"name":"robot","zones":[],"recipients":[],"telegram_chat_id":"not a chat"}
     ${output} =    Run action that fails    set-customer    {"name":"nobody","zones":["FR"],"recipients":[]}
     Should Contain    ${output}    customer_not_found
 

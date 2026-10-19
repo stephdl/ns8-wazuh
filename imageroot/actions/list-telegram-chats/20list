@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+
+import agent
+
+import wazuh_telegram
+
+data = json.load(sys.stdin)
+token = data.get("token", "").strip() or wazuh_telegram.token()
+
+
+def fail(error):
+    agent.set_status("validation-failed")
+    # The value is left empty: a secret must never be echoed back
+    json.dump([{"field": "token", "parameter": "token", "value": "", "error": error}], fp=sys.stdout)
+    sys.exit(3)
+
+
+if not token:
+    fail("telegram_token_required")
+chats = []
+try:
+    # The saved chats first: they stay known after the day of updates Telegram keeps
+    for chat_id in data.get("chat_ids", []):
+        chat = wazuh_telegram.known_chat(token, chat_id)
+        if chat and chat["numeric_id"] not in {c["numeric_id"] for c in chats}:
+            chats.append(chat)
+    # On the number: a channel saved as @name comes back from the updates as -100…
+    chats += [c for c in wazuh_telegram.recent_chats(token) if c["numeric_id"] not in {k["numeric_id"] for k in chats}]
+except wazuh_telegram.TelegramError as error:
+    print(agent.SD_WARNING + f"cannot list the Telegram chats: {error}", file=sys.stderr)
+    if error.status in (401, 404):
+        fail("telegram_token_invalid")
+    # 409: a webhook or another app already reads the updates of this bot
+    if error.status == 429:
+        fail("telegram_rate_limited")
+    if error.status == 409 and not chats:
+        fail("telegram_bot_in_use")
+    if error.status == 409:
+        json.dump({"chats": [{k: c[k] for k in ("id", "title", "type")} for c in chats]}, fp=sys.stdout)
+        sys.exit(0)
+    fail("telegram_unreachable")
+json.dump({"chats": [{k: c[k] for k in ("id", "title", "type")} for c in chats]}, fp=sys.stdout)
