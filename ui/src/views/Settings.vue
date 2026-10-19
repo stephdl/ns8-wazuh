@@ -410,31 +410,6 @@
                       >
                         {{ detail }}
                       </div>
-                      <NsModal
-                        size="default"
-                        kind="danger"
-                        :visible="isShownRemoveTokenModal"
-                        :primary-button-disabled="loading.configureModule"
-                        @modal-hidden="isShownRemoveTokenModal = false"
-                        @primary-click="removeTelegramToken"
-                      >
-                        <template slot="title">{{
-                          $t("settings.telegram_remove_token_title")
-                        }}</template>
-                        <template slot="content">
-                          <p>
-                            {{
-                              $t("settings.telegram_remove_token_description")
-                            }}
-                          </p>
-                        </template>
-                        <template slot="secondary-button">{{
-                          core.$t("common.cancel")
-                        }}</template>
-                        <template slot="primary-button">{{
-                          $t("settings.telegram_remove_token")
-                        }}</template>
-                      </NsModal>
                     </div>
                   </template>
                 </NsInlineNotification>
@@ -459,6 +434,29 @@
         </cv-tile>
       </cv-column>
     </cv-row>
+    <NsModal
+      size="default"
+      kind="danger"
+      :visible="isShownRemoveTokenModal"
+      :primary-button-disabled="loading.configureModule"
+      @modal-hidden="isShownRemoveTokenModal = false"
+      @primary-click="removeTelegramToken"
+    >
+      <template slot="title">{{
+        $t("settings.telegram_remove_token_title")
+      }}</template>
+      <template slot="content">
+        <p>
+          {{ $t("settings.telegram_remove_token_description") }}
+        </p>
+      </template>
+      <template slot="secondary-button">{{
+        core.$t("common.cancel")
+      }}</template>
+      <template slot="primary-button">{{
+        $t("settings.telegram_remove_token")
+      }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
