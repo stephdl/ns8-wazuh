@@ -8,34 +8,31 @@
 
 import html
 import json
+import time
 import urllib.error
 import urllib.request
+
+import wazuh_secrets
 
 TOKEN_FILE = "secrets/telegram.env"
 # Telegram refuses a longer text: the message is cut at line breaks below it
 LIMIT = 4096
+# A group takes about 20 messages a minute: past this, the rest is left to the dashboard
+MAX_PARTS = 5
+# Longer waits are not worth holding the run for: the next one retries
+MAX_RETRY_AFTER = 30
 
 
 class TelegramError(Exception):
-    def __init__(self, status, description):
+    def __init__(self, status, description, retry_after=0):
         super().__init__(f"Telegram answered {status}: {description}")
         self.status = status
         self.description = description
-
-
-def read_secret(path, key):
-    try:
-        with open(path) as f:
-            for line in f:
-                if line.startswith(f"{key}="):
-                    return line.rstrip("\n").split("=", 1)[1]
-    except FileNotFoundError:
-        pass
-    return ""
+        self.retry_after = retry_after
 
 
 def token():
-    return read_secret(TOKEN_FILE, "TELEGRAM_TOKEN")
+    return wazuh_secrets.read(TOKEN_FILE, "TELEGRAM_TOKEN")
 
 
 def escape(text):
@@ -58,8 +55,18 @@ def chunks(text):
     return parts + ([current] if current.strip() else [])
 
 
-def call(bot_token, method, payload):
-    """Call a method of the Bot API and return its result."""
+def call(bot_token, method, payload, retried=False):
+    """Call a method of the Bot API and return its result. A flood limit is waited out once."""
+    try:
+        return _call(bot_token, method, payload)
+    except TelegramError as error:
+        if error.status != 429 or retried or error.retry_after > MAX_RETRY_AFTER:
+            raise
+        time.sleep(error.retry_after or 1)
+        return call(bot_token, method, payload, retried=True)
+
+
+def _call(bot_token, method, payload):
     request = urllib.request.Request(f"https://api.telegram.org/bot{bot_token}/{method}",
                                      data=json.dumps(payload).encode(), method="POST",
                                      headers={"Content-Type": "application/json"})
@@ -68,10 +75,11 @@ def call(bot_token, method, payload):
             return json.load(answer).get("result")
     except urllib.error.HTTPError as error:
         try:
-            description = json.load(error).get("description", "")
+            body = json.load(error)
         except ValueError:
-            description = ""
-        raise TelegramError(error.code, description or error.reason) from None
+            body = {}
+        raise TelegramError(error.code, body.get("description") or error.reason,
+                            body.get("parameters", {}).get("retry_after", 0)) from None
     except (urllib.error.URLError, OSError, ValueError) as error:
         reason = getattr(error, "reason", error)
         raise TelegramError(0, str(reason).replace(bot_token, "***")) from None
@@ -79,14 +87,19 @@ def call(bot_token, method, payload):
 
 def send(bot_token, chat_id, text):
     """Send an HTML text, in several messages when it is too long."""
-    for part in chunks(text):
+    parts = chunks(text)
+    if len(parts) > MAX_PARTS:
+        parts = parts[:MAX_PARTS - 1] + ["… more in the dashboard."]
+    for part in parts:
         call(bot_token, "sendMessage", {"chat_id": chat_id, "text": part, "parse_mode": "HTML",
                                         "disable_web_page_preview": True})
 
 
 def describe(chat):
+    """The chat as listed: numeric_id lets an @name and its number match."""
     name = chat.get("title") or " ".join(p for p in (chat.get("first_name"), chat.get("last_name")) if p)
-    return {"id": str(chat["id"]), "title": name or chat.get("username", ""), "type": chat.get("type", "")}
+    return {"id": str(chat["id"]), "numeric_id": str(chat["id"]), "title": name or chat.get("username", ""),
+            "type": chat.get("type", "")}
 
 
 def known_chat(bot_token, chat_id):
@@ -102,10 +115,11 @@ def known_chat(bot_token, chat_id):
 
 
 def recent_chats(bot_token):
-    """The chats the bot heard from lately, newest first: Telegram keeps the updates a day."""
+    """The chats of the last 100 updates the bot got, newest first: Telegram keeps the updates a day."""
     chats = {}
-    # Without an offset nothing is marked as read: the next call sees the same chats again
-    for update in call(bot_token, "getUpdates", {"allowed_updates": ["message", "channel_post", "my_chat_member"]}):
+    # A negative offset gives the newest updates. It also confirms the older ones: nothing else reads them
+    for update in call(bot_token, "getUpdates", {"offset": -100, "limit": 100,
+                                                 "allowed_updates": ["message", "channel_post", "my_chat_member"]}):
         for kind in ("message", "edited_message", "channel_post", "my_chat_member", "chat_member"):
             chat = update.get(kind, {}).get("chat")
             if chat:

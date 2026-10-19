@@ -30,6 +30,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_secrets
 import wazuh_telegram
 import wazuh_zones
 from wazuh_api import api
@@ -147,7 +148,7 @@ def export(cursor):
     if not url:
         cursor.forget()
         return 0
-    token = wazuh_telegram.read_secret(os.environ.get("EXPORT_SECRETS", "secrets/export.env"), "EXPORT_TOKEN")
+    token = wazuh_secrets.read(os.environ.get("EXPORT_SECRETS", "secrets/export.env"), "EXPORT_TOKEN")
     ts, ids = cursor.load()
     sent = 0
     for hits, ts, ids in pages(ts, ids, [], []):

@@ -39,6 +39,8 @@ except wazuh_telegram.TelegramError as error:
         fail("token", "telegram_token_invalid")
     if error.status == 403:
         fail("chat_id", "telegram_bot_not_member")
+    if error.status == 429:
+        fail("chat_id", "telegram_rate_limited")
     if error.status == 400:
         fail("chat_id", "telegram_chat_not_found")
     fail("chat_id", "telegram_unreachable")

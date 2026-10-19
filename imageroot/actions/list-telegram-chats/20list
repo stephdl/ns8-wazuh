@@ -30,18 +30,21 @@ try:
     # The saved chats first: they stay known after the day of updates Telegram keeps
     for chat_id in data.get("chat_ids", []):
         chat = wazuh_telegram.known_chat(token, chat_id)
-        if chat and chat["id"] not in {c["id"] for c in chats}:
+        if chat and chat["numeric_id"] not in {c["numeric_id"] for c in chats}:
             chats.append(chat)
-    chats += [c for c in wazuh_telegram.recent_chats(token) if c["id"] not in {k["id"] for k in chats}]
+    # On the number: a channel saved as @name comes back from the updates as -100…
+    chats += [c for c in wazuh_telegram.recent_chats(token) if c["numeric_id"] not in {k["numeric_id"] for k in chats}]
 except wazuh_telegram.TelegramError as error:
     print(agent.SD_WARNING + f"cannot list the Telegram chats: {error}", file=sys.stderr)
     if error.status in (401, 404):
         fail("telegram_token_invalid")
     # 409: the bot already gives its updates to a webhook, getUpdates is refused
+    if error.status == 429:
+        fail("telegram_rate_limited")
     if error.status == 409 and not chats:
         fail("telegram_bot_has_webhook")
     if error.status == 409:
-        json.dump({"chats": chats}, fp=sys.stdout)
+        json.dump({"chats": [{k: c[k] for k in ("id", "title", "type")} for c in chats]}, fp=sys.stdout)
         sys.exit(0)
     fail("telegram_unreachable")
-json.dump({"chats": chats}, fp=sys.stdout)
+json.dump({"chats": [{k: c[k] for k in ("id", "title", "type")} for c in chats]}, fp=sys.stdout)
