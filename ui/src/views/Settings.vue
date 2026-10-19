@@ -316,6 +316,48 @@
                       class="mg-bottom"
                       ref="telegram_token"
                     />
+                    <NsButton
+                      kind="tertiary"
+                      size="field"
+                      :loading="loading.listTelegramChats"
+                      :disabled="stillLoading || loading.listTelegramChats"
+                      @click="findTelegramChats"
+                      class="mg-bottom"
+                      >{{ $t("settings.telegram_find_chats") }}</NsButton
+                    >
+                    <cv-dropdown
+                      v-if="telegramChats.length"
+                      v-model="telegramChatId"
+                      :label="$t('settings.telegram_found_chats')"
+                      :placeholder="$t('settings.telegram_choose_chat')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                    >
+                      <cv-dropdown-item
+                        v-for="chat in telegramChats"
+                        :key="chat.id"
+                        :value="chat.id"
+                        >{{ chat.title }} ({{
+                          $t("settings.telegram_chat_" + chat.type)
+                        }})</cv-dropdown-item
+                      >
+                    </cv-dropdown>
+                    <NsInlineNotification
+                      v-if="telegramChatsEmpty"
+                      kind="info"
+                      :title="$t('settings.telegram_no_chats_title')"
+                      :description="
+                        $t('settings.telegram_no_chats_description')
+                      "
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.listTelegramChats"
+                      kind="error"
+                      :title="$t('action.list-telegram-chats')"
+                      :description="error.listTelegramChats"
+                      :showCloseButton="false"
+                    />
                     <NsTextInput
                       v-model.trim="telegramChatId"
                       :label="$t('settings.telegram_chat_id')"
@@ -435,7 +477,11 @@
 <script>
 import to from "await-to-js";
 import { mapState } from "vuex";
-import { CHAT_ID_PATTERN, testTelegram } from "../lib/telegram";
+import {
+  CHAT_ID_PATTERN,
+  listTelegramChats,
+  testTelegram,
+} from "../lib/telegram";
 import {
   QueryParamService,
   UtilService,
@@ -497,12 +543,15 @@ export default {
       telegramTokenSet: false,
       telegramChatId: "",
       telegramTestSent: false,
+      telegramChats: [],
+      telegramChatsEmpty: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
         getStatus: false,
         listUserDomains: false,
         testTelegram: false,
+        listTelegramChats: false,
       },
       error: {
         admin_password: "",
@@ -517,6 +566,7 @@ export default {
         telegram_token: "",
         telegram_chat_id: "",
         testTelegram: "",
+        listTelegramChats: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -977,16 +1027,36 @@ export default {
       if (this.telegramToken) {
         data.token = this.telegramToken;
       }
-      const failure = await testTelegram(this, data);
+      const result = await testTelegram(this, data);
       this.loading.testTelegram = false;
-      if (!failure) {
+      if ("output" in result) {
         this.telegramTestSent = true;
-      } else if (failure.parameter === "token") {
-        this.error.telegram_token = failure.message;
-      } else if (failure.parameter === "chat_id") {
-        this.error.telegram_chat_id = failure.message;
+      } else if (result.parameter === "token") {
+        this.error.telegram_token = result.message;
+      } else if (result.parameter === "chat_id") {
+        this.error.telegram_chat_id = result.message;
       } else {
-        this.error.testTelegram = failure.message;
+        this.error.testTelegram = result.message;
+      }
+    },
+    async findTelegramChats() {
+      this.telegramChatsEmpty = false;
+      this.error.listTelegramChats = "";
+      this.error.telegram_token = "";
+      this.loading.listTelegramChats = true;
+      // A token typed but not saved yet is the one to use
+      const result = await listTelegramChats(
+        this,
+        this.telegramToken ? { token: this.telegramToken } : {}
+      );
+      this.loading.listTelegramChats = false;
+      if ("output" in result) {
+        this.telegramChats = result.output.chats;
+        this.telegramChatsEmpty = !this.telegramChats.length;
+      } else if (result.parameter === "token") {
+        this.error.telegram_token = result.message;
+      } else {
+        this.error.listTelegramChats = result.message;
       }
     },
     async configureModule() {

@@ -1,0 +1,40 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Telegram chats",
+    "$id": "http://nethserver.org/json-schema/task/output/wazuh/list-telegram-chats",
+    "description": "The chats the bot heard from during the last day, newest first",
+    "examples": [
+        {
+            "chats": [
+                {
+                    "id": "-1001234567890",
+                    "title": "Wazuh admin",
+                    "type": "supergroup"
+                }
+            ]
+        }
+    ],
+    "type": "object",
+    "required": ["chats"],
+    "properties": {
+        "chats": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "title", "type"],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "private, group, supergroup or channel"
+                    }
+                }
+            }
+        }
+    }
+}

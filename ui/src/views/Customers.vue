@@ -171,6 +171,46 @@
             ref="recipients"
           />
           <template v-if="telegramTokenSet">
+            <NsButton
+              kind="tertiary"
+              size="field"
+              :loading="loading.listTelegramChats"
+              :disabled="loading.setCustomer || loading.listTelegramChats"
+              @click="findTelegramChats"
+              class="mg-bottom"
+              >{{ $t("settings.telegram_find_chats") }}</NsButton
+            >
+            <cv-dropdown
+              v-if="telegramChats.length"
+              v-model="telegramChatId"
+              :label="$t('settings.telegram_found_chats')"
+              :placeholder="$t('settings.telegram_choose_chat')"
+              :disabled="loading.setCustomer"
+              class="mg-bottom"
+            >
+              <cv-dropdown-item
+                v-for="chat in telegramChats"
+                :key="chat.id"
+                :value="chat.id"
+                >{{ chat.title }} ({{
+                  $t("settings.telegram_chat_" + chat.type)
+                }})</cv-dropdown-item
+              >
+            </cv-dropdown>
+            <NsInlineNotification
+              v-if="telegramChatsEmpty"
+              kind="info"
+              :title="$t('settings.telegram_no_chats_title')"
+              :description="$t('settings.telegram_no_chats_description')"
+              :showCloseButton="false"
+            />
+            <NsInlineNotification
+              v-if="error.listTelegramChats"
+              kind="error"
+              :title="$t('action.list-telegram-chats')"
+              :description="error.listTelegramChats"
+              :showCloseButton="false"
+            />
             <NsTextInput
               v-model.trim="telegramChatId"
               :label="$t('customers.telegram_chat_id')"
@@ -265,7 +305,11 @@ import {
   PageTitleService,
 } from "@nethserver/ns8-ui-lib";
 import { zoneLabel, zoneOptions } from "../lib/countries";
-import { CHAT_ID_PATTERN, testTelegram } from "../lib/telegram";
+import {
+  CHAT_ID_PATTERN,
+  listTelegramChats,
+  testTelegram,
+} from "../lib/telegram";
 
 export default {
   name: "Customers",
@@ -297,6 +341,8 @@ export default {
       recipients: "",
       telegramChatId: "",
       telegramTestSent: false,
+      telegramChats: [],
+      telegramChatsEmpty: false,
       smarthostEnabled: true,
       telegramTokenSet: false,
       loading: {
@@ -304,6 +350,7 @@ export default {
         setCustomer: false,
         removeCustomer: false,
         testTelegram: false,
+        listTelegramChats: false,
       },
       error: {
         listCustomers: "",
@@ -313,6 +360,7 @@ export default {
         recipients: "",
         telegram_chat_id: "",
         testTelegram: "",
+        listTelegramChats: "",
       },
     };
   },
@@ -374,6 +422,9 @@ export default {
       this.recipients = customer.recipients.join("\n");
       this.telegramChatId = customer.telegram_chat_id;
       this.telegramTestSent = false;
+      this.telegramChats = [];
+      this.telegramChatsEmpty = false;
+      this.error.listTelegramChats = "";
     },
     hideEditModal() {
       this.customerToEdit = null;
@@ -465,16 +516,29 @@ export default {
         return;
       }
       this.loading.testTelegram = true;
-      const failure = await testTelegram(this, {
+      const result = await testTelegram(this, {
         chat_id: this.telegramChatId,
       });
       this.loading.testTelegram = false;
-      if (!failure) {
+      if ("output" in result) {
         this.telegramTestSent = true;
-      } else if (failure.parameter === "chat_id") {
-        this.error.telegram_chat_id = failure.message;
+      } else if (result.parameter === "chat_id") {
+        this.error.telegram_chat_id = result.message;
       } else {
-        this.error.testTelegram = failure.message;
+        this.error.testTelegram = result.message;
+      }
+    },
+    async findTelegramChats() {
+      this.telegramChatsEmpty = false;
+      this.error.listTelegramChats = "";
+      this.loading.listTelegramChats = true;
+      const result = await listTelegramChats(this, {});
+      this.loading.listTelegramChats = false;
+      if ("output" in result) {
+        this.telegramChats = result.output.chats;
+        this.telegramChatsEmpty = !this.telegramChats.length;
+      } else {
+        this.error.listTelegramChats = result.message;
       }
     },
     async setCustomer() {

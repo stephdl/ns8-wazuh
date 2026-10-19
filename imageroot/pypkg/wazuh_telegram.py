@@ -58,22 +58,43 @@ def chunks(text):
     return parts + ([current] if current.strip() else [])
 
 
+def call(bot_token, method, payload):
+    """Call a method of the Bot API and return its result."""
+    request = urllib.request.Request(f"https://api.telegram.org/bot{bot_token}/{method}",
+                                     data=json.dumps(payload).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as answer:
+            return json.load(answer).get("result")
+    except urllib.error.HTTPError as error:
+        try:
+            description = json.load(error).get("description", "")
+        except ValueError:
+            description = ""
+        raise TelegramError(error.code, description or error.reason) from None
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        reason = getattr(error, "reason", error)
+        raise TelegramError(0, str(reason).replace(bot_token, "***")) from None
+
+
 def send(bot_token, chat_id, text):
     """Send an HTML text, in several messages when it is too long."""
     for part in chunks(text):
-        body = json.dumps({"chat_id": chat_id, "text": part, "parse_mode": "HTML",
-                           "disable_web_page_preview": True}).encode()
-        request = urllib.request.Request(f"https://api.telegram.org/bot{bot_token}/sendMessage", data=body,
-                                         method="POST", headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(request, timeout=30) as answer:
-                answer.read()
-        except urllib.error.HTTPError as error:
-            try:
-                description = json.load(error).get("description", "")
-            except ValueError:
-                description = ""
-            raise TelegramError(error.code, description or error.reason) from None
-        except (urllib.error.URLError, OSError) as error:
-            reason = getattr(error, "reason", error)
-            raise TelegramError(0, str(reason).replace(bot_token, "***")) from None
+        call(bot_token, "sendMessage", {"chat_id": chat_id, "text": part, "parse_mode": "HTML",
+                                        "disable_web_page_preview": True})
+
+
+def recent_chats(bot_token):
+    """The chats the bot heard from lately, newest first: Telegram keeps the updates a day."""
+    chats = {}
+    # Without an offset nothing is marked as read: the next call sees the same chats again
+    for update in call(bot_token, "getUpdates", {"allowed_updates": ["message", "channel_post", "my_chat_member"]}):
+        for kind in ("message", "edited_message", "channel_post", "my_chat_member", "chat_member"):
+            chat = update.get(kind, {}).get("chat")
+            if chat:
+                name = chat.get("title") or " ".join(p for p in (chat.get("first_name"), chat.get("last_name")) if p)
+                # Moved to the end: the last update of a chat gives its place in the list
+                chats.pop(chat["id"], None)
+                chats[chat["id"]] = {"id": str(chat["id"]), "title": name or chat.get("username", ""),
+                                     "type": chat.get("type", "")}
+    return list(reversed(chats.values()))

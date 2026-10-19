@@ -6,14 +6,14 @@
 // A group ID, a user ID or a public channel name, as the backend accepts it
 export const CHAT_ID_PATTERN = /^(-?[0-9]+|@[A-Za-z0-9_]{5,32})$/;
 
-// Send a test message. Resolves with null when it arrived, else with the parameter
-// in fault ("token", "chat_id" or "") and a translated message.
-export function testTelegram(vm, data) {
+// Run a Telegram action. Resolves with { output } when it worked, else with the
+// parameter in fault ("token", "chat_id" or "") and a translated message.
+function runTelegramAction(vm, taskAction, data) {
   return new Promise((resolve) => {
-    const taskAction = "test-telegram";
     const eventId = vm.getUuid();
-    vm.core.$root.$once(`${taskAction}-completed-${eventId}`, () =>
-      resolve(null)
+    vm.core.$root.$once(
+      `${taskAction}-completed-${eventId}`,
+      (taskContext, taskResult) => resolve({ output: taskResult.output })
     );
     vm.core.$root.$once(`${taskAction}-aborted-${eventId}`, () =>
       resolve({ parameter: "", message: vm.$t("error.generic_error") })
@@ -38,4 +38,12 @@ export function testTelegram(vm, data) {
       resolve({ parameter: "", message: vm.getErrorMessage(err) })
     );
   });
+}
+
+export function testTelegram(vm, data) {
+  return runTelegramAction(vm, "test-telegram", data);
+}
+
+export function listTelegramChats(vm, data) {
+  return runTelegramAction(vm, "list-telegram-chats", data);
 }
