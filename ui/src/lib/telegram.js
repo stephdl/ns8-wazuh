@@ -6,6 +6,9 @@
 // A group ID, a user ID or a public channel name, as the backend accepts it
 export const CHAT_ID_PATTERN = /^(-?[0-9]+|@[A-Za-z0-9_]{5,32})$/;
 
+// Checked before sending: a wrong token would come back in the validation error of the task
+export const TOKEN_PATTERN = /^[0-9]+:[A-Za-z0-9_-]+$/;
+
 // Run a Telegram action. Resolves with { output } when it worked, else with the
 // parameter in fault ("token", "chat_id" or "") and a translated message.
 function runTelegramAction(vm, taskAction, data) {

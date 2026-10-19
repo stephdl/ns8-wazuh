@@ -102,6 +102,7 @@ import { mapState } from "vuex";
 import { UtilService, TaskService } from "@nethserver/ns8-ui-lib";
 import {
   CHAT_ID_PATTERN,
+  TOKEN_PATTERN,
   listTelegramChats,
   testTelegram,
 } from "../lib/telegram";
@@ -161,6 +162,10 @@ export default {
       const lookup = ++this.lookup;
       this.noChats = false;
       this.error.list = "";
+      if (this.token && !TOKEN_PATTERN.test(this.token)) {
+        this.error.list = this.$t("settings.telegram_token_pattern");
+        return;
+      }
       this.loading.list = true;
       const data = CHAT_ID_PATTERN.test(this.value)
         ? { chat_ids: [this.value] }
@@ -190,6 +195,10 @@ export default {
       if (!CHAT_ID_PATTERN.test(this.value)) {
         this.error.chat = this.$t("settings.telegram_chat_id_invalid");
         this.focus();
+        return;
+      }
+      if (this.token && !TOKEN_PATTERN.test(this.token)) {
+        this.error.test = this.$t("settings.telegram_token_pattern");
         return;
       }
       this.loading.test = true;

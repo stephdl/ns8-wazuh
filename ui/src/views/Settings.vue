@@ -465,7 +465,7 @@
 <script>
 import to from "await-to-js";
 import { mapState } from "vuex";
-import { CHAT_ID_PATTERN } from "../lib/telegram";
+import { CHAT_ID_PATTERN, TOKEN_PATTERN } from "../lib/telegram";
 import TelegramChat from "@/components/TelegramChat.vue";
 import {
   QueryParamService,
@@ -937,6 +937,13 @@ export default {
         this.error.notify_sender = "settings.notify_sender_invalid";
         if (isValidationOk) {
           this.focusElement("notify_sender");
+        }
+        isValidationOk = false;
+      }
+      if (this.telegramToken && !TOKEN_PATTERN.test(this.telegramToken)) {
+        this.error.telegram_token = "settings.telegram_token_pattern";
+        if (isValidationOk) {
+          this.focusElement("telegram_token");
         }
         isValidationOk = false;
       }
