@@ -38,6 +38,7 @@
         ref="chat_id"
       />
       <NsButton
+        type="button"
         kind="tertiary"
         size="field"
         :loading="loading.list"
@@ -70,6 +71,7 @@
       :showCloseButton="false"
     />
     <NsButton
+      type="button"
       v-if="value"
       kind="secondary"
       size="field"

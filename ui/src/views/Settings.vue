@@ -317,6 +317,7 @@
                         ref="telegram_token"
                       />
                       <NsButton
+                        type="button"
                         v-if="telegramTokenSet"
                         kind="danger--tertiary"
                         size="field"
