@@ -171,32 +171,36 @@
             ref="recipients"
           />
           <template v-if="telegramTokenSet">
-            <NsButton
-              kind="tertiary"
-              size="field"
-              :loading="loading.listTelegramChats"
-              :disabled="loading.setCustomer || loading.listTelegramChats"
-              @click="findTelegramChats"
-              class="mg-bottom"
-              >{{ $t("settings.telegram_find_chats") }}</NsButton
-            >
-            <cv-dropdown
-              v-if="telegramChats.length"
-              v-model="telegramChatId"
-              :label="$t('settings.telegram_found_chats')"
-              :placeholder="$t('settings.telegram_choose_chat')"
-              :disabled="loading.setCustomer"
-              class="mg-bottom"
-            >
-              <cv-dropdown-item
-                v-for="chat in telegramChats"
-                :key="chat.id"
-                :value="chat.id"
-                >{{ chat.title }} ({{
-                  $t("settings.telegram_chat_" + chat.type)
-                }})</cv-dropdown-item
+            <div class="chat-picker mg-bottom">
+              <cv-dropdown
+                v-model="telegramChatId"
+                :label="$t('settings.telegram_found_chats')"
+                :placeholder="
+                  telegramChats.length
+                    ? $t('settings.telegram_choose_chat')
+                    : $t('settings.telegram_click_find')
+                "
+                :disabled="loading.setCustomer || !telegramChats.length"
+                class="chat-dropdown"
               >
-            </cv-dropdown>
+                <cv-dropdown-item
+                  v-for="chat in telegramChats"
+                  :key="chat.id"
+                  :value="chat.id"
+                  >{{ chat.title }} ({{
+                    $t("settings.telegram_chat_" + chat.type)
+                  }})</cv-dropdown-item
+                >
+              </cv-dropdown>
+              <NsButton
+                kind="tertiary"
+                size="field"
+                :loading="loading.listTelegramChats"
+                :disabled="loading.setCustomer || loading.listTelegramChats"
+                @click="findTelegramChats"
+                >{{ $t("settings.telegram_find_chats") }}</NsButton
+              >
+            </div>
             <NsInlineNotification
               v-if="telegramChatsEmpty"
               kind="info"
@@ -679,6 +683,17 @@ export default {
 @import "../styles/carbon-utils";
 .mg-bottom {
   margin-bottom: $spacing-06;
+}
+
+.chat-picker {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: $spacing-05;
+}
+
+.chat-dropdown {
+  flex: 0 1 20rem;
 }
 .toolbar {
   margin-bottom: $spacing-05;

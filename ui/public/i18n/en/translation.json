@@ -112,6 +112,7 @@
     "telegram_find_chats": "Find chats",
     "telegram_found_chats": "Chats of the bot",
     "telegram_choose_chat": "Choose a chat",
+    "telegram_click_find": "Click Find chats",
     "telegram_chat_private": "private",
     "telegram_chat_group": "group",
     "telegram_chat_supergroup": "group",
