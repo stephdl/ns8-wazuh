@@ -6,8 +6,8 @@
 #
 
 # Send the new findings to the export endpoint (--export) or notify them (--email). --email covers
-# every notification channel, email and Telegram: the admin gets a summary of the new findings, and
-# each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
+# every notification channel, email, Telegram and ntfy: the admin gets a summary of the new findings,
+# and each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
@@ -30,6 +30,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_ntfy
 import wazuh_secrets
 import wazuh_telegram
 import wazuh_zones
@@ -48,6 +49,7 @@ ZONE_SEEN_FILE = "login-zone-alerts.json"
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
 ZONE_TELEGRAM_SEEN_FILE = "login-zone-alerts-telegram.json"
 ZONE_ADMIN_TELEGRAM_SEEN_FILE = "login-zone-admin-telegram.json"
+ZONE_ADMIN_NTFY_SEEN_FILE = "login-zone-admin-ntfy.json"
 # A traveling user logs in again every few minutes: one email a day per user, address and service.
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
@@ -308,6 +310,17 @@ def telegram():
         bot, chat_id, as_html([("text", f"Wazuh on {host}")] + lines))
 
 
+def ntfy():
+    """Publish to an ntfy topic: the access token is optional, a server may let anybody publish."""
+    url = os.environ.get("NTFY_URL", "") or "https://ntfy.sh"
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not host:
+        return None
+    # The title names the server, the priority follows the highest level, a tap opens the dashboard
+    return lambda topic, subject, lines, level="medium": wazuh_ntfy.send(
+        url, wazuh_ntfy.token(), topic, subject, as_markdown(lines), level, f"https://{host}/")
+
+
 def summary_level(document):
     """Level a finding gives the admin summary, weighted like the selection of admin_report."""
     source = document["wazuh"]
@@ -553,6 +566,7 @@ def main():
             log(f"email failed: {error}")
             mail, status = None, 1
         chat = telegram() if bot_on else None
+        topic = os.environ.get("NTFY_TOPIC", "") if os.environ.get("NTFY_ENABLED") == "True" else ""
         runs = [
             ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
                                                  recipients, mail)),
@@ -562,6 +576,8 @@ def main():
                                                     ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, chat)),
             ("customer telegram", lambda: zone_report(Cursor("send-findings-zones-telegram.cursor"),
                                                       ZONE_TELEGRAM_SEEN_FILE, customer_chat, chat)),
+            ("admin ntfy", lambda: admin_report(Cursor("send-findings-ntfy.cursor"),
+                                                ZONE_ADMIN_NTFY_SEEN_FILE, topic, ntfy() if topic else None)),
         ]
         # A channel that fails must not stop the others: it tries again at the next run
         for name, run in runs:
