@@ -151,7 +151,24 @@
     "retention_days_minimum": "Geben Sie eine Anzahl von Tagen zwischen 30 und 3650 ein",
     "retention_days_maximum": "Geben Sie eine Anzahl von Tagen zwischen 30 und 3650 ein",
     "notify_recipients_format": "Jede Zeile muss eine gültige E-Mail-Adresse sein",
-    "notify_min_level_enum": "Wählen Sie eine Stufe aus der Liste"
+    "notify_min_level_enum": "Wählen Sie eine Stufe aus der Liste",
+    "ntfy_title": "ntfy-Benachrichtigungen",
+    "ntfy_enabled": "Zusammenfassung an ntfy senden",
+    "ntfy_url": "ntfy-Server",
+    "ntfy_url_invalid": "Geben Sie eine HTTPS-Adresse ein, zum Beispiel https://ntfy.sh",
+    "ntfy_topic": "Thema",
+    "ntfy_topic_helper": "Die Zusammenfassung der neuen Funde geht alle 5 Minuten an dieses Thema. Auf ntfy.sh kann es jeder lesen, der den Namen kennt: Wählen Sie einen langen Namen oder verwenden Sie auf einem eigenen Server ein Token.",
+    "ntfy_topic_invalid": "Nur Buchstaben, Ziffern, Binde- und Unterstriche, höchstens 64",
+    "ntfy_token": "Zugriffstoken (optional)",
+    "ntfy_token_set": "Token gespeichert, geben Sie zum Ersetzen ein neues ein",
+    "ntfy_token_helper": "Token eines ntfy-Benutzers, der an das Thema senden darf, beginnt mit tk_. Nicht nötig auf einem Server, an den jeder senden darf.",
+    "ntfy_token_invalid": "Ein ntfy-Token beginnt mit tk_",
+    "ntfy_test": "Testnachricht senden",
+    "ntfy_test_sent": "Testnachricht gesendet. Sehen Sie im Thema nach.",
+    "ntfy_topic_forbidden": "Das Token oder der anonyme Zugang darf nicht an dieses Thema senden",
+    "ntfy_rate_limited": "Der ntfy-Server bremst, versuchen Sie es später erneut",
+    "ntfy_unreachable": "Der ntfy-Server ist nicht erreichbar",
+    "ntfy_token_unknown": "Der ntfy-Server kennt dieses Token nicht"
   },
   "about": {
     "title": "Über"
@@ -178,7 +195,8 @@
     "test-telegram": "Telegram testen",
     "list-telegram-chats": "Telegram-Chats suchen",
     "set-agent-customer": "Kunden eines Agents ändern",
-    "remove-customer": "Kunden entfernen"
+    "remove-customer": "Kunden entfernen",
+    "test-ntfy": "ntfy testen"
   },
   "error": {
     "error": "Fehler",
