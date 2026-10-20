@@ -60,6 +60,10 @@ Run `configure-module` with:
 - `notify_sender`: sender address. Empty means `wazuh@<host>`.
 - `notify_min_level`: lowest level mailed: `low`, `medium` (default), `high` or `critical`.
 - `retention_days`: days to keep events and findings, 30 to 3650, 365 by default.
+- `ntfy_enabled`: publish the summary of the new findings to an ntfy topic every 5 minutes (true/false). Needs a topic.
+- `ntfy_url`: ntfy server, `https://ntfy.sh` by default, or a self-hosted one.
+- `ntfy_topic`: topic that receives the summary.
+- `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it.
 
 Example:
 
@@ -312,6 +316,12 @@ r1-node1
 Routine NS8 events stay out of the email: module sessions, timer services, CrowdSec bans, vulnerabilities. They stay in the export. NS8 - Fleet hides them with the `Routine findings hidden` filter.
 
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
+
+The same summary can go to an ntfy topic, at the same minimum level. Its priority follows the highest level in it: `critical` is urgent, `high` is high, `medium` is the default. A tap on it opens the dashboard. On ntfy.sh anybody who knows the topic can read it: pick a long name, or use a self-hosted server with a token. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-ntfy --data '{"url":"https://ntfy.sh","topic":"wazuh-alerts"}'
+```
 
 ## Host name and certificates
 
