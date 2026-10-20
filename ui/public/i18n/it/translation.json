@@ -2,7 +2,8 @@
   "common": {
     "required": "Obbligatorio",
     "work_in_progress": "In lavorazione",
-    "processing": "Elaborazione in corso..."
+    "processing": "Elaborazione in corso...",
+    "not_configured_description": "Wazuh non è ancora avviato. Configura prima il modulo."
   },
   "status": {
     "title": "Stato",

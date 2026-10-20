@@ -2,7 +2,8 @@
   "common": {
     "required": "Obligatoire",
     "work_in_progress": "Travaux en cours",
-    "processing": "Traitement en cours..."
+    "processing": "Traitement en cours...",
+    "not_configured_description": "Wazuh n'est pas encore démarré. Configurez d'abord le module."
   },
   "status": {
     "title": "État",

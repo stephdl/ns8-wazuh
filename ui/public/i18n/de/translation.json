@@ -2,7 +2,8 @@
   "common": {
     "required": "Erforderlich",
     "work_in_progress": "In Arbeit",
-    "processing": "Wird ausgeführt..."
+    "processing": "Wird ausgeführt...",
+    "not_configured_description": "Wazuh läuft noch nicht. Konfigurieren Sie zuerst das Modul."
   },
   "status": {
     "title": "Status",
