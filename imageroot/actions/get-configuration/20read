@@ -14,6 +14,7 @@ import sys
 import json
 import agent
 
+import wazuh_ntfy
 import wazuh_telegram
 
 from wazuh_api import count_agents
@@ -37,6 +38,10 @@ config["telegram_enabled"] = os.getenv("TELEGRAM_ENABLED") == "True"
 config["telegram_admin_enabled"] = os.getenv("TELEGRAM_ADMIN_ENABLED") == "True"
 config["telegram_chat_id"] = os.getenv("TELEGRAM_CHAT_ID", "")
 config["telegram_token_set"] = os.path.exists(wazuh_telegram.TOKEN_FILE)
+config["ntfy_enabled"] = os.getenv("NTFY_ENABLED") == "True"
+config["ntfy_url"] = os.getenv("NTFY_URL", "https://ntfy.sh")
+config["ntfy_topic"] = os.getenv("NTFY_TOPIC", "")
+config["ntfy_token_set"] = os.path.exists(wazuh_ntfy.TOKEN_FILE)
 config["smarthost_enabled"] = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))["enabled"]
 config["export_token_set"] = os.path.exists("secrets/export.env")
 config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"

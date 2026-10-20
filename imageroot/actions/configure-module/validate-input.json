@@ -146,6 +146,29 @@
             "title": "Telegram chat ID",
             "description": "Admin chat: a group ID like -1001234567890, a user ID, or a public channel like @name. Empty when not used.",
             "pattern": "^(-?[0-9]+|@[A-Za-z0-9_]{5,32})?$"
+        },
+        "ntfy_enabled": {
+            "type": "boolean",
+            "title": "ntfy notifications",
+            "description": "Publish the summary of the new findings to an ntfy topic every 5 minutes, at the same minimum level as the emails. Needs the topic."
+        },
+        "ntfy_url": {
+            "type": "string",
+            "title": "ntfy server",
+            "description": "Base URL of the ntfy server, ntfy.sh or a self-hosted one.",
+            "pattern": "^https://[^/?#]+(/[^?#]*)?$"
+        },
+        "ntfy_topic": {
+            "type": "string",
+            "title": "ntfy topic",
+            "description": "Topic that receives the notifications. Empty when not used.",
+            "pattern": "^[A-Za-z0-9_-]{0,64}$"
+        },
+        "ntfy_token": {
+            "type": "string",
+            "title": "ntfy access token",
+            "description": "Access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, send an empty string to remove it. Not needed on a server that lets anybody publish.",
+            "pattern": "^(tk_[A-Za-z0-9]+)?$"
         }
     },
     "allOf": [
@@ -192,6 +215,28 @@
                 ],
                 "properties": {
                     "telegram_chat_id": {
+                        "minLength": 1
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "ntfy_enabled": {
+                        "const": true
+                    }
+                },
+                "required": [
+                    "ntfy_enabled"
+                ]
+            },
+            "then": {
+                "required": [
+                    "ntfy_topic"
+                ],
+                "properties": {
+                    "ntfy_topic": {
                         "minLength": 1
                     }
                 }

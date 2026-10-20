@@ -6,8 +6,8 @@
 #
 
 # Send the new findings to the export endpoint (--export) or notify them (--email). --email covers
-# every notification channel, email and Telegram: the admin gets a summary of the new findings, and
-# each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
+# every notification channel, email, Telegram and ntfy: the admin gets a summary of the new findings,
+# and each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
@@ -30,6 +30,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_ntfy
 import wazuh_secrets
 import wazuh_telegram
 import wazuh_zones
@@ -48,6 +49,7 @@ ZONE_SEEN_FILE = "login-zone-alerts.json"
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
 ZONE_TELEGRAM_SEEN_FILE = "login-zone-alerts-telegram.json"
 ZONE_ADMIN_TELEGRAM_SEEN_FILE = "login-zone-admin-telegram.json"
+ZONE_ADMIN_NTFY_SEEN_FILE = "login-zone-admin-ntfy.json"
 # A traveling user logs in again every few minutes: one email a day per user, address and service.
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
@@ -241,6 +243,19 @@ def as_html(lines):
     return "\n".join(rendered[line[0]](line) for line in lines)
 
 
+MARKDOWN_SPECIAL = re.compile(r"([\\`*_\[\]<>#|~])")
+
+
+def as_markdown(lines):
+    # Indented lines would turn into code blocks, and single line breaks into one paragraph:
+    # each line is trimmed and ends with a hard break instead. The details under a count are in italics
+    escape = lambda text: MARKDOWN_SPECIAL.sub(r"\\\1", text.strip())
+    rendered = {"head": lambda line: f"**{escape(line[1])}**",
+                "text": lambda line: f"_{escape(line[1])}_" if line[1].startswith("      ") else escape(line[1]),
+                "link": lambda line: f"[{escape(line[1])}]({line[2]})"}
+    return "  \n".join(rendered[line[0]](line) for line in lines)
+
+
 def mailer():
     """Deliver by email, or None without the cluster smarthost."""
     host = os.environ.get("TRAEFIK_HOST", "")
@@ -248,7 +263,8 @@ def mailer():
     if not (host and smtp["enabled"] and smtp["host"]):
         return None
     sender = os.environ.get("NOTIFY_SENDER", "") or f"wazuh@{host}"
-    return lambda recipients, subject, lines: send_mail(smtp, sender, recipients, subject, as_text(lines))
+    return lambda recipients, subject, lines, level=None: send_mail(smtp, sender, recipients, subject,
+                                                                    as_text(lines))
 
 
 def telegram():
@@ -258,8 +274,19 @@ def telegram():
     if not (host and bot):
         return None
     # A chat may get the alerts of several servers: the email names this one in its subject
-    return lambda chat_id, subject, lines: wazuh_telegram.send(bot, chat_id,
-                                                               as_html([("text", f"Wazuh on {host}")] + lines))
+    return lambda chat_id, subject, lines, level=None: wazuh_telegram.send(
+        bot, chat_id, as_html([("text", f"Wazuh on {host}")] + lines))
+
+
+def ntfy():
+    """Publish to an ntfy topic: the access token is optional, a server may let anybody publish."""
+    url = os.environ.get("NTFY_URL", "") or "https://ntfy.sh"
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not host:
+        return None
+    # The title names the server, the priority follows the highest level, a tap opens the dashboard
+    return lambda topic, subject, lines, level="medium": wazuh_ntfy.send(
+        url, wazuh_ntfy.token(), topic, subject, as_markdown(lines), level, f"https://{host}/")
 
 
 def admin_report(cursor, seen_file, target, deliver):
@@ -275,6 +302,7 @@ def admin_report(cursor, seen_file, target, deliver):
     seen = SeenLogins(seen_file)
     counts = Counter()
     zone_logins = {}
+    top = 0
     # The zone logins come whatever the minimum level: the customers get them, so must the admin
     wanted = [{"bool": {"should": [{"terms": {"wazuh.rule.level": levels}},
                                    {"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}], "minimum_should_match": 1}}]
@@ -285,6 +313,10 @@ def admin_report(cursor, seen_file, target, deliver):
             wazuh_agent = source.get("agent", {})
             customer = wazuh_zones.customer_of(wazuh_agent.get("groups"))
             title = source.get("rule", {}).get("title", "?")
+            level = source.get("rule", {}).get("level")
+            # A login from outside the zones counts as high whatever its rule says
+            top = max(top, LEVELS.index("high") if title == ZONE_TITLE else
+                      LEVELS.index(level) if level in LEVELS else 0)
             if title == ZONE_TITLE:
                 if seen.first(zone_key(customer, hit["_source"])):
                     zone_logins.setdefault(customer, []).append(zone_line(hit["_source"]))
@@ -320,7 +352,7 @@ def admin_report(cursor, seen_file, target, deliver):
             lines += [("text", f"{plural(skipped, 'older finding')} not sent: this channel was down for more"
                                " than a day."), ("text", "")]
         lines.append(("link", "Open the dashboard", f"https://{host}/"))
-        deliver(target, f"Wazuh: {summary} on {host}", lines)
+        deliver(target, f"Wazuh: {summary} on {host}", lines, LEVELS[top])
         log(f"summary sent, {findings} findings, {logins} zone logins, {skipped} skipped")
     # Saved after the delivery only: a failed one is sent again at the next run
     seen.save()
@@ -471,6 +503,7 @@ def main():
             log(f"email failed: {error}")
             mail, status = None, 1
         chat = telegram() if bot_on else None
+        topic = os.environ.get("NTFY_TOPIC", "") if os.environ.get("NTFY_ENABLED") == "True" else ""
         runs = [
             ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
                                                  recipients, mail)),
@@ -480,6 +513,8 @@ def main():
                                                     ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, chat)),
             ("customer telegram", lambda: zone_report(Cursor("send-findings-zones-telegram.cursor"),
                                                       ZONE_TELEGRAM_SEEN_FILE, customer_chat, chat)),
+            ("admin ntfy", lambda: admin_report(Cursor("send-findings-ntfy.cursor"),
+                                                ZONE_ADMIN_NTFY_SEEN_FILE, topic, ntfy() if topic else None)),
         ]
         # A channel that fails must not stop the others: it tries again at the next run
         for name, run in runs:
