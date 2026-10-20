@@ -29,7 +29,7 @@
               kind="secondary"
               :icon="Restart20"
               :loading="loading.listCustomers"
-              :disabled="loading.listCustomers"
+              :disabled="loading.listCustomers || !configured"
               @click="listCustomers"
               >{{ $t("customers.refresh") }}</NsButton
             >
@@ -55,7 +55,7 @@
             :noSearchResultsDescription="
               core.$t('common.no_search_results_description')
             "
-            :isLoading="loading.listCustomers"
+            :isLoading="loading.getConfiguration || loading.listCustomers"
             :skeletonRows="3"
             :isErrorShown="!!error.listCustomers"
             :errorTitle="$t('action.list-customers')"
@@ -70,6 +70,21 @@
           >
             <template slot="empty-state">
               <NsEmptyState
+                v-if="!configured"
+                :title="$t('status.not_configured')"
+              >
+                <template #description>
+                  <div>{{ $t("common.not_configured_description") }}</div>
+                  <NsButton
+                    kind="ghost"
+                    :icon="ArrowRight20"
+                    @click="goToAppPage(instanceName, 'settings')"
+                    >{{ $t("status.configure") }}</NsButton
+                  >
+                </template>
+              </NsEmptyState>
+              <NsEmptyState
+                v-else
                 :title="$t('customers.no_customers')"
                 :description="$t('customers.no_customers_description')"
               />
@@ -305,7 +320,10 @@ export default {
       smarthostEnabled: true,
       // The bot of the module is on and has a token: a customer chat can get alerts
       telegramReady: false,
+      // Until the module is configured the manager is down and cannot list customers
+      configured: true,
       loading: {
+        getConfiguration: false,
         listCustomers: false,
         setCustomer: false,
         removeCustomer: false,
@@ -343,7 +361,6 @@ export default {
     },
   },
   created() {
-    this.listCustomers();
     this.getConfiguration();
   },
   beforeRouteEnter(to, from, next) {
@@ -424,20 +441,19 @@ export default {
       this.continents = taskResult.output.continents;
       this.loading.listCustomers = false;
     },
-    // Only to warn that the emails need the cluster smarthost, and Telegram the bot token
     async getConfiguration() {
+      this.loading.getConfiguration = true;
       const taskAction = "get-configuration";
       const eventId = this.getUuid();
       this.core.$root.$once(
-        `${taskAction}-completed-${eventId}`,
-        (taskContext, taskResult) => {
-          this.smarthostEnabled = taskResult.output.smarthost_enabled;
-          this.telegramReady =
-            taskResult.output.telegram_enabled &&
-            taskResult.output.telegram_token_set;
-        }
+        `${taskAction}-aborted-${eventId}`,
+        this.getConfigurationAborted
       );
-      await to(
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.getConfigurationCompleted
+      );
+      const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
           action: taskAction,
           extra: {
@@ -447,6 +463,29 @@ export default {
           },
         })
       );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.listCustomers = this.getErrorMessage(err);
+        this.loading.getConfiguration = false;
+      }
+    },
+    getConfigurationAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.listCustomers = this.$t("error.generic_error");
+      this.loading.getConfiguration = false;
+    },
+    getConfigurationCompleted(taskContext, taskResult) {
+      // The emails need the cluster smarthost, and Telegram the bot token
+      this.smarthostEnabled = taskResult.output.smarthost_enabled;
+      this.telegramReady =
+        taskResult.output.telegram_enabled &&
+        taskResult.output.telegram_token_set;
+      this.configured = !!taskResult.output.host;
+      this.loading.getConfiguration = false;
+      if (this.configured) {
+        this.listCustomers();
+      }
     },
     validateSetCustomer() {
       this.clearErrors(this);

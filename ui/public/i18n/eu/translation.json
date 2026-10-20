@@ -2,7 +2,8 @@
   "common": {
     "required": "Beharrezkoa",
     "work_in_progress": "Lanean",
-    "processing": "Prozesatzen..."
+    "processing": "Prozesatzen...",
+    "not_configured_description": "Wazuh ez dago oraindik martxan. Konfiguratu modulua lehenik."
   },
   "status": {
     "title": "Egoera",

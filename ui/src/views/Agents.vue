@@ -31,7 +31,7 @@
                       kind="secondary"
                       :icon="Restart20"
                       :loading="loading.listAgents"
-                      :disabled="loading.listAgents"
+                      :disabled="loading.listAgents || !configured"
                       @click="listAgents"
                       >{{ $t("agents.refresh") }}</NsButton
                     >
@@ -50,7 +50,7 @@
                     :noSearchResultsDescription="
                       core.$t('common.no_search_results_description')
                     "
-                    :isLoading="loading.listAgents"
+                    :isLoading="loading.getConfiguration || loading.listAgents"
                     :skeletonRows="3"
                     :isErrorShown="!!error.listAgents"
                     :errorTitle="$t('action.list-agents')"
@@ -66,7 +66,21 @@
                     @updatePage="tablePage = $event"
                   >
                     <template slot="empty-state">
-                      <NsEmptyState :title="$t('agents.no_agents')" />
+                      <NsEmptyState
+                        v-if="!configured"
+                        :title="$t('status.not_configured')"
+                      >
+                        <template #description>
+                          <div>{{ $t("common.not_configured_description") }}</div>
+                          <NsButton
+                            kind="ghost"
+                            :icon="ArrowRight20"
+                            @click="goToAppPage(instanceName, 'settings')"
+                            >{{ $t("status.configure") }}</NsButton
+                          >
+                        </template>
+                      </NsEmptyState>
+                      <NsEmptyState v-else :title="$t('agents.no_agents')" />
                     </template>
                     <template slot="data">
                       <cv-data-table-row
@@ -450,7 +464,10 @@ export default {
       moveModalCount: 0,
       managerVersion: "",
       packageVersion: "",
+      // Until the module is configured the manager is down and cannot list agents
+      configured: true,
       loading: {
+        getConfiguration: false,
         listAgents: false,
         getEnrollmentToken: false,
         removeAgent: false,
@@ -512,7 +529,7 @@ export default {
     },
   },
   created() {
-    this.listAgents();
+    this.getConfiguration();
   },
   beforeRouteEnter(to, from, next) {
     next((vm) => {
@@ -547,6 +564,47 @@ export default {
       }
       const date = new Date(value);
       return isNaN(date.getTime()) ? value : date.toLocaleString();
+    },
+    async getConfiguration() {
+      this.loading.getConfiguration = true;
+      const taskAction = "get-configuration";
+      const eventId = this.getUuid();
+      this.core.$root.$once(
+        `${taskAction}-aborted-${eventId}`,
+        this.getConfigurationAborted
+      );
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.getConfigurationCompleted
+      );
+      const res = await to(
+        this.createModuleTaskForApp(this.instanceName, {
+          action: taskAction,
+          extra: {
+            title: this.$t("action." + taskAction),
+            isNotificationHidden: true,
+            eventId,
+          },
+        })
+      );
+      const err = res[0];
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.listAgents = this.getErrorMessage(err);
+        this.loading.getConfiguration = false;
+      }
+    },
+    getConfigurationAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.listAgents = this.$t("error.generic_error");
+      this.loading.getConfiguration = false;
+    },
+    getConfigurationCompleted(taskContext, taskResult) {
+      this.configured = !!taskResult.output.host;
+      this.loading.getConfiguration = false;
+      if (this.configured) {
+        this.listAgents();
+      }
     },
     async listAgents() {
       this.loading.listAgents = true;
