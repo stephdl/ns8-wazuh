@@ -152,7 +152,24 @@
     "retention_days_minimum": "Enter a number of days between 30 and 3650",
     "retention_days_maximum": "Enter a number of days between 30 and 3650",
     "notify_recipients_format": "Each line must be a valid email address",
-    "notify_min_level_enum": "Choose a level from the list"
+    "notify_min_level_enum": "Choose a level from the list",
+    "ntfy_title": "ntfy notifications",
+    "ntfy_enabled": "Publish the summary to ntfy",
+    "ntfy_url": "ntfy server",
+    "ntfy_url_invalid": "Enter an HTTPS address, like https://ntfy.sh",
+    "ntfy_topic": "Topic",
+    "ntfy_topic_helper": "The summary of the new findings goes to this topic every 5 minutes. On ntfy.sh anybody who knows the name can read it: pick a long one, or use a token on a private server.",
+    "ntfy_topic_invalid": "Letters, digits, dashes and underscores only, 64 at most",
+    "ntfy_token": "Access token (optional)",
+    "ntfy_token_set": "Token saved, type a new one to replace it",
+    "ntfy_token_helper": "Token of an ntfy user allowed to publish to the topic, starting with tk_. Not needed on a server that lets anybody publish.",
+    "ntfy_token_invalid": "An ntfy token starts with tk_",
+    "ntfy_test": "Send a test message",
+    "ntfy_test_sent": "Test message sent. Check the topic.",
+    "ntfy_topic_forbidden": "The token, or anonymous access, may not publish to this topic",
+    "ntfy_rate_limited": "The ntfy server asks to slow down, try again later",
+    "ntfy_unreachable": "The ntfy server cannot be reached",
+    "ntfy_token_unknown": "The ntfy server does not know this token"
   },
   "about": {
     "title": "About"
@@ -179,7 +196,8 @@
     "test-telegram": "Test Telegram",
     "list-telegram-chats": "Find Telegram chats",
     "set-agent-customer": "Change the customer of an agent",
-    "remove-customer": "Remove a customer"
+    "remove-customer": "Remove a customer",
+    "test-ntfy": "Test ntfy"
   },
   "error": {
     "error": "Error",
