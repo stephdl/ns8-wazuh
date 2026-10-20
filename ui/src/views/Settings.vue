@@ -356,9 +356,84 @@
                       ref="telegram_chat_id"
                     />
                   </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.ntfy_title") }}
+                  </h6>
+                  <NsToggle
+                    value="ntfyEnabled"
+                    :label="$t('settings.ntfy_enabled')"
+                    v-model="ntfyEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="ntfyEnabled">
+                    <NsTextInput
+                      v-model.trim="ntfyUrl"
+                      :label="$t('settings.ntfy_url')"
+                      placeholder="https://ntfy.sh"
+                      :invalid-message="$t(error.ntfy_url)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_url"
+                    />
+                    <NsTextInput
+                      v-model.trim="ntfyTopic"
+                      :label="$t('settings.ntfy_topic')"
+                      :helper-text="$t('settings.ntfy_topic_helper')"
+                      :invalid-message="$t(error.ntfy_topic)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_topic"
+                    />
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="ntfyToken"
+                      :label="$t('settings.ntfy_token')"
+                      :placeholder="
+                        ntfyTokenSet ? $t('settings.ntfy_token_set') : ''
+                      "
+                      :helper-text="$t('settings.ntfy_token_helper')"
+                      :invalid-message="$t(error.ntfy_token)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_token"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testNtfy"
+                      :disabled="stillLoading || loading.testNtfy"
+                      @click="sendNtfyTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.ntfy_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="ntfyTestSent"
+                      kind="success"
+                      :title="$t('settings.ntfy_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testNtfy"
+                      kind="error"
+                      :title="$t('action.test-ntfy')"
+                      :description="error.testNtfy"
+                      :showCloseButton="false"
+                    />
+                  </template>
                   <!-- One level for every channel: the same findings reach the mailbox and the chat -->
                   <cv-dropdown
-                    v-if="notifyEnabled || telegramEnabled"
+                    v-if="notifyEnabled || telegramEnabled || ntfyEnabled"
                     v-model="notifyMinLevel"
                     :label="$t('settings.notify_min_level')"
                     :helper-text="$t('settings.notify_min_level_helper')"
@@ -468,6 +543,12 @@ import { mapState } from "vuex";
 import { CHAT_ID_PATTERN, TOKEN_PATTERN } from "../lib/telegram";
 import TelegramChat from "@/components/TelegramChat.vue";
 import {
+  URL_PATTERN as NTFY_URL_PATTERN,
+  TOPIC_PATTERN as NTFY_TOPIC_PATTERN,
+  TOKEN_PATTERN as NTFY_TOKEN_PATTERN,
+  testNtfy,
+} from "../lib/ntfy";
+import {
   QueryParamService,
   UtilService,
   TaskService,
@@ -532,12 +613,19 @@ export default {
       // Changed on each load: the chat field starts over with the saved chat
       telegramChatKey: 0,
       telegramRemoveToken: false,
+      ntfyEnabled: false,
+      ntfyUrl: "https://ntfy.sh",
+      ntfyTopic: "",
+      ntfyToken: "",
+      ntfyTokenSet: false,
+      ntfyTestSent: false,
       isShownRemoveTokenModal: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
         getStatus: false,
         listUserDomains: false,
+        testNtfy: false,
       },
       error: {
         admin_password: "",
@@ -551,6 +639,10 @@ export default {
         notify_sender: "",
         telegram_token: "",
         telegram_chat_id: "",
+        ntfy_url: "",
+        ntfy_topic: "",
+        ntfy_token: "",
+        testNtfy: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -862,6 +954,11 @@ export default {
       this.telegramToken = "";
       this.telegramRemoveToken = false;
       this.telegramChatKey++;
+      this.ntfyEnabled = config.ntfy_enabled;
+      this.ntfyUrl = config.ntfy_url || "https://ntfy.sh";
+      this.ntfyTopic = config.ntfy_topic;
+      this.ntfyTokenSet = config.ntfy_token_set;
+      this.ntfyToken = "";
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -869,7 +966,8 @@ export default {
         config.retention_days !== 365 ||
         config.export_url !== "" ||
         config.notify_enabled ||
-        config.telegram_enabled;
+        config.telegram_enabled ||
+        config.ntfy_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -971,6 +1069,31 @@ export default {
         }
         isValidationOk = false;
       }
+      if (this.ntfyEnabled) {
+        if (!NTFY_URL_PATTERN.test(this.ntfyUrl)) {
+          this.error.ntfy_url = "settings.ntfy_url_invalid";
+          if (isValidationOk) {
+            this.focusElement("ntfy_url");
+          }
+          isValidationOk = false;
+        }
+        if (!NTFY_TOPIC_PATTERN.test(this.ntfyTopic)) {
+          this.error.ntfy_topic = this.ntfyTopic
+            ? "settings.ntfy_topic_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("ntfy_topic");
+          }
+          isValidationOk = false;
+        }
+      }
+      if (this.ntfyToken && !NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
+        this.error.ntfy_token = "settings.ntfy_token_invalid";
+        if (isValidationOk) {
+          this.focusElement("ntfy_token");
+        }
+        isValidationOk = false;
+      }
       if (
         !Number.isInteger(this.retentionDays) ||
         this.retentionDays < 30 ||
@@ -1014,6 +1137,38 @@ export default {
             focusAlreadySet = true;
           }
         }
+      }
+    },
+    async sendNtfyTest() {
+      this.ntfyTestSent = false;
+      this.error.testNtfy = "";
+      this.error.ntfy_url = "";
+      this.error.ntfy_topic = "";
+      this.error.ntfy_token = "";
+      if (!NTFY_URL_PATTERN.test(this.ntfyUrl)) {
+        this.error.ntfy_url = "settings.ntfy_url_invalid";
+        return;
+      }
+      if (!NTFY_TOPIC_PATTERN.test(this.ntfyTopic)) {
+        this.error.ntfy_topic = "common.required";
+        return;
+      }
+      if (this.ntfyToken && !NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
+        this.error.ntfy_token = "settings.ntfy_token_invalid";
+        return;
+      }
+      this.loading.testNtfy = true;
+      const data = { url: this.ntfyUrl, topic: this.ntfyTopic };
+      // A typed token is tested before it is saved, else the backend takes the stored one
+      if (this.ntfyToken) {
+        data.token = this.ntfyToken;
+      }
+      const result = await testNtfy(this, data);
+      this.loading.testNtfy = false;
+      if ("output" in result) {
+        this.ntfyTestSent = true;
+      } else {
+        this.error.testNtfy = result.message;
       }
     },
     removeTelegramToken() {
@@ -1079,6 +1234,14 @@ export default {
         telegram_chat_id: CHAT_ID_PATTERN.test(this.telegramChatId)
           ? this.telegramChatId
           : "",
+        ntfy_enabled: this.ntfyEnabled,
+        // While ntfy is off the fields are hidden: keep only what the backend accepts
+        ntfy_url: NTFY_URL_PATTERN.test(this.ntfyUrl)
+          ? this.ntfyUrl
+          : "https://ntfy.sh",
+        ntfy_topic: NTFY_TOPIC_PATTERN.test(this.ntfyTopic)
+          ? this.ntfyTopic
+          : "",
       };
       // Without a new password the backend keeps the current one
       if (this.isPasswordActive) {
@@ -1091,6 +1254,9 @@ export default {
         data.export_token = "";
       }
       // Same for the bot token: turning Telegram off keeps it for later
+      if (this.ntfyToken) {
+        data.ntfy_token = this.ntfyToken;
+      }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
       } else if (this.telegramRemoveToken) {
