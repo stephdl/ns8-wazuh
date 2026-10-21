@@ -64,6 +64,10 @@ Run `configure-module` with:
 - `ntfy_url`: ntfy server, `https://ntfy.sh` by default, or a self-hosted one.
 - `ntfy_topic`: topic that receives the summary.
 - `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it.
+- `mattermost_enabled`: post the summary of the new findings to a Mattermost incoming webhook every 5 minutes (true/false). Needs the webhook.
+- `mattermost_webhook`: URL of the incoming webhook. It is a secret. Omit to keep the current one, empty to remove it.
+- `mattermost_channel`: optional channel name or `@user`. Empty for the channel of the webhook.
+- `mattermost_username`: optional sender name, shown only when Mattermost lets integrations override usernames.
 
 Example:
 
@@ -321,6 +325,12 @@ The same summary can go to an ntfy topic, at the same minimum level. Its priorit
 
 ```
 api-cli run module/wazuh1/test-ntfy --data '{"url":"https://ntfy.sh","topic":"wazuh-alerts"}'
+```
+
+The summary can also go to a Mattermost channel, at the same minimum level. Create an incoming webhook in Mattermost (Integrations > Incoming Webhooks; a system admin may have to allow them in System Console > Integrations > Integration Management) and paste its URL. The post is an attachment: its border colour follows the highest level, its title opens the dashboard. Without a channel the webhook posts to its own channel. Anybody who knows the webhook URL can post there, so the module keeps it like a password and never shows it back. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-mattermost --data '{}'
 ```
 
 ## Host name and certificates
