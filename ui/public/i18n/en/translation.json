@@ -152,7 +152,24 @@
     "retention_days_minimum": "Enter a number of days between 30 and 3650",
     "retention_days_maximum": "Enter a number of days between 30 and 3650",
     "notify_recipients_format": "Each line must be a valid email address",
-    "notify_min_level_enum": "Choose a level from the list"
+    "notify_min_level_enum": "Choose a level from the list",
+    "talk_title": "Nextcloud Talk notifications",
+    "talk_enabled": "Post the summary to Nextcloud Talk",
+    "talk_url": "Nextcloud server",
+    "talk_url_invalid": "Enter an HTTPS address, like https://cloud.example.com",
+    "talk_conversation": "Conversation token",
+    "talk_conversation_helper": "The last part of the link of the conversation, like a1b2c3d4 in https://cloud.example.com/call/a1b2c3d4. The bot must be set up in it.",
+    "talk_conversation_invalid": "Lowercase letters and digits only, 4 to 32",
+    "talk_secret": "Bot secret",
+    "talk_secret_set": "Secret saved, type a new one to replace it",
+    "talk_secret_helper": "Shared secret of the bot, 40 to 128 characters. The Nextcloud admin creates the bot with occ talk:bot:create and sets it up in the conversation, see the README.",
+    "talk_secret_invalid": "The secret has 40 to 128 printable characters, without spaces",
+    "talk_secret_required": "Enter the bot secret",
+    "talk_test": "Send a test message",
+    "talk_test_sent": "Test message sent. Check the conversation.",
+    "talk_bot_unverified": "Nextcloud Talk refuses the bot: the secret is wrong, the bot is not set up in this conversation, or the conversation does not exist",
+    "talk_rate_limited": "Nextcloud Talk blocks the bot after too many refusals, try again later",
+    "talk_unreachable": "The Nextcloud server cannot be reached"
   },
   "about": {
     "title": "About"
@@ -179,7 +196,8 @@
     "test-telegram": "Test Telegram",
     "list-telegram-chats": "Find Telegram chats",
     "set-agent-customer": "Change the customer of an agent",
-    "remove-customer": "Remove a customer"
+    "remove-customer": "Remove a customer",
+    "test-talk": "Test Nextcloud Talk"
   },
   "error": {
     "error": "Error",
