@@ -231,7 +231,10 @@ AUTH = ("event.category:authentication"
         # The samba service account and the computers log in every few minutes: their failures stay
         " and not event.action:(service-logon or machine-logon)")
 FAIL = f"{AUTH} and event.outcome:failure"
-SUCCESS = f"{AUTH} and event.outcome:success"
+# The standard integrations count sshd disconnections before any login as successes, and they
+# decode again the ssh logins the ns8 decoders already read: only the ns8 logins are real ones
+SUCCESS = (f"{AUTH} and event.outcome:success and event.action:(logged-in or logon)"
+           " and wazuh.integration.name:ns8")
 # Only the login zone decoder writes a reason that starts so
 OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
