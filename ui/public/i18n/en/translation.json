@@ -168,7 +168,25 @@
     "ntfy_topic_forbidden": "The token, or anonymous access, may not publish to this topic",
     "ntfy_rate_limited": "The ntfy server asks to slow down, try again later",
     "ntfy_unreachable": "The ntfy server cannot be reached",
-    "ntfy_token_unknown": "The ntfy server does not know this token"
+    "ntfy_token_unknown": "The ntfy server does not know this token",
+    "mattermost_title": "Mattermost notifications",
+    "mattermost_enabled": "Post the summary to Mattermost",
+    "mattermost_webhook": "Incoming webhook",
+    "mattermost_webhook_set": "Webhook saved, paste a new one to replace it",
+    "mattermost_webhook_helper": "Create it in Mattermost under Integrations > Incoming Webhooks. Anybody who knows this address can post to the channel: it is kept like a password.",
+    "mattermost_webhook_invalid": "Paste the HTTPS address of an incoming webhook, ending with /hooks/ and its key",
+    "mattermost_webhook_required": "Paste the incoming webhook",
+    "mattermost_channel": "Channel (optional)",
+    "mattermost_channel_helper": "Channel name as in its link, or @user for a direct message. Empty to post to the channel of the webhook.",
+    "mattermost_channel_invalid": "Lowercase letters, digits, dots, dashes and underscores, or @user",
+    "mattermost_username": "Sender name (optional)",
+    "mattermost_username_helper": "Mattermost shows it only when Enable integrations to override usernames is on.",
+    "mattermost_username_invalid": "Letters, digits, spaces, dots, dashes, underscores and brackets only, 64 at most",
+    "mattermost_test": "Send a test message",
+    "mattermost_test_sent": "Test message sent. Check the channel.",
+    "mattermost_channel_unknown": "Mattermost does not know this channel",
+    "mattermost_webhook_unknown": "Mattermost refuses the webhook: it is unknown or disabled, or the user named as channel does not exist",
+    "mattermost_unreachable": "The Mattermost server cannot be reached"
   },
   "about": {
     "title": "About"
@@ -196,7 +214,8 @@
     "list-telegram-chats": "Find Telegram chats",
     "set-agent-customer": "Change the customer of an agent",
     "remove-customer": "Remove a customer",
-    "test-ntfy": "Test ntfy"
+    "test-ntfy": "Test ntfy",
+    "test-mattermost": "Test Mattermost"
   },
   "error": {
     "error": "Error",

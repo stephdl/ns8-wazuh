@@ -168,7 +168,25 @@
     "ntfy_topic_forbidden": "Das Token oder der anonyme Zugang darf nicht an dieses Thema senden",
     "ntfy_rate_limited": "Der ntfy-Server bremst, versuchen Sie es später erneut",
     "ntfy_unreachable": "Der ntfy-Server ist nicht erreichbar",
-    "ntfy_token_unknown": "Der ntfy-Server kennt dieses Token nicht"
+    "ntfy_token_unknown": "Der ntfy-Server kennt dieses Token nicht",
+    "mattermost_title": "Mattermost-Benachrichtigungen",
+    "mattermost_enabled": "Zusammenfassung an Mattermost senden",
+    "mattermost_webhook": "Incoming Webhook",
+    "mattermost_webhook_set": "Webhook gespeichert, zum Ersetzen einen neuen einfügen",
+    "mattermost_webhook_helper": "Legen Sie ihn in Mattermost unter Integrationen > Eingehende Webhooks an. Wer diese Adresse kennt, kann in den Kanal schreiben: Sie wird wie ein Passwort behandelt.",
+    "mattermost_webhook_invalid": "Fügen Sie die HTTPS-Adresse eines eingehenden Webhooks ein, sie endet mit /hooks/ und dem Schlüssel",
+    "mattermost_webhook_required": "Fügen Sie den eingehenden Webhook ein",
+    "mattermost_channel": "Kanal (optional)",
+    "mattermost_channel_helper": "Kanalname wie in seinem Link, oder @benutzer für eine Direktnachricht. Leer für den Kanal des Webhooks.",
+    "mattermost_channel_invalid": "Kleinbuchstaben, Ziffern, Punkte, Binde- und Unterstriche, oder @benutzer",
+    "mattermost_username": "Absendername (optional)",
+    "mattermost_username_helper": "Mattermost zeigt ihn nur, wenn »Integrationen dürfen Benutzernamen überschreiben« eingeschaltet ist.",
+    "mattermost_username_invalid": "Nur Buchstaben, Ziffern, Leerzeichen, Punkte, Binde- und Unterstriche und Klammern, höchstens 64",
+    "mattermost_test": "Testnachricht senden",
+    "mattermost_test_sent": "Testnachricht gesendet. Sehen Sie im Kanal nach.",
+    "mattermost_channel_unknown": "Mattermost kennt diesen Kanal nicht",
+    "mattermost_webhook_unknown": "Mattermost lehnt den Webhook ab: Er ist unbekannt oder abgeschaltet, oder der als Kanal genannte Benutzer existiert nicht",
+    "mattermost_unreachable": "Der Mattermost-Server ist nicht erreichbar"
   },
   "about": {
     "title": "Über"
@@ -196,7 +214,8 @@
     "list-telegram-chats": "Telegram-Chats suchen",
     "set-agent-customer": "Kunden eines Agents ändern",
     "remove-customer": "Kunden entfernen",
-    "test-ntfy": "ntfy testen"
+    "test-ntfy": "ntfy testen",
+    "test-mattermost": "Mattermost testen"
   },
   "error": {
     "error": "Fehler",
