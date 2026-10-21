@@ -229,7 +229,9 @@ def write(name, objects):
 AUTH = ("event.category:authentication"
         " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")"
         # The samba service account and the computers log in every few minutes: their failures stay
-        " and not event.action:(service-logon or machine-logon)")
+        " and not event.action:(service-logon or machine-logon)"
+        # Upstream system-auth counts sshd disconnections before login as successes, ns8 reads every real one
+        " and not (event.outcome:success and not wazuh.integration.name:ns8)")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
 # Only the login zone decoder writes a reason that starts so
