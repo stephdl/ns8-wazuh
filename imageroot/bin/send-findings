@@ -6,8 +6,8 @@
 #
 
 # Send the new findings to the export endpoint (--export) or notify them (--email). --email covers
-# every notification channel, email and Telegram: the admin gets a summary of the new findings, and
-# each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
+# every notification channel, email, Telegram and Mattermost: the admin gets a summary of the new
+# findings, and each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
@@ -30,6 +30,7 @@ from email.message import EmailMessage
 
 import agent
 
+import wazuh_mattermost
 import wazuh_secrets
 import wazuh_telegram
 import wazuh_zones
@@ -48,6 +49,9 @@ ZONE_SEEN_FILE = "login-zone-alerts.json"
 ZONE_ADMIN_SEEN_FILE = "login-zone-admin.json"
 ZONE_TELEGRAM_SEEN_FILE = "login-zone-alerts-telegram.json"
 ZONE_ADMIN_TELEGRAM_SEEN_FILE = "login-zone-admin-telegram.json"
+ZONE_ADMIN_MATTERMOST_SEEN_FILE = "login-zone-admin-mattermost.json"
+# The target of a webhook without a channel of its own: no channel name can start with #
+WEBHOOK_CHANNEL = "#webhook"
 # A traveling user logs in again every few minutes: one email a day per user, address and service.
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
@@ -322,6 +326,18 @@ def summary_level(document):
     return level if level in LEVELS else LEVELS[0]
 
 
+def mattermost():
+    """Post to a Mattermost incoming webhook: the webhook picks the channel unless one is set."""
+    webhook = wazuh_mattermost.webhook()
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not (host and webhook):
+        return None
+    # The border colour follows the highest level, the title opens the dashboard
+    return lambda channel, subject, lines, level="medium": wazuh_mattermost.send(
+        webhook, subject, as_markdown(lines), level, f"https://{host}/",
+        "" if channel == WEBHOOK_CHANNEL else channel, os.environ.get("MATTERMOST_USERNAME", ""))
+
+
 def admin_report(cursor, seen_file, target, deliver):
     """Send the admin a summary of the new findings and of the logins from outside the allowed zones."""
     host = os.environ.get("TRAEFIK_HOST", "")
@@ -553,6 +569,7 @@ def main():
             log(f"email failed: {error}")
             mail, status = None, 1
         chat = telegram() if bot_on else None
+        team_chat = mattermost() if os.environ.get("MATTERMOST_ENABLED") == "True" else None
         runs = [
             ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
                                                  recipients, mail)),
@@ -562,6 +579,10 @@ def main():
                                                     ZONE_ADMIN_TELEGRAM_SEEN_FILE, chat_id, chat)),
             ("customer telegram", lambda: zone_report(Cursor("send-findings-zones-telegram.cursor"),
                                                       ZONE_TELEGRAM_SEEN_FILE, customer_chat, chat)),
+            ("admin mattermost", lambda: admin_report(Cursor("send-findings-mattermost.cursor"),
+                                                      ZONE_ADMIN_MATTERMOST_SEEN_FILE,
+                                                      os.environ.get("MATTERMOST_CHANNEL", "") or WEBHOOK_CHANNEL,
+                                                      team_chat)),
         ]
         # A channel that fails must not stop the others: it tries again at the next run
         for name, run in runs:
