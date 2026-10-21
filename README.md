@@ -124,6 +124,8 @@ On an NS8 node, the agent reads the journal through `/var/ossec/bin/ns8-journal`
 
 It runs every 10 seconds and sends up to 5000 lines per run. It keeps its place in `/var/ossec/var/ns8-journal.cursor`, so no line is lost. Lines from the host system get the application `system`.
 
+Rootcheck skips the container images on an NS8 node: their layers hold world-writable files on purpose. In an LXC container it does not scan `/dev`, where LXC keeps its own files. `--update` sets both on agents installed before.
+
 ### Windows and macOS
 
 The script covers Linux only. Install the agent with the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token.
@@ -202,7 +204,7 @@ Twelve rules raise findings:
 |---|---|
 | NS8 authentication failure | low |
 | NS8 CrowdSec scenario triggered | low |
-| NS8 mail virus found | high |
+| NS8 mail virus found | low |
 | NS8 mail relay denied | low |
 | NS8 domain account locked | medium |
 | NS8 domain admin group changed | high |
@@ -309,7 +311,7 @@ r1-node1
   1 x Group deleted - kuma13
 ```
 
-Routine NS8 events stay out of the email: module sessions, timer services, CrowdSec bans, vulnerabilities. They stay in the export. NS8 - Fleet hides them with the `Routine findings hidden` filter.
+Routine NS8 events stay out of the email: services that start, stop or go away without error, CrowdSec bans, vulnerabilities. A service that fails to start is always mailed. A stop of firewalld, sshd, auditd, chronyd, wazuh-agent or the CrowdSec service is mailed too. They all stay in the export. NS8 - Fleet hides the routine ones with the `Routine findings hidden` filter.
 
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
 

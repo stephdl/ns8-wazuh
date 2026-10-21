@@ -470,12 +470,43 @@ NS8CONF
     say "NS8 node: the agent reads the journal through ns8-journal, with the module of each line."
 }
 
+# Rootcheck reports as rootkits the /dev/.lxc files of an LXC container,
+# and the world-writable files of the Podman image layers of an NS8 node
+setup_rootcheck() {
+    local lxc=0 ns8=0
+    [ "$(systemd-detect-virt -c 2>/dev/null)" != "lxc" ] || lxc=1
+    { [ -d /etc/nethserver ] || command -v runagent >/dev/null 2>&1; } && ns8=1
+    [ "${lxc}" -eq 1 ] || [ "${ns8}" -eq 1 ] || return 0
+    command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, rootcheck keeps its defaults"; return 0; }
+    python3 - "${CONFIG}" "${lxc}" "${ns8}" <<'ROOTCHECK' || die "cannot set rootcheck in ${CONFIG}"
+import re, sys
+path, lxc, ns8 = sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1"
+text = open(path).read()
+match = re.search(r"<rootcheck>.*?</rootcheck>", text, re.S)
+if not match:
+    sys.exit(0)
+block = match.group(0)
+if lxc:
+    block = re.sub(r"<check_dev>\s*yes\s*</check_dev>", "<check_dev>no</check_dev>", block)
+if ns8:
+    for ignore in ("<ignore>/var/lib/containers/storage</ignore>",
+                   '<ignore type="sregex">/.local/share/containers/</ignore>'):
+        if ignore not in block:
+            block = block.replace("</rootcheck>", f"  {ignore}\n  </rootcheck>")
+open(path, "w").write(text[:match.start()] + block + text[match.end():])
+ROOTCHECK
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the rootcheck setting, see ${CONFIG}"
+    [ "${lxc}" -eq 0 ] || say "LXC container: rootcheck does not scan /dev."
+    [ "${ns8}" -eq 0 ] || say "NS8 node: rootcheck skips the container images."
+}
+
 if [ "${UPDATE}" -eq 1 ]; then
     [ -s "${INSTALL_DIR}/etc/client.keys" ] || die "the agent is not enrolled: install it with a token first"
     before="$(installed_version)"
     say "Installed version: ${before:-unknown}, wanted: ${VERSION}"
     install_package
     setup_ns8_journal
+    setup_rootcheck
     # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
     pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
     # The package keeps ossec.conf and the key, a restart loads the new binaries
@@ -543,6 +574,7 @@ if [ -n "${AGENT_NAME}" ] || [ -n "${AGENT_GROUP}" ]; then
 fi
 
 setup_ns8_journal
+setup_rootcheck
 
 # Only root reads the token: the agent takes it at its first start and deletes it
 token_file="${INSTALL_DIR}/etc/enrollment_token"
