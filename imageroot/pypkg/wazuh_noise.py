@@ -5,33 +5,17 @@
 
 """Routine findings: NOISE is left out of the email, DASHBOARD_NOISE is hidden by default in the fleet dashboard."""
 
-# Expected on an NS8 node: each rootless module has its own systemd session, and the log collector
-# restarts with it. Module users and firewall changes stay in:
-# installing or removing a module is rare enough to be worth a line.
-# Oneshot services run by a timer log a start, a stop and sometimes a delete at each run.
-TIMER_UNITS = ["promtail", "systemd-hostnamed", "dnf-makecache", "backup-timers", "phonehome", "logrotate",
-               "mlocate-updatedb", "man-db-cache-update", "refresh-volume-metrics", "password-warning",
-               "ns8-cluster-updater", "sssd-kcm", "droplet-agent-update"]
+# Timers, module sessions and backups stop services all day. Only these units stopping is worth a line,
+# an attacker stops them to hide. A failed unit stays in, whatever its name. Debian names: ssh, chrony.
+# The starts are informational: they stay out of the email and stay in the dashboard, for a new unit.
+GUARD_UNITS = ["firewalld", "sshd", "ssh", "auditd", "wazuh-agent", "chronyd", "chrony"]
 
 NOISE = [
-    {"prefix": {"wazuh.rule.title": "System service stopped - user@"}},
-    {"prefix": {"wazuh.rule.title": "System service started - user@"}},
-    {"prefix": {"wazuh.rule.title": "System service stopped - fix-xdg-state@"}},
-    {"prefix": {"wazuh.rule.title": "System service started - fix-xdg-state@"}},
-    {"prefix": {"wazuh.rule.title": "System service deleted - user"}},
-    {"prefix": {"wazuh.rule.title": "System service deleted - fix-xdg-state@"}},
-    {"terms": {"wazuh.rule.title": [f"System service {state} - {unit}"
-                                    for unit in TIMER_UNITS for state in ("started", "stopped", "deleted")]}},
-    # Numbered after the module: backup12, crowdsec13-upgrade-hub
-    {"wildcard": {"wazuh.rule.title": "System service st*ed - backup*"}},
-    {"wildcard": {"wazuh.rule.title": "System service deleted - backup*"}},
-    {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-export-alerts"}},
-    {"wildcard": {"wazuh.rule.title": "System service deleted - crowdsec*-export-alerts"}},
-    {"wildcard": {"wazuh.rule.title": "System service st*ed - crowdsec*-upgrade-hub"}},
-    {"wildcard": {"wazuh.rule.title": "System service deleted - crowdsec*-upgrade-hub"}},
-    # Transient units of systemd-run
-    {"wildcard": {"wazuh.rule.title": "System service st*ed - run-r*"}},
-    {"wildcard": {"wazuh.rule.title": "System service deleted - run-r*"}},
+    {"bool": {"filter": [{"terms": {"event.action": ["service-stopped", "service-deleted"]}},
+                         {"term": {"event.outcome": "success"}}],
+              "must_not": [{"terms": {"service.name": GUARD_UNITS}},
+                           # The CrowdSec module service, not its crowdsec1-upgrade-hub timer
+                           {"regexp": {"service.name": "crowdsec[0-9]+"}}]}},
     # The CrowdSec bouncer adds each banned address to its nftables set. Other firewall changes stay in.
     {"bool": {"filter": [{"term": {"wazuh.rule.title": "Firewall rule modified"}},
                          {"prefix": {"process.name": "crowdsec-firew"}}]}},
