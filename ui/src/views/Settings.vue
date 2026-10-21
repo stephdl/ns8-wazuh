@@ -431,9 +431,92 @@
                       :showCloseButton="false"
                     />
                   </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.mattermost_title") }}
+                  </h6>
+                  <NsToggle
+                    value="mattermostEnabled"
+                    :label="$t('settings.mattermost_enabled')"
+                    v-model="mattermostEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="mattermostEnabled">
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="mattermostWebhook"
+                      :label="$t('settings.mattermost_webhook')"
+                      :placeholder="
+                        mattermostWebhookSet
+                          ? $t('settings.mattermost_webhook_set')
+                          : 'https://chat.example.com/hooks/…'
+                      "
+                      :helper-text="$t('settings.mattermost_webhook_helper')"
+                      :invalid-message="$t(error.mattermost_webhook)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_webhook"
+                    />
+                    <NsTextInput
+                      v-model.trim="mattermostChannel"
+                      :label="$t('settings.mattermost_channel')"
+                      :helper-text="$t('settings.mattermost_channel_helper')"
+                      :invalid-message="$t(error.mattermost_channel)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_channel"
+                    />
+                    <NsTextInput
+                      v-model.trim="mattermostUsername"
+                      :label="$t('settings.mattermost_username')"
+                      placeholder="Wazuh"
+                      :helper-text="$t('settings.mattermost_username_helper')"
+                      :invalid-message="$t(error.mattermost_username)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_username"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testMattermost"
+                      :disabled="stillLoading || loading.testMattermost"
+                      @click="sendMattermostTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.mattermost_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="mattermostTestSent"
+                      kind="success"
+                      :title="$t('settings.mattermost_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testMattermost"
+                      kind="error"
+                      :title="$t('action.test-mattermost')"
+                      :description="error.testMattermost"
+                      :showCloseButton="false"
+                    />
+                  </template>
                   <!-- One level for every channel: the same findings reach the mailbox and the chat -->
                   <cv-dropdown
-                    v-if="notifyEnabled || telegramEnabled || ntfyEnabled"
+                    v-if="
+                      notifyEnabled ||
+                      telegramEnabled ||
+                      ntfyEnabled ||
+                      mattermostEnabled
+                    "
                     v-model="notifyMinLevel"
                     :label="$t('settings.notify_min_level')"
                     :helper-text="$t('settings.notify_min_level_helper')"
@@ -549,6 +632,12 @@ import {
   testNtfy,
 } from "../lib/ntfy";
 import {
+  WEBHOOK_PATTERN as MATTERMOST_WEBHOOK_PATTERN,
+  CHANNEL_PATTERN as MATTERMOST_CHANNEL_PATTERN,
+  USERNAME_PATTERN as MATTERMOST_USERNAME_PATTERN,
+  testMattermost,
+} from "../lib/mattermost";
+import {
   QueryParamService,
   UtilService,
   TaskService,
@@ -619,6 +708,12 @@ export default {
       ntfyToken: "",
       ntfyTokenSet: false,
       ntfyTestSent: false,
+      mattermostEnabled: false,
+      mattermostWebhook: "",
+      mattermostWebhookSet: false,
+      mattermostChannel: "",
+      mattermostUsername: "",
+      mattermostTestSent: false,
       isShownRemoveTokenModal: false,
       loading: {
         getConfiguration: false,
@@ -626,6 +721,7 @@ export default {
         getStatus: false,
         listUserDomains: false,
         testNtfy: false,
+        testMattermost: false,
       },
       error: {
         admin_password: "",
@@ -643,6 +739,10 @@ export default {
         ntfy_topic: "",
         ntfy_token: "",
         testNtfy: "",
+        mattermost_webhook: "",
+        mattermost_channel: "",
+        mattermost_username: "",
+        testMattermost: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -959,6 +1059,11 @@ export default {
       this.ntfyTopic = config.ntfy_topic;
       this.ntfyTokenSet = config.ntfy_token_set;
       this.ntfyToken = "";
+      this.mattermostEnabled = config.mattermost_enabled;
+      this.mattermostWebhookSet = config.mattermost_webhook_set;
+      this.mattermostWebhook = "";
+      this.mattermostChannel = config.mattermost_channel;
+      this.mattermostUsername = config.mattermost_username;
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -967,7 +1072,8 @@ export default {
         config.export_url !== "" ||
         config.notify_enabled ||
         config.telegram_enabled ||
-        config.ntfy_enabled;
+        config.ntfy_enabled ||
+        config.mattermost_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -1094,6 +1200,39 @@ export default {
         }
         isValidationOk = false;
       }
+      if (this.mattermostEnabled) {
+        if (
+          this.mattermostWebhook
+            ? !MATTERMOST_WEBHOOK_PATTERN.test(this.mattermostWebhook)
+            : !this.mattermostWebhookSet
+        ) {
+          this.error.mattermost_webhook = this.mattermostWebhook
+            ? "settings.mattermost_webhook_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("mattermost_webhook");
+          }
+          isValidationOk = false;
+        }
+        if (
+          this.mattermostChannel &&
+          !MATTERMOST_CHANNEL_PATTERN.test(this.mattermostChannel)
+        ) {
+          this.error.mattermost_channel = "settings.mattermost_channel_invalid";
+          if (isValidationOk) {
+            this.focusElement("mattermost_channel");
+          }
+          isValidationOk = false;
+        }
+        if (!MATTERMOST_USERNAME_PATTERN.test(this.mattermostUsername)) {
+          this.error.mattermost_username =
+            "settings.mattermost_username_invalid";
+          if (isValidationOk) {
+            this.focusElement("mattermost_username");
+          }
+          isValidationOk = false;
+        }
+      }
       if (
         !Number.isInteger(this.retentionDays) ||
         this.retentionDays < 30 ||
@@ -1171,6 +1310,49 @@ export default {
         this.error.testNtfy = result.message;
       }
     },
+    async sendMattermostTest() {
+      this.mattermostTestSent = false;
+      this.error.testMattermost = "";
+      this.error.mattermost_webhook = "";
+      this.error.mattermost_channel = "";
+      if (
+        this.mattermostWebhook
+          ? !MATTERMOST_WEBHOOK_PATTERN.test(this.mattermostWebhook)
+          : !this.mattermostWebhookSet
+      ) {
+        this.error.mattermost_webhook = this.mattermostWebhook
+          ? "settings.mattermost_webhook_invalid"
+          : "common.required";
+        return;
+      }
+      if (
+        this.mattermostChannel &&
+        !MATTERMOST_CHANNEL_PATTERN.test(this.mattermostChannel)
+      ) {
+        this.error.mattermost_channel = "settings.mattermost_channel_invalid";
+        return;
+      }
+      this.loading.testMattermost = true;
+      const data = {
+        channel: this.mattermostChannel,
+        username: MATTERMOST_USERNAME_PATTERN.test(this.mattermostUsername)
+          ? this.mattermostUsername
+          : "",
+      };
+      // A typed webhook is tested before it is saved, else the backend takes the stored one
+      if (this.mattermostWebhook) {
+        data.webhook = this.mattermostWebhook;
+      }
+      const result = await testMattermost(this, data);
+      this.loading.testMattermost = false;
+      if ("output" in result) {
+        this.mattermostTestSent = true;
+      } else if (result.parameter === "channel") {
+        this.error.mattermost_channel = result.message;
+      } else {
+        this.error.testMattermost = result.message;
+      }
+    },
     removeTelegramToken() {
       this.isShownRemoveTokenModal = false;
       // Without a token nothing could be sent: the bot switch goes off with it
@@ -1242,6 +1424,18 @@ export default {
         ntfy_topic: NTFY_TOPIC_PATTERN.test(this.ntfyTopic)
           ? this.ntfyTopic
           : "",
+        mattermost_enabled: this.mattermostEnabled,
+        // While Mattermost is off the fields are hidden: keep only what the backend accepts
+        mattermost_channel: MATTERMOST_CHANNEL_PATTERN.test(
+          this.mattermostChannel
+        )
+          ? this.mattermostChannel
+          : "",
+        mattermost_username: MATTERMOST_USERNAME_PATTERN.test(
+          this.mattermostUsername
+        )
+          ? this.mattermostUsername
+          : "",
       };
       // Without a new password the backend keeps the current one
       if (this.isPasswordActive) {
@@ -1253,9 +1447,12 @@ export default {
       } else if (!this.exportUrl) {
         data.export_token = "";
       }
-      // Same for the bot token: turning Telegram off keeps it for later
+      // Same for the other secrets: turning a channel off keeps them for later
       if (this.ntfyToken) {
         data.ntfy_token = this.ntfyToken;
+      }
+      if (this.mattermostWebhook) {
+        data.mattermost_webhook = this.mattermostWebhook;
       }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
