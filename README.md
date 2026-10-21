@@ -18,8 +18,8 @@ The module is not ready for production. It runs Wazuh `5.0.0-rc1`. The plan and 
 └────────────────────┘              └──────────────┬───────────────┼───────┘
                                                    │               │
                                                    ▼               │
-                                     findings: email, HTTPS    Traefik, HTTPS,
-                                                               LDAP login
+                                     findings: email,          Traefik, HTTPS,
+                                     Telegram, HTTPS           LDAP login
 ```
 
 The agent runs on each watched server. It reads the journal, watches file changes, lists packages and checks the configuration. It sends everything to the manager over an encrypted channel.
@@ -32,7 +32,7 @@ The agent always connects to the server, never the opposite. Only the Wazuh node
 
 One rootless pod with three containers: the manager, the indexer and the dashboard. Traefik publishes the dashboard over HTTPS. The module opens ports 1514, 1515 and 1517 for the agents, so only one instance can run on a node.
 
-The node needs at least 6 GB of RAM and 50 GB of disk. Set `vm.max_map_count=262144` on the node if you can. With the Rocky Linux default (65530) the indexer still works, a bit slower.
+The node needs at least 6 GB of RAM and 50 GB of disk. At install, the volumes `wazuh-indexer-data`, `wazuh-snapshots` and `wazuh-logs` can go on an additional disk. The snapshots volume holds a copy of the indices before each backup, so keep it next to the indexer data. Set `vm.max_map_count=262144` on the node if you can. With the Rocky Linux default (65530) the indexer still works, a bit slower.
 
 Saving the settings restarts nothing, unless the host name changed or a service is down.
 
@@ -60,6 +60,10 @@ Run `configure-module` with:
 - `notify_sender`: sender address. Empty means `wazuh@<host>`.
 - `notify_min_level`: lowest level mailed: `low`, `medium` (default), `high` or `critical`.
 - `retention_days`: days to keep events and findings, 30 to 3650, 365 by default.
+- `telegram_token`: token of the Telegram bot, from BotFather. Omit it to keep the saved one, send `""` to remove it.
+- `telegram_enabled`: turn the bot on (true/false). Off, no chat gets anything.
+- `telegram_admin_enabled`: send the findings summary to the admin chat (true/false).
+- `telegram_chat_id`: admin chat. A group ID like `-1001234567890`, a user ID or a public channel like `@name`.
 
 Example:
 
@@ -77,7 +81,12 @@ api-cli run module/wazuh1/configure-module --data - <<EOF
   "notify_enabled": true,
   "notify_recipients": ["soc@domain.com"],
   "notify_sender": "",
-  "notify_min_level": "medium"
+  "notify_min_level": "medium",
+  "retention_days": 365,
+  "telegram_token": "123456789:AAH-example",
+  "telegram_enabled": true,
+  "telegram_admin_enabled": true,
+  "telegram_chat_id": "-1001234567890"
 }
 EOF
 ```
@@ -162,13 +171,13 @@ To move a server, use Change customer in the agent menu. The agent keeps its id.
 ```
 api-cli run module/wazuh1/list-customers --data '{}'
 api-cli run module/wazuh1/set-agent-customer --data '{"id":"001","customer":"acme"}'
-api-cli run module/wazuh1/set-customer --data '{"name":"acme","zones":["@EU","CA"],"recipients":["soc@acme.example"]}'
+api-cli run module/wazuh1/set-customer --data '{"name":"acme","zones":["@EU","CA"],"recipients":["soc@acme.example"],"telegram_enabled":true,"telegram_chat_id":"-1001234567890"}'
 api-cli run module/wazuh1/remove-customer --data '{"name":"acme"}'
 ```
 
 ### Login zones
 
-On the Customers page, give a customer its allowed countries or continents. A successful login from a public address outside them raises a finding. The customer recipients also get an email. Each user, address and service is reported once a day.
+On the Customers page, give a customer its allowed countries or continents. A successful login from a public address outside them raises a finding. The customer recipients also get an email, and its Telegram chat a message if it has one. Each user, address and service is reported once a day.
 
 A customer without zones is not watched. LAN and VPN logins have no country and are not checked.
 
@@ -289,9 +298,9 @@ The local `admin` account always works, even when the domain is down.
 
 `get-health` returns the indexer state, the number of agents and the expiry of the agent certificate. The Status page shows the same.
 
-## Findings export and email
+## Findings export, email and Telegram
 
-A timer sends the new findings: every minute to the export address, every 5 minutes by email. It keeps a cursor, so nothing is lost when the pod stops or the endpoint is down. A finding may be sent twice, never zero times.
+A timer sends the new findings: every minute to the export address, every 5 minutes by email and Telegram. It keeps a cursor, so nothing is lost when the pod stops or the endpoint is down. A finding may be sent twice, never zero times.
 
 The export posts batches of up to 100 findings:
 
@@ -312,6 +321,31 @@ r1-node1
 Routine NS8 events stay out of the email: module sessions, timer services, CrowdSec bans, vulnerabilities. They stay in the export. NS8 - Fleet hides them with the `Routine findings hidden` filter.
 
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
+
+### Telegram
+
+One bot sends every Telegram message of the instance. The admin chat gets the same summary as the email, at the same minimum level. Each customer chat gets only its logins from outside the allowed zones. The admin summary also lists those logins, whatever the minimum level.
+
+To set it up:
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
+2. Add the bot to the admin group or channel. In a channel, make it an administrator. For a private chat, send it a message.
+3. In Settings, paste the token and turn the bot on.
+4. Click Find chats. It lists the chats the bot joined or got a message from during the last day. Pick one, or type its ID by hand.
+5. Send a test message, then save.
+
+For a customer, add the bot to its chat, then pick the chat on the Customers page and turn its Telegram alerts on.
+
+Each message starts with the server name, since one chat can get the alerts of several servers. Each chat keeps its own cursor: a chat that is down retries alone, and never makes another one send twice. After more than a day down, the older findings are counted but not sent. A customer chat that refuses the bot for good is skipped.
+
+Find chats only reads the bot updates. It does not confirm them, so a bot shared with another app keeps working. It fails if a webhook already reads them. Then type the chat ID by hand.
+
+Removing the token turns the bot off and clears every chat ID.
+
+```
+api-cli run module/wazuh1/list-telegram-chats --data '{}'
+api-cli run module/wazuh1/test-telegram --data '{"chat_id":"-1001234567890"}'
+```
 
 ## Host name and certificates
 
