@@ -5,12 +5,13 @@
 
 """Routine findings: NOISE is left out of the email, DASHBOARD_NOISE is hidden by default in the fleet dashboard."""
 
-# Timers, module sessions and backups start and stop services all day. Only these units stopping is
-# worth a line, an attacker stops them to hide. A failed unit stays in, whatever its name.
-GUARD_UNITS = ["firewalld", "sshd", "auditd", "wazuh-agent", "chronyd"]
+# Timers, module sessions and backups stop services all day. Only these units stopping is worth a line,
+# an attacker stops them to hide. A failed unit stays in, whatever its name. Debian names: ssh, chrony.
+# The starts are informational: they stay out of the email and stay in the dashboard, for a new unit.
+GUARD_UNITS = ["firewalld", "sshd", "ssh", "auditd", "wazuh-agent", "chronyd", "chrony"]
 
 NOISE = [
-    {"bool": {"filter": [{"terms": {"event.action": ["service-started", "service-stopped", "service-deleted"]}},
+    {"bool": {"filter": [{"terms": {"event.action": ["service-stopped", "service-deleted"]}},
                          {"term": {"event.outcome": "success"}}],
               "must_not": [{"terms": {"service.name": GUARD_UNITS}},
                            # The CrowdSec module service, not its crowdsec1-upgrade-hub timer

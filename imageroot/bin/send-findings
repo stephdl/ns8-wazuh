@@ -275,13 +275,13 @@ def admin_report(cursor, seen_file, target, deliver):
     seen = SeenLogins(seen_file)
     counts = Counter()
     zone_logins = {}
-    # The zone logins come whatever the minimum level: the customers get them, so must the admin.
-    # A service that fails to start is only informational for Wazuh, but it is what an admin must see.
-    wanted = [{"bool": {"should": [{"terms": {"wazuh.rule.level": levels}},
-                                   {"match_phrase": {"wazuh.rule.title": ZONE_TITLE}},
-                                   {"bool": {"filter": [{"term": {"event.action": "service-started"}},
-                                                        {"term": {"event.outcome": "failure"}}]}}],
-                        "minimum_should_match": 1}}]
+    # The zone logins come whatever the minimum level: the customers get them, so must the admin
+    wanted = [{"terms": {"wazuh.rule.level": levels}}, {"match_phrase": {"wazuh.rule.title": ZONE_TITLE}}]
+    # A service that fails to start is only informational for Wazuh, but it weighs as much as a medium finding
+    if "medium" in levels:
+        wanted.append({"bool": {"filter": [{"term": {"event.action": "service-started"}},
+                                           {"term": {"event.outcome": "failure"}}]}})
+    wanted = [{"bool": {"should": wanted, "minimum_should_match": 1}}]
     ts, ids, skipped = catch_up(cursor, wanted, NOISE)
     for hits, ts, ids in pages(ts, ids, wanted, NOISE):
         for hit in hits:

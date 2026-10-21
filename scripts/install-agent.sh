@@ -185,10 +185,12 @@ install_package() {
     fi
 }
 
+is_ns8() { [ -d /etc/nethserver ] || command -v runagent >/dev/null 2>&1; }
+
 # On an NS8 node the agent runs ns8-journal instead of reading journald itself, so each line
 # carries the module that wrote it: its own journald reader sends only "program[pid]: message"
 setup_ns8_journal() {
-    [ -d /etc/nethserver ] || command -v runagent >/dev/null 2>&1 || return 0
+    is_ns8 || return 0
     command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, the lines will not carry their NS8 module"; return 0; }
     cat > "${INSTALL_DIR}/bin/ns8-journal" <<'NS8JOURNAL'
 #!/usr/bin/env python3
@@ -475,7 +477,7 @@ NS8CONF
 setup_rootcheck() {
     local lxc=0 ns8=0
     [ "$(systemd-detect-virt -c 2>/dev/null)" != "lxc" ] || lxc=1
-    { [ -d /etc/nethserver ] || command -v runagent >/dev/null 2>&1; } && ns8=1
+    ! is_ns8 || ns8=1
     [ "${lxc}" -eq 1 ] || [ "${ns8}" -eq 1 ] || return 0
     command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, rootcheck keeps its defaults"; return 0; }
     python3 - "${CONFIG}" "${lxc}" "${ns8}" <<'ROOTCHECK' || die "cannot set rootcheck in ${CONFIG}"
@@ -484,20 +486,24 @@ path, lxc, ns8 = sys.argv[1], sys.argv[2] == "1", sys.argv[3] == "1"
 text = open(path).read()
 match = re.search(r"<rootcheck>.*?</rootcheck>", text, re.S)
 if not match:
-    sys.exit(0)
+    sys.exit(print("Warning: no rootcheck block, rootcheck keeps its defaults", file=sys.stderr))
 block = match.group(0)
 if lxc:
-    block = re.sub(r"<check_dev>\s*yes\s*</check_dev>", "<check_dev>no</check_dev>", block)
+    # check_dev is on when the tag is missing
+    if re.search(r"<check_dev>", block):
+        block = re.sub(r"<check_dev>.*?</check_dev>", "<check_dev>no</check_dev>", block)
+    else:
+        block = block.replace("</rootcheck>", "  <check_dev>no</check_dev>\n  </rootcheck>")
+    print("LXC container: rootcheck does not scan /dev.", file=sys.stderr)
 if ns8:
     for ignore in ("<ignore>/var/lib/containers/storage</ignore>",
                    '<ignore type="sregex">/.local/share/containers/</ignore>'):
         if ignore not in block:
             block = block.replace("</rootcheck>", f"  {ignore}\n  </rootcheck>")
+    print("NS8 node: rootcheck skips the container images.", file=sys.stderr)
 open(path, "w").write(text[:match.start()] + block + text[match.end():])
 ROOTCHECK
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the rootcheck setting, see ${CONFIG}"
-    [ "${lxc}" -eq 0 ] || say "LXC container: rootcheck does not scan /dev."
-    [ "${ns8}" -eq 0 ] || say "NS8 node: rootcheck skips the container images."
 }
 
 if [ "${UPDATE}" -eq 1 ]; then
