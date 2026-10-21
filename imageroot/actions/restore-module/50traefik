@@ -34,6 +34,9 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "mattermost_enabled": renv.get("MATTERMOST_ENABLED") == "True",
     "mattermost_channel": renv.get("MATTERMOST_CHANNEL", ""),
     "mattermost_username": renv.get("MATTERMOST_USERNAME", ""),
+    "talk_enabled": renv.get("TALK_ENABLED") == "True",
+    "talk_url": renv.get("TALK_URL", ""),
+    "talk_conversation": renv.get("TALK_CONVERSATION", ""),
     "retention_days": int(renv.get("LOG_RETENTION_DAYS", "365")),
 })
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

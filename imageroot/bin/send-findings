@@ -6,8 +6,9 @@
 #
 
 # Send the new findings to the export endpoint (--export) or notify them (--email). --email covers
-# every notification channel, email, Telegram, ntfy and Mattermost: the admin gets a summary of the new
-# findings, and each customer its logins from outside its allowed zones, at its own addresses and Telegram chat.
+# every notification channel, email, Telegram, ntfy, Mattermost and Nextcloud Talk: the admin gets a summary
+# of the new findings, and each customer its logins from outside its allowed zones, at its own addresses and
+# Telegram chat.
 #
 # A cursor file keeps the position of the last finding sent, so a stopped pod, a failed
 # delivery or a slow detector loses nothing: the next run starts after the cursor and
@@ -33,6 +34,7 @@ import agent
 import wazuh_mattermost
 import wazuh_ntfy
 import wazuh_secrets
+import wazuh_talk
 import wazuh_telegram
 import wazuh_zones
 from wazuh_api import api
@@ -54,6 +56,7 @@ ZONE_ADMIN_NTFY_SEEN_FILE = "login-zone-admin-ntfy.json"
 ZONE_ADMIN_MATTERMOST_SEEN_FILE = "login-zone-admin-mattermost.json"
 # The target of a webhook without a channel of its own: no channel name can start with #
 WEBHOOK_CHANNEL = "#webhook"
+ZONE_ADMIN_TALK_SEEN_FILE = "login-zone-admin-talk.json"
 # A traveling user logs in again every few minutes: one email a day per user, address and service.
 # The address, not only the country: a second attacker in the same country must not go unseen.
 # The service: a stolen password used on one more application must show
@@ -305,6 +308,18 @@ def mattermost():
         "" if channel == WEBHOOK_CHANNEL else channel, os.environ.get("MATTERMOST_USERNAME", ""))
 
 
+def talk():
+    """Post to a Nextcloud Talk conversation through the bot whose secret is stored."""
+    url = os.environ.get("TALK_URL", "")
+    bot_secret = wazuh_talk.secret()
+    host = os.environ.get("TRAEFIK_HOST", "")
+    if not (url and host and bot_secret):
+        return None
+    # The first character follows the highest level, the dashboard link is the last line
+    return lambda conversation, subject, lines, level="medium": wazuh_talk.send(
+        url, conversation, bot_secret, subject, as_markdown(lines), level)
+
+
 def admin_report(cursor, seen_file, target, deliver):
     """Send the admin a summary of the new findings and of the logins from outside the allowed zones."""
     host = os.environ.get("TRAEFIK_HOST", "")
@@ -521,6 +536,7 @@ def main():
         chat = telegram() if bot_on else None
         topic = os.environ.get("NTFY_TOPIC", "") if os.environ.get("NTFY_ENABLED") == "True" else ""
         team_chat = mattermost() if os.environ.get("MATTERMOST_ENABLED") == "True" else None
+        conversation = os.environ.get("TALK_CONVERSATION", "") if os.environ.get("TALK_ENABLED") == "True" else ""
         runs = [
             ("admin email", lambda: admin_report(Cursor("send-findings-email.cursor"), ZONE_ADMIN_SEEN_FILE,
                                                  recipients, mail)),
@@ -536,6 +552,8 @@ def main():
                                                       ZONE_ADMIN_MATTERMOST_SEEN_FILE,
                                                       os.environ.get("MATTERMOST_CHANNEL", "") or WEBHOOK_CHANNEL,
                                                       team_chat)),
+            ("admin talk", lambda: admin_report(Cursor("send-findings-talk.cursor"), ZONE_ADMIN_TALK_SEEN_FILE,
+                                                conversation, talk() if conversation else None)),
         ]
         # A channel that fails must not stop the others: it tries again at the next run
         for name, run in runs:

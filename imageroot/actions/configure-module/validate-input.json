@@ -192,6 +192,29 @@
             "title": "Mattermost incoming webhook",
             "description": "URL of the incoming webhook. It is a secret: anybody who knows it can post. Omit to keep the current one, send an empty string to remove it.",
             "pattern": "^(https://[^/?#]+(/[^?#]*)?/hooks/[A-Za-z0-9]+)?$"
+        },
+        "talk_enabled": {
+            "type": "boolean",
+            "title": "Nextcloud Talk notifications",
+            "description": "Post the summary of the new findings to a Nextcloud Talk conversation through a bot every 5 minutes, at the same minimum level as the emails. Needs the server, the conversation and the bot secret."
+        },
+        "talk_url": {
+            "type": "string",
+            "title": "Nextcloud server",
+            "description": "Base URL of the Nextcloud server, like https://cloud.example.com. Empty when not used.",
+            "pattern": "^(https://[^/?#]+(/[^?#]*)?)?$"
+        },
+        "talk_conversation": {
+            "type": "string",
+            "title": "Talk conversation token",
+            "description": "Token of the conversation, the last part of its link. Empty when not used.",
+            "pattern": "^[a-z0-9]{0,32}$"
+        },
+        "talk_secret": {
+            "type": "string",
+            "title": "Talk bot secret",
+            "description": "Shared secret of the bot, set with occ talk:bot:create or talk:bot:install. Omit to keep the current one, send an empty string to remove it.",
+            "pattern": "^([\\x21-\\x7e]{40,128})?$"
         }
     },
     "allOf": [
@@ -261,6 +284,32 @@
                 "properties": {
                     "ntfy_topic": {
                         "minLength": 1
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "talk_enabled": {
+                        "const": true
+                    }
+                },
+                "required": [
+                    "talk_enabled"
+                ]
+            },
+            "then": {
+                "required": [
+                    "talk_url",
+                    "talk_conversation"
+                ],
+                "properties": {
+                    "talk_url": {
+                        "minLength": 1
+                    },
+                    "talk_conversation": {
+                        "minLength": 4
                     }
                 }
             }

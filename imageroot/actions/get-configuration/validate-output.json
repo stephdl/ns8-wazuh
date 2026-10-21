@@ -56,7 +56,11 @@
         "mattermost_enabled",
         "mattermost_channel",
         "mattermost_username",
-        "mattermost_webhook_set"
+        "mattermost_webhook_set",
+        "talk_enabled",
+        "talk_url",
+        "talk_conversation",
+        "talk_secret_set"
     ],
     "properties": {
         "host": {
@@ -209,6 +213,23 @@
             "type": "boolean",
             "title": "Mattermost webhook set",
             "description": "True when a webhook is stored. The webhook URL is a secret and is never returned."
+        },
+        "talk_enabled": {
+            "type": "boolean",
+            "title": "Nextcloud Talk notifications"
+        },
+        "talk_url": {
+            "type": "string",
+            "title": "Nextcloud server"
+        },
+        "talk_conversation": {
+            "type": "string",
+            "title": "Talk conversation token"
+        },
+        "talk_secret_set": {
+            "type": "boolean",
+            "title": "Talk bot secret set",
+            "description": "True when the bot secret is stored. The secret itself is never returned."
         }
     }
 }

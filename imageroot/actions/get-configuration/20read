@@ -16,6 +16,7 @@ import agent
 
 import wazuh_mattermost
 import wazuh_ntfy
+import wazuh_talk
 import wazuh_telegram
 
 from wazuh_api import count_agents
@@ -47,6 +48,10 @@ config["mattermost_enabled"] = os.getenv("MATTERMOST_ENABLED") == "True"
 config["mattermost_channel"] = os.getenv("MATTERMOST_CHANNEL", "")
 config["mattermost_username"] = os.getenv("MATTERMOST_USERNAME", "")
 config["mattermost_webhook_set"] = os.path.exists(wazuh_mattermost.WEBHOOK_FILE)
+config["talk_enabled"] = os.getenv("TALK_ENABLED") == "True"
+config["talk_url"] = os.getenv("TALK_URL", "")
+config["talk_conversation"] = os.getenv("TALK_CONVERSATION", "")
+config["talk_secret_set"] = os.path.exists(wazuh_talk.SECRET_FILE)
 config["smarthost_enabled"] = agent.get_smarthost_settings(agent.redis_connect(use_replica=True))["enabled"]
 config["export_token_set"] = os.path.exists("secrets/export.env")
 config["index_unclassified_events"] = os.getenv("INDEX_UNCLASSIFIED_EVENTS") == "True"
