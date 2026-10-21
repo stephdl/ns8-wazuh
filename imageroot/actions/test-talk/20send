@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import os
+import sys
+
+import agent
+
+import wazuh_talk
+
+data = json.load(sys.stdin)
+url = data["url"]
+conversation = data["conversation"]
+bot_secret = data.get("secret", "").strip() or wazuh_talk.secret()
+
+
+def fail(field, error):
+    agent.set_status("validation-failed")
+    # The value is left empty for the secret: a secret must never be echoed back
+    value = {"url": url, "conversation": conversation}.get(field, "")
+    json.dump([{"field": field, "parameter": field, "value": value, "error": error}], fp=sys.stdout)
+    sys.exit(3)
+
+
+if not bot_secret:
+    fail("secret", "talk_secret_required")
+host = os.environ.get("TRAEFIK_HOST", "") or os.environ["MODULE_ID"]
+try:
+    wazuh_talk.send(url, conversation, bot_secret, f"Wazuh on {host}", "Test message. The alerts will come here.",
+                    "low")
+except wazuh_talk.TalkError as error:
+    print(agent.SD_WARNING + f"test message to Talk conversation {conversation} failed: {error}", file=sys.stderr)
+    # Talk answers 401 to a wrong secret, to a bot not set up in the conversation and to an unknown
+    # conversation alike, and 429 once that happened too often
+    if error.status in (401, 403, 404):
+        fail("conversation", "talk_bot_unverified")
+    if error.status == 429:
+        fail("conversation", "talk_rate_limited")
+    fail("url", "talk_unreachable")
