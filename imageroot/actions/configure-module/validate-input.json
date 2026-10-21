@@ -169,6 +169,29 @@
             "title": "ntfy access token",
             "description": "Access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, send an empty string to remove it. Not needed on a server that lets anybody publish.",
             "pattern": "^(tk_[A-Za-z0-9]+)?$"
+        },
+        "mattermost_enabled": {
+            "type": "boolean",
+            "title": "Mattermost notifications",
+            "description": "Post the summary of the new findings to a Mattermost incoming webhook every 5 minutes, at the same minimum level as the emails. Needs the webhook."
+        },
+        "mattermost_channel": {
+            "type": "string",
+            "title": "Mattermost channel",
+            "description": "Channel name (not the display name) or @user. Empty to post to the channel of the webhook.",
+            "pattern": "^(@?[a-z0-9._-]{1,64})?$"
+        },
+        "mattermost_username": {
+            "type": "string",
+            "title": "Mattermost sender name",
+            "description": "Name shown on the posts. Mattermost uses it only with Enable integrations to override usernames. Empty for the name of the webhook.",
+            "pattern": "^[A-Za-z0-9 ._()-]{0,64}$"
+        },
+        "mattermost_webhook": {
+            "type": "string",
+            "title": "Mattermost incoming webhook",
+            "description": "URL of the incoming webhook. It is a secret: anybody who knows it can post. Omit to keep the current one, send an empty string to remove it.",
+            "pattern": "^(https://[^/?#]+(/[^?#]*)?/hooks/[A-Za-z0-9]+)?$"
         }
     },
     "allOf": [

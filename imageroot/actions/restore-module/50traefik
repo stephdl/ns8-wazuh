@@ -31,6 +31,9 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "ntfy_enabled": renv.get("NTFY_ENABLED") == "True",
     "ntfy_url": renv.get("NTFY_URL", "https://ntfy.sh"),
     "ntfy_topic": renv.get("NTFY_TOPIC", ""),
+    "mattermost_enabled": renv.get("MATTERMOST_ENABLED") == "True",
+    "mattermost_channel": renv.get("MATTERMOST_CHANNEL", ""),
+    "mattermost_username": renv.get("MATTERMOST_USERNAME", ""),
     "retention_days": int(renv.get("LOG_RETENTION_DAYS", "365")),
 })
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

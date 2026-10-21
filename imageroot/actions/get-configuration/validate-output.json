@@ -52,7 +52,11 @@
         "ntfy_enabled",
         "ntfy_url",
         "ntfy_topic",
-        "ntfy_token_set"
+        "ntfy_token_set",
+        "mattermost_enabled",
+        "mattermost_channel",
+        "mattermost_username",
+        "mattermost_webhook_set"
     ],
     "properties": {
         "host": {
@@ -188,6 +192,23 @@
             "type": "boolean",
             "title": "ntfy access token set",
             "description": "True when an access token is stored. The token itself is never returned."
+        },
+        "mattermost_enabled": {
+            "type": "boolean",
+            "title": "Mattermost notifications"
+        },
+        "mattermost_channel": {
+            "type": "string",
+            "title": "Mattermost channel"
+        },
+        "mattermost_username": {
+            "type": "string",
+            "title": "Mattermost sender name"
+        },
+        "mattermost_webhook_set": {
+            "type": "boolean",
+            "title": "Mattermost webhook set",
+            "description": "True when a webhook is stored. The webhook URL is a secret and is never returned."
         }
     }
 }
