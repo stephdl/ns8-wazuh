@@ -68,6 +68,10 @@ Run `configure-module` with:
 - `mattermost_webhook`: URL of the incoming webhook. It is a secret. Omit to keep the current one, empty to remove it.
 - `mattermost_channel`: optional channel name or `@user`. Empty for the channel of the webhook.
 - `mattermost_username`: optional sender name, shown only when Mattermost lets integrations override usernames.
+- `talk_enabled`: post the summary of the new findings to a Nextcloud Talk conversation every 5 minutes (true/false). Needs the server, the conversation and the bot secret.
+- `talk_url`: Nextcloud server, like `https://cloud.example.com`.
+- `talk_conversation`: token of the conversation, the last part of its link.
+- `talk_secret`: shared secret of the bot. Omit to keep the current one, empty to remove it.
 
 Example:
 
@@ -331,6 +335,30 @@ The summary can also go to a Mattermost channel, at the same minimum level. Crea
 
 ```
 api-cli run module/wazuh1/test-mattermost --data '{}'
+```
+
+Or to a Nextcloud Talk conversation, through a bot (Talk 17.1 and later). Bots are created on the command line by the Nextcloud admin. On Nextcloud 32 and later, a bot that may only post messages:
+
+```
+occ talk:bot:create "Wazuh" "Wazuh findings"
+```
+
+It prints the bot id and a random secret. Older versions need the secret and a URL, which is never called for this feature:
+
+```
+occ talk:bot:install --feature response "Wazuh" "<40 to 128 characters>" "https://wazuh.example.com/" "Wazuh findings"
+```
+
+Then set the bot up in the conversation, with the token from the link of the conversation (`/call/<token>`):
+
+```
+occ talk:bot:setup <bot id> <token>
+```
+
+The module signs each message with the secret (HMAC-SHA256), the secret itself never travels. The first character of the message follows the highest level. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-talk --data '{"url":"https://cloud.example.com","conversation":"<token>"}'
 ```
 
 ## Host name and certificates
