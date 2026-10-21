@@ -509,13 +509,89 @@
                       :showCloseButton="false"
                     />
                   </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.talk_title") }}
+                  </h6>
+                  <NsToggle
+                    value="talkEnabled"
+                    :label="$t('settings.talk_enabled')"
+                    v-model="talkEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="talkEnabled">
+                    <NsTextInput
+                      v-model.trim="talkUrl"
+                      :label="$t('settings.talk_url')"
+                      placeholder="https://cloud.example.com"
+                      :invalid-message="$t(error.talk_url)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_url"
+                    />
+                    <NsTextInput
+                      v-model.trim="talkConversation"
+                      :label="$t('settings.talk_conversation')"
+                      :helper-text="$t('settings.talk_conversation_helper')"
+                      :invalid-message="$t(error.talk_conversation)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_conversation"
+                    />
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="talkSecret"
+                      :label="$t('settings.talk_secret')"
+                      :placeholder="
+                        talkSecretSet ? $t('settings.talk_secret_set') : ''
+                      "
+                      :helper-text="$t('settings.talk_secret_helper')"
+                      :invalid-message="$t(error.talk_secret)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_secret"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testTalk"
+                      :disabled="stillLoading || loading.testTalk"
+                      @click="sendTalkTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.talk_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="talkTestSent"
+                      kind="success"
+                      :title="$t('settings.talk_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testTalk"
+                      kind="error"
+                      :title="$t('action.test-talk')"
+                      :description="error.testTalk"
+                      :showCloseButton="false"
+                    />
+                  </template>
                   <!-- One level for every channel: the same findings reach the mailbox and the chat -->
                   <cv-dropdown
                     v-if="
                       notifyEnabled ||
                       telegramEnabled ||
                       ntfyEnabled ||
-                      mattermostEnabled
+                      mattermostEnabled ||
+                      talkEnabled
                     "
                     v-model="notifyMinLevel"
                     :label="$t('settings.notify_min_level')"
@@ -638,6 +714,12 @@ import {
   testMattermost,
 } from "../lib/mattermost";
 import {
+  URL_PATTERN as TALK_URL_PATTERN,
+  CONVERSATION_PATTERN as TALK_CONVERSATION_PATTERN,
+  SECRET_PATTERN as TALK_SECRET_PATTERN,
+  testTalk,
+} from "../lib/talk";
+import {
   QueryParamService,
   UtilService,
   TaskService,
@@ -714,6 +796,12 @@ export default {
       mattermostChannel: "",
       mattermostUsername: "",
       mattermostTestSent: false,
+      talkEnabled: false,
+      talkUrl: "",
+      talkConversation: "",
+      talkSecret: "",
+      talkSecretSet: false,
+      talkTestSent: false,
       isShownRemoveTokenModal: false,
       loading: {
         getConfiguration: false,
@@ -722,6 +810,7 @@ export default {
         listUserDomains: false,
         testNtfy: false,
         testMattermost: false,
+        testTalk: false,
       },
       error: {
         admin_password: "",
@@ -743,6 +832,10 @@ export default {
         mattermost_channel: "",
         mattermost_username: "",
         testMattermost: "",
+        talk_url: "",
+        talk_conversation: "",
+        talk_secret: "",
+        testTalk: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -1064,6 +1157,11 @@ export default {
       this.mattermostWebhook = "";
       this.mattermostChannel = config.mattermost_channel;
       this.mattermostUsername = config.mattermost_username;
+      this.talkEnabled = config.talk_enabled;
+      this.talkUrl = config.talk_url;
+      this.talkConversation = config.talk_conversation;
+      this.talkSecretSet = config.talk_secret_set;
+      this.talkSecret = "";
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -1073,7 +1171,8 @@ export default {
         config.notify_enabled ||
         config.telegram_enabled ||
         config.ntfy_enabled ||
-        config.mattermost_enabled;
+        config.mattermost_enabled ||
+        config.talk_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -1233,6 +1332,39 @@ export default {
           isValidationOk = false;
         }
       }
+      if (this.talkEnabled) {
+        if (!TALK_URL_PATTERN.test(this.talkUrl)) {
+          this.error.talk_url = this.talkUrl
+            ? "settings.talk_url_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_url");
+          }
+          isValidationOk = false;
+        }
+        if (!TALK_CONVERSATION_PATTERN.test(this.talkConversation)) {
+          this.error.talk_conversation = this.talkConversation
+            ? "settings.talk_conversation_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_conversation");
+          }
+          isValidationOk = false;
+        }
+        if (
+          this.talkSecret
+            ? !TALK_SECRET_PATTERN.test(this.talkSecret)
+            : !this.talkSecretSet
+        ) {
+          this.error.talk_secret = this.talkSecret
+            ? "settings.talk_secret_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_secret");
+          }
+          isValidationOk = false;
+        }
+      }
       if (
         !Number.isInteger(this.retentionDays) ||
         this.retentionDays < 30 ||
@@ -1353,6 +1485,50 @@ export default {
         this.error.testMattermost = result.message;
       }
     },
+    async sendTalkTest() {
+      this.talkTestSent = false;
+      this.error.testTalk = "";
+      this.error.talk_url = "";
+      this.error.talk_conversation = "";
+      this.error.talk_secret = "";
+      if (!TALK_URL_PATTERN.test(this.talkUrl)) {
+        this.error.talk_url = this.talkUrl
+          ? "settings.talk_url_invalid"
+          : "common.required";
+        return;
+      }
+      if (!TALK_CONVERSATION_PATTERN.test(this.talkConversation)) {
+        this.error.talk_conversation = this.talkConversation
+          ? "settings.talk_conversation_invalid"
+          : "common.required";
+        return;
+      }
+      if (
+        this.talkSecret
+          ? !TALK_SECRET_PATTERN.test(this.talkSecret)
+          : !this.talkSecretSet
+      ) {
+        this.error.talk_secret = this.talkSecret
+          ? "settings.talk_secret_invalid"
+          : "common.required";
+        return;
+      }
+      this.loading.testTalk = true;
+      const data = { url: this.talkUrl, conversation: this.talkConversation };
+      // A typed secret is tested before it is saved, else the backend takes the stored one
+      if (this.talkSecret) {
+        data.secret = this.talkSecret;
+      }
+      const result = await testTalk(this, data);
+      this.loading.testTalk = false;
+      if ("output" in result) {
+        this.talkTestSent = true;
+      } else if (result.parameter === "url") {
+        this.error.talk_url = result.message;
+      } else {
+        this.error.testTalk = result.message;
+      }
+    },
     removeTelegramToken() {
       this.isShownRemoveTokenModal = false;
       // Without a token nothing could be sent: the bot switch goes off with it
@@ -1436,6 +1612,12 @@ export default {
         )
           ? this.mattermostUsername
           : "",
+        talk_enabled: this.talkEnabled,
+        // While Talk is off the fields are hidden: keep only what the backend accepts
+        talk_url: TALK_URL_PATTERN.test(this.talkUrl) ? this.talkUrl : "",
+        talk_conversation: TALK_CONVERSATION_PATTERN.test(this.talkConversation)
+          ? this.talkConversation
+          : "",
       };
       // Without a new password the backend keeps the current one
       if (this.isPasswordActive) {
@@ -1453,6 +1635,9 @@ export default {
       }
       if (this.mattermostWebhook) {
         data.mattermost_webhook = this.mattermostWebhook;
+      }
+      if (this.talkSecret) {
+        data.talk_secret = this.talkSecret;
       }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
