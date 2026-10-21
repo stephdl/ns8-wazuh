@@ -229,12 +229,11 @@ def write(name, objects):
 AUTH = ("event.category:authentication"
         " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")"
         # The samba service account and the computers log in every few minutes: their failures stay
-        " and not event.action:(service-logon or machine-logon)")
+        " and not event.action:(service-logon or machine-logon)"
+        # Upstream system-auth counts sshd disconnections before login as successes, ns8 reads every real one
+        " and not (event.outcome:success and not wazuh.integration.name:ns8)")
 FAIL = f"{AUTH} and event.outcome:failure"
-# The standard integrations count sshd disconnections before any login as successes, and they
-# decode again the ssh logins the ns8 decoders already read: only the ns8 logins are real ones
-SUCCESS = (f"{AUTH} and event.outcome:success and event.action:(logged-in or logon)"
-           " and wazuh.integration.name:ns8")
+SUCCESS = f"{AUTH} and event.outcome:success"
 # Only the login zone decoder writes a reason that starts so
 OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
