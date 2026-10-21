@@ -48,7 +48,19 @@
         "telegram_enabled",
         "telegram_admin_enabled",
         "telegram_chat_id",
-        "telegram_token_set"
+        "telegram_token_set",
+        "ntfy_enabled",
+        "ntfy_url",
+        "ntfy_topic",
+        "ntfy_token_set",
+        "mattermost_enabled",
+        "mattermost_channel",
+        "mattermost_username",
+        "mattermost_webhook_set",
+        "talk_enabled",
+        "talk_url",
+        "talk_conversation",
+        "talk_secret_set"
     ],
     "properties": {
         "host": {
@@ -167,6 +179,57 @@
             "type": "boolean",
             "title": "Smarthost enabled",
             "description": "The cluster smarthost is configured, so emails can be sent."
+        },
+        "ntfy_enabled": {
+            "type": "boolean",
+            "title": "ntfy notifications"
+        },
+        "ntfy_url": {
+            "type": "string",
+            "title": "ntfy server"
+        },
+        "ntfy_topic": {
+            "type": "string",
+            "title": "ntfy topic"
+        },
+        "ntfy_token_set": {
+            "type": "boolean",
+            "title": "ntfy access token set",
+            "description": "True when an access token is stored. The token itself is never returned."
+        },
+        "mattermost_enabled": {
+            "type": "boolean",
+            "title": "Mattermost notifications"
+        },
+        "mattermost_channel": {
+            "type": "string",
+            "title": "Mattermost channel"
+        },
+        "mattermost_username": {
+            "type": "string",
+            "title": "Mattermost sender name"
+        },
+        "mattermost_webhook_set": {
+            "type": "boolean",
+            "title": "Mattermost webhook set",
+            "description": "True when a webhook is stored. The webhook URL is a secret and is never returned."
+        },
+        "talk_enabled": {
+            "type": "boolean",
+            "title": "Nextcloud Talk notifications"
+        },
+        "talk_url": {
+            "type": "string",
+            "title": "Nextcloud server"
+        },
+        "talk_conversation": {
+            "type": "string",
+            "title": "Talk conversation token"
+        },
+        "talk_secret_set": {
+            "type": "boolean",
+            "title": "Talk bot secret set",
+            "description": "True when the bot secret is stored. The secret itself is never returned."
         }
     }
 }

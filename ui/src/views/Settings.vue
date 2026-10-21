@@ -356,9 +356,243 @@
                       ref="telegram_chat_id"
                     />
                   </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.ntfy_title") }}
+                  </h6>
+                  <NsToggle
+                    value="ntfyEnabled"
+                    :label="$t('settings.ntfy_enabled')"
+                    v-model="ntfyEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="ntfyEnabled">
+                    <NsTextInput
+                      v-model.trim="ntfyUrl"
+                      :label="$t('settings.ntfy_url')"
+                      placeholder="https://ntfy.sh"
+                      :invalid-message="$t(error.ntfy_url)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_url"
+                    />
+                    <NsTextInput
+                      v-model.trim="ntfyTopic"
+                      :label="$t('settings.ntfy_topic')"
+                      :helper-text="$t('settings.ntfy_topic_helper')"
+                      :invalid-message="$t(error.ntfy_topic)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_topic"
+                    />
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="ntfyToken"
+                      :label="$t('settings.ntfy_token')"
+                      :placeholder="
+                        ntfyTokenSet ? $t('settings.ntfy_token_set') : ''
+                      "
+                      :helper-text="$t('settings.ntfy_token_helper')"
+                      :invalid-message="$t(error.ntfy_token)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="ntfy_token"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testNtfy"
+                      :disabled="stillLoading || loading.testNtfy"
+                      @click="sendNtfyTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.ntfy_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="ntfyTestSent"
+                      kind="success"
+                      :title="$t('settings.ntfy_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testNtfy"
+                      kind="error"
+                      :title="$t('action.test-ntfy')"
+                      :description="error.testNtfy"
+                      :showCloseButton="false"
+                    />
+                  </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.mattermost_title") }}
+                  </h6>
+                  <NsToggle
+                    value="mattermostEnabled"
+                    :label="$t('settings.mattermost_enabled')"
+                    v-model="mattermostEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="mattermostEnabled">
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="mattermostWebhook"
+                      :label="$t('settings.mattermost_webhook')"
+                      :placeholder="
+                        mattermostWebhookSet
+                          ? $t('settings.mattermost_webhook_set')
+                          : 'https://chat.example.com/hooks/…'
+                      "
+                      :helper-text="$t('settings.mattermost_webhook_helper')"
+                      :invalid-message="$t(error.mattermost_webhook)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_webhook"
+                    />
+                    <NsTextInput
+                      v-model.trim="mattermostChannel"
+                      :label="$t('settings.mattermost_channel')"
+                      :helper-text="$t('settings.mattermost_channel_helper')"
+                      :invalid-message="$t(error.mattermost_channel)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_channel"
+                    />
+                    <NsTextInput
+                      v-model.trim="mattermostUsername"
+                      :label="$t('settings.mattermost_username')"
+                      placeholder="Wazuh"
+                      :helper-text="$t('settings.mattermost_username_helper')"
+                      :invalid-message="$t(error.mattermost_username)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="mattermost_username"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testMattermost"
+                      :disabled="stillLoading || loading.testMattermost"
+                      @click="sendMattermostTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.mattermost_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="mattermostTestSent"
+                      kind="success"
+                      :title="$t('settings.mattermost_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testMattermost"
+                      kind="error"
+                      :title="$t('action.test-mattermost')"
+                      :description="error.testMattermost"
+                      :showCloseButton="false"
+                    />
+                  </template>
+                  <h6 class="mg-bottom">
+                    {{ $t("settings.talk_title") }}
+                  </h6>
+                  <NsToggle
+                    value="talkEnabled"
+                    :label="$t('settings.talk_enabled')"
+                    v-model="talkEnabled"
+                    :disabled="stillLoading"
+                    class="mg-bottom"
+                  >
+                    <template slot="text-left">{{
+                      $t("settings.disabled")
+                    }}</template>
+                    <template slot="text-right">{{
+                      $t("settings.enabled")
+                    }}</template>
+                  </NsToggle>
+                  <template v-if="talkEnabled">
+                    <NsTextInput
+                      v-model.trim="talkUrl"
+                      :label="$t('settings.talk_url')"
+                      placeholder="https://cloud.example.com"
+                      :invalid-message="$t(error.talk_url)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_url"
+                    />
+                    <NsTextInput
+                      v-model.trim="talkConversation"
+                      :label="$t('settings.talk_conversation')"
+                      :helper-text="$t('settings.talk_conversation_helper')"
+                      :invalid-message="$t(error.talk_conversation)"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_conversation"
+                    />
+                    <NsTextInput
+                      type="password"
+                      v-model.trim="talkSecret"
+                      :label="$t('settings.talk_secret')"
+                      :placeholder="
+                        talkSecretSet ? $t('settings.talk_secret_set') : ''
+                      "
+                      :helper-text="$t('settings.talk_secret_helper')"
+                      :invalid-message="$t(error.talk_secret)"
+                      :passwordShowLabel="$t('settings.show')"
+                      :passwordHideLabel="$t('settings.hide')"
+                      :disabled="stillLoading"
+                      class="mg-bottom"
+                      ref="talk_secret"
+                    />
+                    <NsButton
+                      type="button"
+                      kind="secondary"
+                      size="field"
+                      :loading="loading.testTalk"
+                      :disabled="stillLoading || loading.testTalk"
+                      @click="sendTalkTest"
+                      class="mg-bottom"
+                      >{{ $t("settings.talk_test") }}</NsButton
+                    >
+                    <NsInlineNotification
+                      v-if="talkTestSent"
+                      kind="success"
+                      :title="$t('settings.talk_test_sent')"
+                      :showCloseButton="false"
+                    />
+                    <NsInlineNotification
+                      v-if="error.testTalk"
+                      kind="error"
+                      :title="$t('action.test-talk')"
+                      :description="error.testTalk"
+                      :showCloseButton="false"
+                    />
+                  </template>
                   <!-- One level for every channel: the same findings reach the mailbox and the chat -->
                   <cv-dropdown
-                    v-if="notifyEnabled || telegramEnabled"
+                    v-if="
+                      notifyEnabled ||
+                      telegramEnabled ||
+                      ntfyEnabled ||
+                      mattermostEnabled ||
+                      talkEnabled
+                    "
                     v-model="notifyMinLevel"
                     :label="$t('settings.notify_min_level')"
                     :helper-text="$t('settings.notify_min_level_helper')"
@@ -468,6 +702,24 @@ import { mapState } from "vuex";
 import { CHAT_ID_PATTERN, TOKEN_PATTERN } from "../lib/telegram";
 import TelegramChat from "@/components/TelegramChat.vue";
 import {
+  URL_PATTERN as NTFY_URL_PATTERN,
+  TOPIC_PATTERN as NTFY_TOPIC_PATTERN,
+  TOKEN_PATTERN as NTFY_TOKEN_PATTERN,
+  testNtfy,
+} from "../lib/ntfy";
+import {
+  WEBHOOK_PATTERN as MATTERMOST_WEBHOOK_PATTERN,
+  CHANNEL_PATTERN as MATTERMOST_CHANNEL_PATTERN,
+  USERNAME_PATTERN as MATTERMOST_USERNAME_PATTERN,
+  testMattermost,
+} from "../lib/mattermost";
+import {
+  URL_PATTERN as TALK_URL_PATTERN,
+  CONVERSATION_PATTERN as TALK_CONVERSATION_PATTERN,
+  SECRET_PATTERN as TALK_SECRET_PATTERN,
+  testTalk,
+} from "../lib/talk";
+import {
   QueryParamService,
   UtilService,
   TaskService,
@@ -532,12 +784,33 @@ export default {
       // Changed on each load: the chat field starts over with the saved chat
       telegramChatKey: 0,
       telegramRemoveToken: false,
+      ntfyEnabled: false,
+      ntfyUrl: "https://ntfy.sh",
+      ntfyTopic: "",
+      ntfyToken: "",
+      ntfyTokenSet: false,
+      ntfyTestSent: false,
+      mattermostEnabled: false,
+      mattermostWebhook: "",
+      mattermostWebhookSet: false,
+      mattermostChannel: "",
+      mattermostUsername: "",
+      mattermostTestSent: false,
+      talkEnabled: false,
+      talkUrl: "",
+      talkConversation: "",
+      talkSecret: "",
+      talkSecretSet: false,
+      talkTestSent: false,
       isShownRemoveTokenModal: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
         getStatus: false,
         listUserDomains: false,
+        testNtfy: false,
+        testMattermost: false,
+        testTalk: false,
       },
       error: {
         admin_password: "",
@@ -551,6 +824,18 @@ export default {
         notify_sender: "",
         telegram_token: "",
         telegram_chat_id: "",
+        ntfy_url: "",
+        ntfy_topic: "",
+        ntfy_token: "",
+        testNtfy: "",
+        mattermost_webhook: "",
+        mattermost_channel: "",
+        mattermost_username: "",
+        testMattermost: "",
+        talk_url: "",
+        talk_conversation: "",
+        talk_secret: "",
+        testTalk: "",
         listUserDomains: "",
         getConfiguration: "",
         configureModule: "",
@@ -862,6 +1147,21 @@ export default {
       this.telegramToken = "";
       this.telegramRemoveToken = false;
       this.telegramChatKey++;
+      this.ntfyEnabled = config.ntfy_enabled;
+      this.ntfyUrl = config.ntfy_url || "https://ntfy.sh";
+      this.ntfyTopic = config.ntfy_topic;
+      this.ntfyTokenSet = config.ntfy_token_set;
+      this.ntfyToken = "";
+      this.mattermostEnabled = config.mattermost_enabled;
+      this.mattermostWebhookSet = config.mattermost_webhook_set;
+      this.mattermostWebhook = "";
+      this.mattermostChannel = config.mattermost_channel;
+      this.mattermostUsername = config.mattermost_username;
+      this.talkEnabled = config.talk_enabled;
+      this.talkUrl = config.talk_url;
+      this.talkConversation = config.talk_conversation;
+      this.talkSecretSet = config.talk_secret_set;
+      this.talkSecret = "";
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -869,7 +1169,10 @@ export default {
         config.retention_days !== 365 ||
         config.export_url !== "" ||
         config.notify_enabled ||
-        config.telegram_enabled;
+        config.telegram_enabled ||
+        config.ntfy_enabled ||
+        config.mattermost_enabled ||
+        config.talk_enabled;
       this.loading.getConfiguration = false;
       this.focusElement("host");
     },
@@ -971,6 +1274,97 @@ export default {
         }
         isValidationOk = false;
       }
+      if (this.ntfyEnabled) {
+        if (!NTFY_URL_PATTERN.test(this.ntfyUrl)) {
+          this.error.ntfy_url = "settings.ntfy_url_invalid";
+          if (isValidationOk) {
+            this.focusElement("ntfy_url");
+          }
+          isValidationOk = false;
+        }
+        if (!NTFY_TOPIC_PATTERN.test(this.ntfyTopic)) {
+          this.error.ntfy_topic = this.ntfyTopic
+            ? "settings.ntfy_topic_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("ntfy_topic");
+          }
+          isValidationOk = false;
+        }
+      }
+      if (this.ntfyToken && !NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
+        this.error.ntfy_token = "settings.ntfy_token_invalid";
+        if (isValidationOk) {
+          this.focusElement("ntfy_token");
+        }
+        isValidationOk = false;
+      }
+      if (this.mattermostEnabled) {
+        if (
+          this.mattermostWebhook
+            ? !MATTERMOST_WEBHOOK_PATTERN.test(this.mattermostWebhook)
+            : !this.mattermostWebhookSet
+        ) {
+          this.error.mattermost_webhook = this.mattermostWebhook
+            ? "settings.mattermost_webhook_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("mattermost_webhook");
+          }
+          isValidationOk = false;
+        }
+        if (
+          this.mattermostChannel &&
+          !MATTERMOST_CHANNEL_PATTERN.test(this.mattermostChannel)
+        ) {
+          this.error.mattermost_channel = "settings.mattermost_channel_invalid";
+          if (isValidationOk) {
+            this.focusElement("mattermost_channel");
+          }
+          isValidationOk = false;
+        }
+        if (!MATTERMOST_USERNAME_PATTERN.test(this.mattermostUsername)) {
+          this.error.mattermost_username =
+            "settings.mattermost_username_invalid";
+          if (isValidationOk) {
+            this.focusElement("mattermost_username");
+          }
+          isValidationOk = false;
+        }
+      }
+      if (this.talkEnabled) {
+        if (!TALK_URL_PATTERN.test(this.talkUrl)) {
+          this.error.talk_url = this.talkUrl
+            ? "settings.talk_url_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_url");
+          }
+          isValidationOk = false;
+        }
+        if (!TALK_CONVERSATION_PATTERN.test(this.talkConversation)) {
+          this.error.talk_conversation = this.talkConversation
+            ? "settings.talk_conversation_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_conversation");
+          }
+          isValidationOk = false;
+        }
+        if (
+          this.talkSecret
+            ? !TALK_SECRET_PATTERN.test(this.talkSecret)
+            : !this.talkSecretSet
+        ) {
+          this.error.talk_secret = this.talkSecret
+            ? "settings.talk_secret_invalid"
+            : "common.required";
+          if (isValidationOk) {
+            this.focusElement("talk_secret");
+          }
+          isValidationOk = false;
+        }
+      }
       if (
         !Number.isInteger(this.retentionDays) ||
         this.retentionDays < 30 ||
@@ -1014,6 +1408,125 @@ export default {
             focusAlreadySet = true;
           }
         }
+      }
+    },
+    async sendNtfyTest() {
+      this.ntfyTestSent = false;
+      this.error.testNtfy = "";
+      this.error.ntfy_url = "";
+      this.error.ntfy_topic = "";
+      this.error.ntfy_token = "";
+      if (!NTFY_URL_PATTERN.test(this.ntfyUrl)) {
+        this.error.ntfy_url = "settings.ntfy_url_invalid";
+        return;
+      }
+      if (!NTFY_TOPIC_PATTERN.test(this.ntfyTopic)) {
+        this.error.ntfy_topic = "common.required";
+        return;
+      }
+      if (this.ntfyToken && !NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
+        this.error.ntfy_token = "settings.ntfy_token_invalid";
+        return;
+      }
+      this.loading.testNtfy = true;
+      const data = { url: this.ntfyUrl, topic: this.ntfyTopic };
+      // A typed token is tested before it is saved, else the backend takes the stored one
+      if (this.ntfyToken) {
+        data.token = this.ntfyToken;
+      }
+      const result = await testNtfy(this, data);
+      this.loading.testNtfy = false;
+      if ("output" in result) {
+        this.ntfyTestSent = true;
+      } else {
+        this.error.testNtfy = result.message;
+      }
+    },
+    async sendMattermostTest() {
+      this.mattermostTestSent = false;
+      this.error.testMattermost = "";
+      this.error.mattermost_webhook = "";
+      this.error.mattermost_channel = "";
+      if (
+        this.mattermostWebhook
+          ? !MATTERMOST_WEBHOOK_PATTERN.test(this.mattermostWebhook)
+          : !this.mattermostWebhookSet
+      ) {
+        this.error.mattermost_webhook = this.mattermostWebhook
+          ? "settings.mattermost_webhook_invalid"
+          : "common.required";
+        return;
+      }
+      if (
+        this.mattermostChannel &&
+        !MATTERMOST_CHANNEL_PATTERN.test(this.mattermostChannel)
+      ) {
+        this.error.mattermost_channel = "settings.mattermost_channel_invalid";
+        return;
+      }
+      this.loading.testMattermost = true;
+      const data = {
+        channel: this.mattermostChannel,
+        username: MATTERMOST_USERNAME_PATTERN.test(this.mattermostUsername)
+          ? this.mattermostUsername
+          : "",
+      };
+      // A typed webhook is tested before it is saved, else the backend takes the stored one
+      if (this.mattermostWebhook) {
+        data.webhook = this.mattermostWebhook;
+      }
+      const result = await testMattermost(this, data);
+      this.loading.testMattermost = false;
+      if ("output" in result) {
+        this.mattermostTestSent = true;
+      } else if (result.parameter === "channel") {
+        this.error.mattermost_channel = result.message;
+      } else {
+        this.error.testMattermost = result.message;
+      }
+    },
+    async sendTalkTest() {
+      this.talkTestSent = false;
+      this.error.testTalk = "";
+      this.error.talk_url = "";
+      this.error.talk_conversation = "";
+      this.error.talk_secret = "";
+      if (!TALK_URL_PATTERN.test(this.talkUrl)) {
+        this.error.talk_url = this.talkUrl
+          ? "settings.talk_url_invalid"
+          : "common.required";
+        return;
+      }
+      if (!TALK_CONVERSATION_PATTERN.test(this.talkConversation)) {
+        this.error.talk_conversation = this.talkConversation
+          ? "settings.talk_conversation_invalid"
+          : "common.required";
+        return;
+      }
+      if (
+        this.talkSecret
+          ? !TALK_SECRET_PATTERN.test(this.talkSecret)
+          : !this.talkSecretSet
+      ) {
+        this.error.talk_secret = this.talkSecret
+          ? "settings.talk_secret_invalid"
+          : "common.required";
+        return;
+      }
+      this.loading.testTalk = true;
+      const data = { url: this.talkUrl, conversation: this.talkConversation };
+      // A typed secret is tested before it is saved, else the backend takes the stored one
+      if (this.talkSecret) {
+        data.secret = this.talkSecret;
+      }
+      const result = await testTalk(this, data);
+      this.loading.testTalk = false;
+      if ("output" in result) {
+        this.talkTestSent = true;
+      } else if (result.parameter === "url") {
+        this.error.talk_url = result.message;
+      } else {
+        this.error.testTalk = result.message;
       }
     },
     removeTelegramToken() {
@@ -1079,6 +1592,32 @@ export default {
         telegram_chat_id: CHAT_ID_PATTERN.test(this.telegramChatId)
           ? this.telegramChatId
           : "",
+        ntfy_enabled: this.ntfyEnabled,
+        // While ntfy is off the fields are hidden: keep only what the backend accepts
+        ntfy_url: NTFY_URL_PATTERN.test(this.ntfyUrl)
+          ? this.ntfyUrl
+          : "https://ntfy.sh",
+        ntfy_topic: NTFY_TOPIC_PATTERN.test(this.ntfyTopic)
+          ? this.ntfyTopic
+          : "",
+        mattermost_enabled: this.mattermostEnabled,
+        // While Mattermost is off the fields are hidden: keep only what the backend accepts
+        mattermost_channel: MATTERMOST_CHANNEL_PATTERN.test(
+          this.mattermostChannel
+        )
+          ? this.mattermostChannel
+          : "",
+        mattermost_username: MATTERMOST_USERNAME_PATTERN.test(
+          this.mattermostUsername
+        )
+          ? this.mattermostUsername
+          : "",
+        talk_enabled: this.talkEnabled,
+        // While Talk is off the fields are hidden: keep only what the backend accepts
+        talk_url: TALK_URL_PATTERN.test(this.talkUrl) ? this.talkUrl : "",
+        talk_conversation: TALK_CONVERSATION_PATTERN.test(this.talkConversation)
+          ? this.talkConversation
+          : "",
       };
       // Without a new password the backend keeps the current one
       if (this.isPasswordActive) {
@@ -1090,7 +1629,16 @@ export default {
       } else if (!this.exportUrl) {
         data.export_token = "";
       }
-      // Same for the bot token: turning Telegram off keeps it for later
+      // Same for the other secrets: turning a channel off keeps them for later
+      if (this.ntfyToken) {
+        data.ntfy_token = this.ntfyToken;
+      }
+      if (this.mattermostWebhook) {
+        data.mattermost_webhook = this.mattermostWebhook;
+      }
+      if (this.talkSecret) {
+        data.talk_secret = this.talkSecret;
+      }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
       } else if (this.telegramRemoveToken) {

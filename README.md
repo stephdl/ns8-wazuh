@@ -60,6 +60,18 @@ Run `configure-module` with:
 - `notify_sender`: sender address. Empty means `wazuh@<host>`.
 - `notify_min_level`: lowest level mailed: `low`, `medium` (default), `high` or `critical`.
 - `retention_days`: days to keep events and findings, 30 to 3650, 365 by default.
+- `ntfy_enabled`: publish the summary of the new findings to an ntfy topic every 5 minutes (true/false). Needs a topic.
+- `ntfy_url`: ntfy server, `https://ntfy.sh` by default, or a self-hosted one.
+- `ntfy_topic`: topic that receives the summary.
+- `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it.
+- `mattermost_enabled`: post the summary of the new findings to a Mattermost incoming webhook every 5 minutes (true/false). Needs the webhook.
+- `mattermost_webhook`: URL of the incoming webhook. It is a secret. Omit to keep the current one, empty to remove it.
+- `mattermost_channel`: optional channel name or `@user`. Empty for the channel of the webhook.
+- `mattermost_username`: optional sender name, shown only when Mattermost lets integrations override usernames.
+- `talk_enabled`: post the summary of the new findings to a Nextcloud Talk conversation every 5 minutes (true/false). Needs the server, the conversation and the bot secret.
+- `talk_url`: Nextcloud server, like `https://cloud.example.com`.
+- `talk_conversation`: token of the conversation, the last part of its link.
+- `talk_secret`: shared secret of the bot. Omit to keep the current one, empty to remove it.
 
 Example:
 
@@ -312,6 +324,42 @@ r1-node1
 Routine NS8 events stay out of the email: module sessions, timer services, CrowdSec bans, vulnerabilities. They stay in the export. NS8 - Fleet hides them with the `Routine findings hidden` filter.
 
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
+
+The same summary can go to an ntfy topic, at the same minimum level. Its priority follows the highest level in it: `critical` is urgent, `high` is high, `medium` is the default. A tap on it opens the dashboard. On ntfy.sh anybody who knows the topic can read it: pick a long name, or use a self-hosted server with a token. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-ntfy --data '{"url":"https://ntfy.sh","topic":"wazuh-alerts"}'
+```
+
+The summary can also go to a Mattermost channel, at the same minimum level. Create an incoming webhook in Mattermost (Integrations > Incoming Webhooks; a system admin may have to allow them in System Console > Integrations > Integration Management) and paste its URL. The post is an attachment: its border colour follows the highest level, its title opens the dashboard. Without a channel the webhook posts to its own channel. Anybody who knows the webhook URL can post there, so the module keeps it like a password and never shows it back. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-mattermost --data '{}'
+```
+
+Or to a Nextcloud Talk conversation, through a bot (Talk 17.1 and later). Bots are created on the command line by the Nextcloud admin. On Nextcloud 32 and later, a bot that may only post messages:
+
+```
+occ talk:bot:create "Wazuh" "Wazuh findings"
+```
+
+It prints the bot id and a random secret. Older versions need the secret and a URL, which is never called for this feature:
+
+```
+occ talk:bot:install --feature response "Wazuh" "<40 to 128 characters>" "https://wazuh.example.com/" "Wazuh findings"
+```
+
+Then set the bot up in the conversation, with the token from the link of the conversation (`/call/<token>`):
+
+```
+occ talk:bot:setup <bot id> <token>
+```
+
+The module signs each message with the secret (HMAC-SHA256), the secret itself never travels. The first character of the message follows the highest level. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-talk --data '{"url":"https://cloud.example.com","conversation":"<token>"}'
+```
 
 ## Host name and certificates
 
