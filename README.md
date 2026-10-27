@@ -135,6 +135,8 @@ It runs every 10 seconds and sends up to 5000 lines per run. It keeps its place 
 
 Rootcheck skips the container images on an NS8 node: their layers hold world-writable files on purpose. In an LXC container it does not scan `/dev`, where LXC keeps its own files. `--update` sets both on agents installed before.
 
+File integrity skips `/etc/pki/ca-trust/extracted` and `/etc/selinux/targeted/contexts`. A package update rewrites every file there, from sources that stay watched. `--update` sets it on agents installed before.
+
 ### Uptime
 
 The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the uptime in days and the last boot of each server. `--update` adds it to agents installed before.

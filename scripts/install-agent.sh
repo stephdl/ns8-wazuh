@@ -508,6 +508,27 @@ NS8UPTIME
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the ns8-uptime setting, see ${CONFIG}"
 }
 
+# A package update rewrites every file under these paths: one ca-certificates update gave 930 FIM findings.
+# They are built from sources that stay watched, /etc/pki/ca-trust/source and the SELinux policy.
+setup_syscheck() {
+    command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, file integrity keeps its defaults"; return 0; }
+    python3 - "${CONFIG}" <<'SYSCHECK' || die "cannot set syscheck in ${CONFIG}"
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+match = re.search(r"<syscheck>.*?</syscheck>", text, re.S)
+if not match:
+    sys.exit(print("Warning: no syscheck block, file integrity keeps its defaults", file=sys.stderr))
+block = match.group(0)
+for ignore in ('<ignore type="sregex">^/etc/pki/ca-trust/extracted/</ignore>',
+               '<ignore type="sregex">^/etc/selinux/targeted/contexts/</ignore>'):
+    if ignore not in block:
+        block = block.replace("</syscheck>", f"  {ignore}\n  </syscheck>")
+open(path, "w").write(text[:match.start()] + block + text[match.end():])
+SYSCHECK
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the syscheck setting, see ${CONFIG}"
+}
+
 # Rootcheck reports as rootkits the /dev/.lxc files of an LXC container,
 # and the world-writable files of the Podman image layers of an NS8 node
 setup_rootcheck() {
@@ -549,6 +570,7 @@ if [ "${UPDATE}" -eq 1 ]; then
     install_package
     setup_ns8_journal
     setup_uptime
+    setup_syscheck
     setup_rootcheck
     # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
     pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
@@ -618,6 +640,7 @@ fi
 
 setup_ns8_journal
 setup_uptime
+setup_syscheck
 setup_rootcheck
 
 # Only root reads the token: the agent takes it at its first start and deletes it
