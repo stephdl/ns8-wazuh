@@ -328,6 +328,8 @@ r1-node1
 
 Routine NS8 events stay out of the email: services that stop or go away without error, CrowdSec bans, vulnerabilities. Service starts are informational, so they are not mailed, but NS8 - Fleet keeps them so a new unit shows. A service that fails to start is mailed when `notify_min_level` is `low` or `medium`. A stop of firewalld, ssh, auditd, chrony, wazuh-agent or the CrowdSec service is mailed too. They all stay in the export. NS8 - Fleet hides the routine ones with the `Routine findings hidden` filter.
 
+A file changed within 13 hours after a package install, update or removal on the same agent goes under `Files changed after a package update`, apart from the new findings. The file integrity scan runs every 12 hours, so a change from a night update shows at the next scan. The files are still listed, 10 at most. An NS8 core update is not a package update: its files stay in the new findings.
+
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
 
 ### Telegram
