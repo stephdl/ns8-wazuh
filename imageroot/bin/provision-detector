@@ -43,8 +43,7 @@ def disabled_titles():
     return titles
 
 
-def our_rules():
-    disabled = disabled_titles()
+def our_rules(disabled):
     answer = api("POST", f"{SA}/rules/_search?pre_packaged=false", {"size": 500, "query": {"match_all": {}}})
     unique = {}
     for hit in answer.get("hits", {}).get("hits", []):
@@ -71,8 +70,9 @@ def find_detector():
 
 # The rules are registered a few seconds after the promotion
 rules = []
+disabled = disabled_titles()
 for _ in range(30):
-    rules = our_rules()
+    rules = our_rules(disabled)
     if rules:
         break
     time.sleep(2)

@@ -37,7 +37,8 @@ NOISE = [
 DASHBOARD_NOISE = list(NOISE)
 
 # The NS8 timers and sessions start all day, about 4000 starts a week on two nodes. Another unit stays in.
-ROUTINE_UNITS = r"backup[0-9]+|refresh-(module|volume)-metrics|dnf-makecache|user@[0-9]+|fix-xdg-state@[0-9]+" \
+# Lucene regexp: a bare @ means any string, so it is escaped.
+ROUTINE_UNITS = r"backup[0-9]+|refresh-(module|volume)-metrics|dnf-makecache|user\@[0-9]+|fix-xdg-state\@[0-9]+" \
                 r"|logrotate|password-warning|phonehome"
 DASHBOARD_NOISE += [
     {"bool": {"filter": [{"term": {"event.action": "service-started"}},

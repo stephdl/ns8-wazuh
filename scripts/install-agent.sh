@@ -508,8 +508,8 @@ NS8UPTIME
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the ns8-uptime setting, see ${CONFIG}"
 }
 
-# A package update rewrites every file under these paths: one ca-certificates update gave 930 FIM findings.
-# They are built from sources that stay watched, /etc/pki/ca-trust/source and the SELinux policy.
+# A package update rewrites every file under these paths: one ca-certificates update gave 670 FIM findings
+# in directory-hash. The CA bundles next to it stay watched, so does the SELinux policy.
 setup_syscheck() {
     command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, file integrity keeps its defaults"; return 0; }
     python3 - "${CONFIG}" <<'SYSCHECK' || die "cannot set syscheck in ${CONFIG}"
@@ -520,8 +520,8 @@ match = re.search(r"<syscheck>.*?</syscheck>", text, re.S)
 if not match:
     sys.exit(print("Warning: no syscheck block, file integrity keeps its defaults", file=sys.stderr))
 block = match.group(0)
-for ignore in ('<ignore type="sregex">^/etc/pki/ca-trust/extracted/</ignore>',
-               '<ignore type="sregex">^/etc/selinux/targeted/contexts/</ignore>'):
+for ignore in ('<ignore type="sregex">^/etc/pki/ca-trust/extracted/pem/directory-hash</ignore>',
+               '<ignore type="sregex">^/etc/selinux/targeted/contexts</ignore>'):
     if ignore not in block:
         block = block.replace("</syscheck>", f"  {ignore}\n  </syscheck>")
 open(path, "w").write(text[:match.start()] + block + text[match.end():])
