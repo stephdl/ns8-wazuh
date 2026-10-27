@@ -376,11 +376,11 @@ write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
          table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
                                "params": {"field": "@timestamp", "customLabel": "Last event"}}])), 24, 14),
-    # Only an agent installed or updated with ns8-uptime shows here. Only the last boot is kept:
+    # Only an agent installed or updated with ns8-uptime shows here. Only the boot of the last report is kept:
     # the highest uptime of the period would be the one before a reboot.
     (vis("ns8-fleet-uptime", "Uptime per agent", APPS, "event.action:uptime-reported",
          table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent", order_by="_key"),
-               terms("5", "event.start", "bucket", size=1, label="Last boot", order_by="_key"),
+               terms("5", "event.start", "bucket", size=1, label="Last boot", order_by="4"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
                                "params": {"field": "host.uptime", "customLabel": "Uptime (days)",
                                           "json": json.dumps({"script": {"source": "Math.floor(_value / 86400)",

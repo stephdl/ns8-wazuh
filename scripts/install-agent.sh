@@ -488,6 +488,7 @@ setup_uptime() {
 # and the dashboard groups the reports by boot time.
 
 set -- $(awk -v now="$(date +%s.%N)" '{ printf "%d %d\n", $1, now - $1 + 0.5 }' /proc/uptime)
+[ -n "$2" ] || { echo "ns8-uptime: cannot read /proc/uptime" >&2; exit 1; }
 up="$1"
 boot="$(date -u -d "@$2" +%Y-%m-%dT%H:%M:%SZ)"
 printf '{"ns8_uptime":1,"uptime":%s,"boot":"%s"}\n' "${up}" "${boot}"

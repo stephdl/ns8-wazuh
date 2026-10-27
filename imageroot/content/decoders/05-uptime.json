@@ -20,13 +20,13 @@
     },
     "check": [
       {
-        "_line": "contains(\"output: 'ns8-uptime': \")"
+        "event.original": "starts_with(\"wazuh: output: 'ns8-uptime': \")"
       }
     ],
     "normalize": [
       {
-        "parse|_line": [
-          "<~>output: 'ns8-uptime': <_up_raw>"
+        "parse|event.original": [
+          "wazuh: output: 'ns8-uptime': <_up_raw>"
         ]
       },
       {
