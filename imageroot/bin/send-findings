@@ -61,6 +61,7 @@ FIM_PREFIX = "Wazuh FIM - "
 UPDATE_HEAD = "Files changed after a package update"
 # FIM scans every 12 hours: a file changed by an update at 01:00 is found at the 08:00 scan
 UPDATE_WINDOW_MS = 13 * 3600 * 1000
+FIM_ACTION = re.compile(r"^Wazuh FIM - File (\w+)$")
 
 
 def log(message):
@@ -211,14 +212,19 @@ def split_title(title):
 
 
 def package_updates(since):
-    """The times of the package changes of each agent since the cursor less the window, by 10 minutes."""
-    query = {"bool": {"filter": [{"range": {"@timestamp": {"gte": f"{since}||-13h"}}},
+    """The minutes of the package changes of each agent, from the window before the cursor."""
+    query = {"bool": {"filter": [{"range": {"@timestamp": {"gte": f"{since}||-14h"}}},
                                  {"term": {"event.category": "package"}}]}}
     aggs = {"a": {"terms": {"field": "wazuh.agent.name", "size": 1000},
-                  "aggs": {"t": {"date_histogram": {"field": "@timestamp", "fixed_interval": "10m", "min_doc_count": 1}}}}}
-    answer = api("POST", f"{EVENTS}/_search", {"size": 0, "query": query, "aggs": aggs})
+                  "aggs": {"t": {"date_histogram": {"field": "@timestamp", "fixed_interval": "1m", "min_doc_count": 1}}}}}
+    try:
+        answer = api("POST", f"{EVENTS}/_search", {"size": 0, "query": query, "aggs": aggs})
+    except RuntimeError as error:
+        answer = {"error": str(error)}
     if "aggregations" not in answer:
-        raise RuntimeError(f"package search failed: {json.dumps(answer)[:300]}")
+        # Without the grouping the files are mailed as new findings: better than no summary and no zone alert
+        log(f"Warning: package search failed, files changed by updates are not grouped: {json.dumps(answer)[:300]}")
+        return {}
     return {a["key"]: [t["key"] for t in a["t"]["buckets"]] for a in answer["aggregations"]["a"]["buckets"]}
 
 
@@ -227,8 +233,8 @@ def epoch_ms(stamp):
 
 
 def after_update(times, moment):
-    # A bucket starts up to 10 minutes before its update, so the window reaches 10 minutes further
-    return any(0 <= moment - t <= UPDATE_WINDOW_MS + 600000 for t in times)
+    # A bucket starts up to one minute before its update
+    return any(60000 <= moment - t <= UPDATE_WINDOW_MS for t in times)
 
 
 def summary_lines(found):
@@ -309,7 +315,7 @@ def admin_report(cursor, seen_file, target, deliver):
                                            {"term": {"event.outcome": "failure"}}]}})
     wanted = [{"bool": {"should": wanted, "minimum_should_match": 1}}]
     ts, ids, skipped = catch_up(cursor, wanted, NOISE)
-    updates = package_updates(ts)
+    since, updates = ts, None
     for hits, ts, ids in pages(ts, ids, wanted, NOISE):
         for hit in hits:
             source = hit["_source"]["wazuh"]
@@ -322,8 +328,14 @@ def admin_report(cursor, seen_file, target, deliver):
                     zone_logins.setdefault(customer, []).append(zone_line(hit["_source"]))
                 continue
             # Still listed with its file, under one line: a change slipped in during an update stays visible
-            if title.startswith(FIM_PREFIX) and after_update(updates.get(agent_name, ()), epoch_ms(hit["_source"]["@timestamp"])):
-                title = f"{UPDATE_HEAD} - {split_title(title)[1]}"
+            if title.startswith(FIM_PREFIX):
+                # Asked only when a FIM finding comes, most runs have none
+                if updates is None:
+                    updates = package_updates(since)
+                if after_update(updates.get(agent_name, ()), epoch_ms(hit["_source"]["@timestamp"])):
+                    head, path = split_title(title)
+                    action = FIM_ACTION.match(head)
+                    title = f"{UPDATE_HEAD} - {action.group(1) if action else head} {path}"
             counts[(customer, agent_name, title)] += 1
     updated = sum(n for (_, _, title), n in counts.items() if title.startswith(UPDATE_HEAD))
     findings = sum(counts.values()) - updated
@@ -331,7 +343,7 @@ def admin_report(cursor, seen_file, target, deliver):
     if findings or updated or logins or skipped:
         summary = [plural(logins, "login") + " from outside the allowed zones" if logins else "",
                    plural(findings, "new finding") if findings else "",
-                   plural(updated, "file") + " changed by package updates" if updated else ""]
+                   plural(updated, "file change") + " after package updates" if updated else ""]
         summary = " and ".join(part for part in summary if part) or "findings not sent during an outage"
         # One block per customer and agent, one line per kind of finding with a count, instead of one line per finding
         lines = [("head", f"{summary[0].upper()}{summary[1:]}."), ("text", "")]
@@ -358,7 +370,7 @@ def admin_report(cursor, seen_file, target, deliver):
                                " than a day."), ("text", "")]
         lines.append(("link", "Open the dashboard", f"https://{host}/"))
         deliver(target, f"Wazuh: {summary} on {host}", lines)
-        log(f"summary sent, {findings} findings, {logins} zone logins, {skipped} skipped")
+        log(f"summary sent, {findings} findings, {updated} file changes after updates, {logins} zone logins, {skipped} skipped")
     # Saved after the delivery only: a failed one is sent again at the next run
     seen.save()
     cursor.save(ts, ids)

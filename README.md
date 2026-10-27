@@ -135,7 +135,7 @@ It runs every 10 seconds and sends up to 5000 lines per run. It keeps its place 
 
 Rootcheck skips the container images on an NS8 node: their layers hold world-writable files on purpose. In an LXC container it does not scan `/dev`, where LXC keeps its own files. `--update` sets both on agents installed before.
 
-File integrity skips `/etc/pki/ca-trust/extracted/pem/directory-hash` and `/etc/selinux/targeted/contexts`. A package update rewrites every file there. The CA bundles and the SELinux policy stay watched. `--update` sets it on agents installed before.
+File integrity skips `/etc/pki/ca-trust/extracted/pem/directory-hash`. A ca-certificates update rewrites every file there. The CA bundles stay watched. `--update` sets it on agents installed before.
 
 ### Uptime
 
