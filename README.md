@@ -135,6 +135,10 @@ It runs every 10 seconds and sends up to 5000 lines per run. It keeps its place 
 
 Rootcheck skips the container images on an NS8 node: their layers hold world-writable files on purpose. In an LXC container it does not scan `/dev`, where LXC keeps its own files. `--update` sets both on agents installed before.
 
+### Uptime
+
+The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the uptime in days and the last boot of each server. `--update` adds it to agents installed before.
+
 ### Windows and macOS
 
 The script covers Linux only. Install the agent with the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token.
@@ -242,7 +246,7 @@ Ten dashboards, under Explore > Dashboards:
 | NS8 - Logins | logins and failures on every service, with maps |
 | NS8 - Web | status codes, errors, scans, with a map |
 | NS8 - CrowdSec | attacks and bans, with maps |
-| NS8 - Fleet | alerts by level, rule and MITRE tactic, last report per server |
+| NS8 - Fleet | alerts by level, rule and MITRE tactic, last report and uptime per server |
 | NS8 - System changes | accounts, groups, services and firewall changes |
 | NS8 - Mail | sent and rejected mail, spam, viruses, source countries |
 | NS8 - Directory | Samba domain logins and changes. Needs the Samba audit below |

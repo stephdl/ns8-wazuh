@@ -78,6 +78,11 @@ Agent status should be
     ${statuses} =    Evaluate    [a['status'] for a in $result['agents'] if a['name'] == '${AGENT_NAME}']
     Should Be Equal    ${statuses}    ${{ ['${expected}'] }}
 
+Uptime should be indexed
+    ${output} =    Execute Command
+    ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' 'https://localhost:9200/wazuh-events-v5-applications*/_search' -d '{"size":1,"_source":["host.uptime"],"query":{"bool":{"filter":[{"term":{"event.action":"uptime-reported"}},{"term":{"wazuh.agent.name":"${AGENT_NAME}"}}]}}}'
+    Should Match Regexp    ${output}    "host":\\{"uptime":\\d+\\}
+
 *** Test Cases ***
 Check if wazuh is installed correctly
     Use the leader
@@ -233,6 +238,13 @@ Check if the agent update keeps the enrollment
     ...    return_rc=True  return_stderr=True
     Should Be Equal As Integers    ${rc}  0    ${stderr}
     Wait Until Keyword Succeeds    2 min    10 s    Agent status should be    active
+
+Check if the agent reports its uptime
+    Use the install node
+    ${output} =    Execute Command    /var/ossec/bin/ns8-uptime
+    Should Match Regexp    ${output}    ^\\{"ns8_uptime":1,"uptime":\\d+,"boot":"[0-9T:-]+Z"\\}$
+    # The agent runs the command at its start, after the update above
+    Wait Until Keyword Succeeds    3 min    15 s    Uptime should be indexed
 
 Check if ns8-journal ends when its output is cut
     Use the install node

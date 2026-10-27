@@ -22,9 +22,9 @@ def count(label=None):
             "params": {"customLabel": label} if label else {}}
 
 
-def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-"):
+def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-", order_by="1"):
     return {"id": id, "enabled": True, "type": "terms", "schema": schema,
-            "params": {"field": field, "size": size, "order": "desc", "orderBy": "1",
+            "params": {"field": field, "size": size, "order": "desc", "orderBy": order_by,
                        "otherBucket": False, "otherBucketLabel": "Other",
                        "missingBucket": missing, "missingBucketLabel": missing_label,
                        **({"customLabel": label} if label else {})}}
@@ -73,11 +73,12 @@ def bars(split_agg, series=None):
     return "horizontal_bar", axes("horizontal_bar", horizontal=True), aggs
 
 
-def table(*buckets, extra_metrics=()):
+def table(*buckets, extra_metrics=(), with_count=True):
     params = {"perPage": 10, "showPartialRows": False, "showMetricsAtAllLevels": False,
               "sort": {"columnIndex": None, "direction": None}, "showTotal": False,
               "totalFunc": "sum", "percentageCol": "", "showToolbar": True}
-    return "table", params, [count("Count"), *extra_metrics, *[dict(b, schema="bucket") for b in buckets]]
+    metrics = [count("Count")] if with_count else []
+    return "table", params, [*metrics, *extra_metrics, *[dict(b, schema="bucket") for b in buckets]]
 
 
 def pie(split_agg):
@@ -358,7 +359,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
 
 NOT_INFO = "not wazuh.rule.level:informational"
 write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
-    "Alerts of every server, and when each one last reported", [
+    "Alerts of every server, when each one last reported and last booted", [
     (vis("ns8-fleet-levels", "Findings over time", FINDINGS, "",
          over_time(terms("3", "wazuh.rule.level", "group", size=5), kind="histogram")), 32, 10),
     (vis("ns8-fleet-level-count", "Findings by level", FINDINGS, "",
@@ -370,11 +371,23 @@ write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
          pie(terms("2", "wazuh.rule.mitre.tactic.name", "segment", size=10))), 24, 14),
     (vis("ns8-fleet-rules", "Top rules, informational excluded", FINDINGS, NOT_INFO,
          table(terms("2", "wazuh.rule.title", "bucket", size=50, label="Rule"),
-               terms("3", "wazuh.rule.level", "bucket", size=1, label="Level"))), 24, 14),
+               terms("3", "wazuh.rule.level", "bucket", size=1, label="Level"))), 48, 14),
     (vis("ns8-fleet-last-event", "Last event per agent", EVENTS, "",
          table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
                                "params": {"field": "@timestamp", "customLabel": "Last event"}}])), 24, 14),
+    # Only an agent installed or updated with ns8-uptime shows here. Only the boot of the last report is kept:
+    # the highest uptime of the period would be the one before a reboot.
+    (vis("ns8-fleet-uptime", "Uptime per agent", APPS, "event.action:uptime-reported",
+         table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent", order_by="_key"),
+               terms("5", "event.start", "bucket", size=1, label="Last boot", order_by="4"),
+               extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
+                               "params": {"field": "host.uptime", "customLabel": "Uptime (days)",
+                                          "json": json.dumps({"script": {"source": "Math.floor(_value / 86400)",
+                                                                         "lang": "painless"}})}},
+                              {"id": "4", "enabled": True, "type": "max", "schema": "metric",
+                               "params": {"field": "@timestamp", "customLabel": "Last report"}}],
+               with_count=False)), 24, 14),
 ]))
 
 CHANGES = ("event.action:(user-created or user-deleted or user-modified or group-created or group-deleted"

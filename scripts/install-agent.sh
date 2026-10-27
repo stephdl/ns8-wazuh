@@ -472,6 +472,42 @@ NS8CONF
     say "NS8 node: the agent reads the journal through ns8-journal, with the module of each line."
 }
 
+# The inventory of the agent has no uptime: ns8-uptime reports it every hour, on any Linux host
+setup_uptime() {
+    cat > "${INSTALL_DIR}/bin/ns8-uptime" <<'NS8UPTIME'
+#!/bin/sh
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Print the uptime in seconds and the boot time as one JSON line, read by the ns8-uptime decoder.
+# The boot time comes from /proc/uptime and not from btime: an LXC container reads its own uptime there.
+# Computed to the millisecond, then rounded: whole seconds made it move by one second between reports,
+# and the dashboard groups the reports by boot time.
+
+set -- $(awk -v now="$(date +%s.%N)" '{ printf "%d %d\n", $1, now - $1 + 0.5 }' /proc/uptime)
+[ -n "$2" ] || { echo "ns8-uptime: cannot read /proc/uptime" >&2; exit 1; }
+up="$1"
+boot="$(date -u -d "@$2" +%Y-%m-%dT%H:%M:%SZ)"
+printf '{"ns8_uptime":1,"uptime":%s,"boot":"%s"}\n' "${up}" "${boot}"
+NS8UPTIME
+    chmod 750 "${INSTALL_DIR}/bin/ns8-uptime"
+    if ! grep -q "<command>/var/ossec/bin/ns8-uptime</command>" "${CONFIG}"; then
+        # The last ossec_config block, as for ns8-journal, and without python3: a plain host may not have it
+        last="$(grep -n "</ossec_config>" "${CONFIG}" | tail -n 1 | cut -d: -f1)"
+        [ -n "${last}" ] || die "no </ossec_config> in ${CONFIG}"
+        awk -v last="${last}" 'NR == last {
+            print "  <localfile>\n    <log_format>command</log_format>"
+            print "    <command>/var/ossec/bin/ns8-uptime</command>\n    <alias>ns8-uptime</alias>"
+            print "    <frequency>3600</frequency>\n  </localfile>"
+        } { print }' "${CONFIG}" > "${CONFIG}.new" && cat "${CONFIG}.new" > "${CONFIG}" && rm -f "${CONFIG}.new" \
+            || die "cannot set ns8-uptime in ${CONFIG}"
+    fi
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the ns8-uptime setting, see ${CONFIG}"
+}
+
 # Rootcheck reports as rootkits the /dev/.lxc files of an LXC container,
 # and the world-writable files of the Podman image layers of an NS8 node
 setup_rootcheck() {
@@ -512,6 +548,7 @@ if [ "${UPDATE}" -eq 1 ]; then
     say "Installed version: ${before:-unknown}, wanted: ${VERSION}"
     install_package
     setup_ns8_journal
+    setup_uptime
     setup_rootcheck
     # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
     pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
@@ -580,6 +617,7 @@ if [ -n "${AGENT_NAME}" ] || [ -n "${AGENT_GROUP}" ]; then
 fi
 
 setup_ns8_journal
+setup_uptime
 setup_rootcheck
 
 # Only root reads the token: the agent takes it at its first start and deletes it

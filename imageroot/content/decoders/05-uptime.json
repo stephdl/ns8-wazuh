@@ -1,0 +1,71 @@
+{
+  "resource": {
+    "name": "decoder/ns8-uptime/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "Host uptime",
+      "description": "Uptime and boot time sent every hour by the ns8-uptime command of the agent",
+      "author": "NethServer",
+      "module": "ns8",
+      "compatibility": "Linux",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "Linux"
+      ]
+    },
+    "check": [
+      {
+        "event.original": "starts_with(\"wazuh: output: 'ns8-uptime': \")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|event.original": [
+          "wazuh: output: 'ns8-uptime': <_up_raw>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "_up": "parse_json($_up_raw)"
+          }
+        ]
+      },
+      {
+        "check": "exists($_up.ns8_uptime)",
+        "map": [
+          {
+            "host.uptime": "$_up.uptime"
+          },
+          {
+            "event.start": "$_up.boot"
+          },
+          {
+            "process.name": "ns8-uptime"
+          },
+          {
+            "message": "concat('up since ', $_up.boot)"
+          },
+          {
+            "event.category": [
+              "host"
+            ]
+          },
+          {
+            "event.type": [
+              "info"
+            ]
+          },
+          {
+            "event.action": "uptime-reported"
+          }
+        ]
+      }
+    ]
+  }
+}
