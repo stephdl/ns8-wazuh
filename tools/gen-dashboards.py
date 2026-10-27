@@ -358,7 +358,7 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
 
 NOT_INFO = "not wazuh.rule.level:informational"
 write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
-    "Alerts of every server, and when each one last reported", [
+    "Alerts of every server, when each one last reported and last booted", [
     (vis("ns8-fleet-levels", "Findings over time", FINDINGS, "",
          over_time(terms("3", "wazuh.rule.level", "group", size=5), kind="histogram")), 32, 10),
     (vis("ns8-fleet-level-count", "Findings by level", FINDINGS, "",
@@ -370,11 +370,18 @@ write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
          pie(terms("2", "wazuh.rule.mitre.tactic.name", "segment", size=10))), 24, 14),
     (vis("ns8-fleet-rules", "Top rules, informational excluded", FINDINGS, NOT_INFO,
          table(terms("2", "wazuh.rule.title", "bucket", size=50, label="Rule"),
-               terms("3", "wazuh.rule.level", "bucket", size=1, label="Level"))), 24, 14),
+               terms("3", "wazuh.rule.level", "bucket", size=1, label="Level"))), 48, 14),
     (vis("ns8-fleet-last-event", "Last event per agent", EVENTS, "",
          table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
                                "params": {"field": "@timestamp", "customLabel": "Last event"}}])), 24, 14),
+    # Only an agent installed or updated with ns8-uptime shows here
+    (vis("ns8-fleet-uptime", "Last boot per agent", APPS, "event.action:uptime-reported",
+         table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
+               extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
+                               "params": {"field": "event.start", "customLabel": "Last boot"}},
+                              {"id": "4", "enabled": True, "type": "max", "schema": "metric",
+                               "params": {"field": "@timestamp", "customLabel": "Last report"}}])), 24, 14),
 ]))
 
 CHANGES = ("event.action:(user-created or user-deleted or user-modified or group-created or group-deleted"
