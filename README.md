@@ -137,7 +137,7 @@ Rootcheck skips the container images on an NS8 node: their layers hold world-wri
 
 ### Uptime
 
-The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the last boot of each server. `--update` adds it to agents installed before.
+The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the uptime in days and the last boot of each server. `--update` adds it to agents installed before.
 
 ### Windows and macOS
 
@@ -246,7 +246,7 @@ Ten dashboards, under Explore > Dashboards:
 | NS8 - Logins | logins and failures on every service, with maps |
 | NS8 - Web | status codes, errors, scans, with a map |
 | NS8 - CrowdSec | attacks and bans, with maps |
-| NS8 - Fleet | alerts by level, rule and MITRE tactic, last report and last boot per server |
+| NS8 - Fleet | alerts by level, rule and MITRE tactic, last report and uptime per server |
 | NS8 - System changes | accounts, groups, services and firewall changes |
 | NS8 - Mail | sent and rejected mail, spam, viruses, source countries |
 | NS8 - Directory | Samba domain logins and changes. Needs the Samba audit below |

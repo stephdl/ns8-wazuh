@@ -484,9 +484,12 @@ setup_uptime() {
 
 # Print the uptime in seconds and the boot time as one JSON line, read by the ns8-uptime decoder.
 # The boot time comes from /proc/uptime and not from btime: an LXC container reads its own uptime there.
+# Computed to the millisecond, then rounded: whole seconds made it move by one second between reports,
+# and the dashboard groups the reports by boot time.
 
-up="$(cut -d. -f1 /proc/uptime)"
-boot="$(date -u -d "@$(( $(date +%s) - up ))" +%Y-%m-%dT%H:%M:%SZ)"
+set -- $(awk -v now="$(date +%s.%N)" '{ printf "%d %d\n", $1, now - $1 + 0.5 }' /proc/uptime)
+up="$1"
+boot="$(date -u -d "@$2" +%Y-%m-%dT%H:%M:%SZ)"
 printf '{"ns8_uptime":1,"uptime":%s,"boot":"%s"}\n' "${up}" "${boot}"
 NS8UPTIME
     chmod 750 "${INSTALL_DIR}/bin/ns8-uptime"

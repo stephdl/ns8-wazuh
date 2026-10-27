@@ -22,9 +22,9 @@ def count(label=None):
             "params": {"customLabel": label} if label else {}}
 
 
-def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-"):
+def terms(id, field, schema, size=10, label=None, missing=False, missing_label="-", order_by="1"):
     return {"id": id, "enabled": True, "type": "terms", "schema": schema,
-            "params": {"field": field, "size": size, "order": "desc", "orderBy": "1",
+            "params": {"field": field, "size": size, "order": "desc", "orderBy": order_by,
                        "otherBucket": False, "otherBucketLabel": "Other",
                        "missingBucket": missing, "missingBucketLabel": missing_label,
                        **({"customLabel": label} if label else {})}}
@@ -73,11 +73,12 @@ def bars(split_agg, series=None):
     return "horizontal_bar", axes("horizontal_bar", horizontal=True), aggs
 
 
-def table(*buckets, extra_metrics=()):
+def table(*buckets, extra_metrics=(), with_count=True):
     params = {"perPage": 10, "showPartialRows": False, "showMetricsAtAllLevels": False,
               "sort": {"columnIndex": None, "direction": None}, "showTotal": False,
               "totalFunc": "sum", "percentageCol": "", "showToolbar": True}
-    return "table", params, [count("Count"), *extra_metrics, *[dict(b, schema="bucket") for b in buckets]]
+    metrics = [count("Count")] if with_count else []
+    return "table", params, [*metrics, *extra_metrics, *[dict(b, schema="bucket") for b in buckets]]
 
 
 def pie(split_agg):
@@ -375,13 +376,18 @@ write("40-fleet.ndjson", dashboard("ns8-fleet", "NS8 - Fleet",
          table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
                                "params": {"field": "@timestamp", "customLabel": "Last event"}}])), 24, 14),
-    # Only an agent installed or updated with ns8-uptime shows here
-    (vis("ns8-fleet-uptime", "Last boot per agent", APPS, "event.action:uptime-reported",
-         table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent"),
+    # Only an agent installed or updated with ns8-uptime shows here. Only the last boot is kept:
+    # the highest uptime of the period would be the one before a reboot.
+    (vis("ns8-fleet-uptime", "Uptime per agent", APPS, "event.action:uptime-reported",
+         table(terms("2", "wazuh.agent.name", "bucket", size=100, label="Agent", order_by="_key"),
+               terms("5", "event.start", "bucket", size=1, label="Last boot", order_by="_key"),
                extra_metrics=[{"id": "3", "enabled": True, "type": "max", "schema": "metric",
-                               "params": {"field": "event.start", "customLabel": "Last boot"}},
+                               "params": {"field": "host.uptime", "customLabel": "Uptime (days)",
+                                          "json": json.dumps({"script": {"source": "Math.floor(_value / 86400)",
+                                                                         "lang": "painless"}})}},
                               {"id": "4", "enabled": True, "type": "max", "schema": "metric",
-                               "params": {"field": "@timestamp", "customLabel": "Last report"}}])), 24, 14),
+                               "params": {"field": "@timestamp", "customLabel": "Last report"}}],
+               with_count=False)), 24, 14),
 ]))
 
 CHANGES = ("event.action:(user-created or user-deleted or user-modified or group-created or group-deleted"
