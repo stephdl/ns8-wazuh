@@ -211,7 +211,7 @@ Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node n
 | NethVoice | failed SIP, CTI and reports logins |
 | Proxmox VE | logins, failures and tasks |
 
-Twelve rules raise findings:
+Eleven rules raise findings, the web scan rule is off:
 
 | Rule | Level |
 |---|---|
@@ -223,7 +223,7 @@ Twelve rules raise findings:
 | NS8 domain admin group changed | high |
 | NS8 domain password reset | low |
 | NS8 domain password policy changed | medium |
-| NS8 web scan | informational |
+| NS8 web scan | off: one finding per request. NS8 - Web shows the scans |
 | NS8 Proxmox guest destroyed | high |
 | NS8 Proxmox backup failed | medium |
 | NS8 login from outside the allowed zones | medium |
