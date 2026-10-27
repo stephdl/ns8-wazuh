@@ -9,7 +9,7 @@
       ]
     },
     "sigma_id": "7d0e5a60-3f1c-4e0c-9f0e-0a0a7a1c0009",
-    "enabled": true,
+    "enabled": false,
     "status": "experimental",
     "level": "informational",
     "logsource": {

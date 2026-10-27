@@ -10,6 +10,9 @@
 # only for the standard content: without one the rules never run and no finding appears.
 # The script is idempotent and refreshes the rules of the detector, which change at each promotion.
 
+import glob
+import json
+import os
 import sys
 import time
 
@@ -22,13 +25,25 @@ SA = "_plugins/_security_analytics"
 NAME = "ns8"
 # Our decoders put every event in the applications category
 INDEX = "wazuh-events-v5-applications"
+CONTENT_DIR = os.environ.get("CONTENT_DIR", os.path.join(os.environ.get("AGENT_INSTALL_DIR", "."), "content"))
 
 
 def log(message):
     print(message, file=sys.stderr)
 
 
-def our_rules():
+def disabled_titles():
+    # Security Analytics does not carry the enabled flag of the Content Manager: the detector would still run them
+    titles = set()
+    for path in glob.glob(os.path.join(CONTENT_DIR, "rules", "*.json")):
+        with open(path) as f:
+            resource = json.load(f)["resource"]
+        if not resource.get("enabled", True):
+            titles.add(resource["metadata"]["title"])
+    return titles
+
+
+def our_rules(disabled):
     answer = api("POST", f"{SA}/rules/_search?pre_packaged=false", {"size": 500, "query": {"match_all": {}}})
     unique = {}
     for hit in answer.get("hits", {}).get("hits", []):
@@ -37,6 +52,8 @@ def our_rules():
         space = source.get("space")
         space = space.get("name") if isinstance(space, dict) else space
         if source.get("category") != NAME or space != "custom":
+            continue
+        if source.get("metadata", {}).get("title") in disabled:
             continue
         # The detector wants the id of the document of the Content Manager, not the id in Security Analytics
         unique[source.get("metadata", {}).get("title")] = source["document"]["id"]
@@ -53,8 +70,9 @@ def find_detector():
 
 # The rules are registered a few seconds after the promotion
 rules = []
+disabled = disabled_titles()
 for _ in range(30):
-    rules = our_rules()
+    rules = our_rules(disabled)
     if rules:
         break
     time.sleep(2)

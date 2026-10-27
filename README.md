@@ -135,6 +135,8 @@ It runs every 10 seconds and sends up to 5000 lines per run. It keeps its place 
 
 Rootcheck skips the container images on an NS8 node: their layers hold world-writable files on purpose. In an LXC container it does not scan `/dev`, where LXC keeps its own files. `--update` sets both on agents installed before.
 
+File integrity skips `/etc/pki/ca-trust/extracted/pem/directory-hash`. A ca-certificates update rewrites every file there. The CA bundles stay watched. `--update` sets it on agents installed before.
+
 ### Uptime
 
 The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the uptime in days and the last boot of each server. `--update` adds it to agents installed before.
@@ -211,7 +213,7 @@ Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node n
 | NethVoice | failed SIP, CTI and reports logins |
 | Proxmox VE | logins, failures and tasks |
 
-Twelve rules raise findings:
+Eleven rules raise findings, the web scan rule is off:
 
 | Rule | Level |
 |---|---|
@@ -223,7 +225,7 @@ Twelve rules raise findings:
 | NS8 domain admin group changed | high |
 | NS8 domain password reset | low |
 | NS8 domain password policy changed | medium |
-| NS8 web scan | informational |
+| NS8 web scan | off: one finding per request. NS8 - Web shows the scans |
 | NS8 Proxmox guest destroyed | high |
 | NS8 Proxmox backup failed | medium |
 | NS8 login from outside the allowed zones | medium |
@@ -325,6 +327,8 @@ r1-node1
 ```
 
 Routine NS8 events stay out of the email: services that stop or go away without error, CrowdSec bans, vulnerabilities. Service starts are informational, so they are not mailed, but NS8 - Fleet keeps them so a new unit shows. A service that fails to start is mailed when `notify_min_level` is `low` or `medium`. A stop of firewalld, ssh, auditd, chrony, wazuh-agent or the CrowdSec service is mailed too. They all stay in the export. NS8 - Fleet hides the routine ones with the `Routine findings hidden` filter.
+
+A file changed within 13 hours after a package install, update or removal on the same agent goes under `Files changed after a package update`, apart from the new findings. The file integrity scan runs every 12 hours, so a change from a night update shows at the next scan. The files are still listed, 10 at most. An NS8 core update is not a package update: its files stay in the new findings.
 
 Some smarthosts refuse `wazuh@<host>`. Set `notify_sender` then.
 
