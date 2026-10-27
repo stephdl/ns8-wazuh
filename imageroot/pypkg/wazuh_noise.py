@@ -36,6 +36,15 @@ NOISE = [
 
 DASHBOARD_NOISE = list(NOISE)
 
+# The NS8 timers and sessions start all day, about 4000 starts a week on two nodes. Another unit stays in.
+ROUTINE_UNITS = r"backup[0-9]+|refresh-(module|volume)-metrics|dnf-makecache|user@[0-9]+|fix-xdg-state@[0-9]+" \
+                r"|logrotate|password-warning|phonehome"
+DASHBOARD_NOISE += [
+    {"bool": {"filter": [{"term": {"event.action": "service-started"}},
+                         {"term": {"event.outcome": "success"}},
+                         {"regexp": {"service.name": ROUTINE_UNITS}}]}},
+]
+
 # The vulnerability scan finds the same CVE again at each run: the Vulnerability Detection page lists them.
 # The fleet dashboard keeps them, so a critical CVE still shows in the level counts.
 NOISE = NOISE + [{"prefix": {"wazuh.rule.title": "Wazuh VD - "}}]
