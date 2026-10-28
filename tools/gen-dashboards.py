@@ -157,6 +157,48 @@ def markdown(id, title, text, new_tab=False):
             "references": []}
 
 
+def place_map(id, title, pattern, query):
+    """A circle per city with its name and country on hover, a click filters the city.
+    The tile map can only show coordinates. query is DSL: Vega does not read KQL."""
+    spec = {
+        "$schema": "https://vega.github.io/schema/vega/v5.json",
+        "config": {"kibana": {"type": "map", "latitude": 20, "longitude": 0, "zoom": 2}},
+        "data": [{
+            "name": "places",
+            "url": {"index": pattern, "%context_query%": "@timestamp", "body": {
+                "size": 0,
+                "query": {"bool": {"must": ["%dashboard_context-must_clause%"] + query.get("must", []),
+                                   "filter": query.get("filter", []),
+                                   "must_not": ["%dashboard_context-must_not_clause%"] + query.get("must_not", [])}},
+                "aggs": {"countries": {"terms": {"field": "source.geo.country_name", "size": 50}, "aggs": {
+                    "cities": {"terms": {"field": "source.geo.city_name", "size": 100, "missing": "-"}, "aggs": {
+                        "where": {"geo_centroid": {"field": "source.geo.location"}}}}}}}}},
+            "format": {"property": "aggregations.countries.buckets"},
+            "transform": [
+                {"type": "flatten", "fields": ["cities.buckets"], "as": ["city"]},
+                {"type": "geopoint", "projection": "projection",
+                 "fields": ["city.where.location.lon", "city.where.location.lat"]}]}],
+        "scales": [{"name": "size", "type": "sqrt", "domain": {"data": "places", "field": "city.doc_count"},
+                    "range": [60, 1500]}],
+        # GeoIP gives some addresses a country and no city: these filter on the country
+        "signals": [{"name": "pick", "on": [{"events": "symbol:click", "update":
+            "datum.city.key == '-'"
+            " ? kibanaAddFilter({match_phrase: {'source.geo.country_name': datum.key}}, '%s')"
+            " : kibanaAddFilter({match_phrase: {'source.geo.city_name': datum.city.key}}, '%s')" % (pattern, pattern)}]}],
+        "marks": [{"type": "symbol", "from": {"data": "places"}, "encode": {"update": {
+            "x": {"field": "x"}, "y": {"field": "y"}, "size": {"scale": "size", "field": "city.doc_count"},
+            "fill": {"value": "#2e9e4f"}, "fillOpacity": {"value": 0.6},
+            "stroke": {"value": "#1b5e30"}, "cursor": {"value": "pointer"},
+            "tooltip": {"signal": "{title: datum.city.key == '-' ? datum.key : datum.city.key + ', ' + datum.key,"
+                                   " 'Logins': datum.city.doc_count}"}}}}]}
+    params = {"spec": json.dumps(spec, indent=2)}
+    return {"id": id, "type": "visualization",
+            "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
+                           "visState": json.dumps({"title": title, "type": "vega", "params": params, "aggs": []}),
+                           "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
+            "references": []}
+
+
 def search(id, title, pattern, query, columns):
     return {"id": id, "type": "search",
             "attributes": {"title": title, "description": "", "version": 1, "hits": 0,
@@ -235,6 +277,11 @@ AUTH = ("event.category:authentication"
         " and not (event.outcome:success and not wazuh.integration.name:ns8)")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
+# SUCCESS in DSL, for the Vega map: an ns8 success is always a real login
+SUCCESS_DSL = {"filter": [{"term": {"event.category": "authentication"}}, {"term": {"event.outcome": "success"}},
+                          {"term": {"wazuh.integration.name": "ns8"}}],
+               "must_not": [{"terms": {"process.executable": ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]}},
+                            {"terms": {"event.action": ["service-logon", "machine-logon"]}}]}
 # Only the login zone decoder writes a reason that starts so
 OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
@@ -254,7 +301,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 16, 12),
     # Apart from the failures: mixed in, the bots hide where the users log in from
-    (vis("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS, geo_map("Greens")), 24, 14),
+    (place_map("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS_DSL), 24, 14),
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 24, 14),
     (vis("ns8-logins-success-sources", "Successful logins by user and source", EVENTS, SUCCESS,
          table(terms("2", "user.name", "bucket", size=50, label="User"),
