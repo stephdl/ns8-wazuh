@@ -64,6 +64,10 @@ Run `configure-module` with:
 - `telegram_enabled`: turn the bot on (true/false). Off, no chat gets anything.
 - `telegram_admin_enabled`: send the findings summary to the admin chat (true/false).
 - `telegram_chat_id`: admin chat. A group ID like `-1001234567890`, a user ID or a public channel like `@name`.
+- `ntfy_enabled`: publish the summary of the new findings to an ntfy topic every 5 minutes (true/false). Needs a topic.
+- `ntfy_url`: ntfy server, `https://ntfy.sh` by default, or a self-hosted one.
+- `ntfy_topic`: topic that receives the summary.
+- `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it. The token is stored for the `ntfy_url` it came with: a new URL without a new token drops it, so it never goes to another server.
 
 Example:
 
@@ -357,6 +361,14 @@ Removing the token turns the bot off and clears every chat ID.
 ```
 api-cli run module/wazuh1/list-telegram-chats --data '{}'
 api-cli run module/wazuh1/test-telegram --data '{"chat_id":"-1001234567890"}'
+```
+
+### ntfy
+
+The same summary can go to an ntfy topic, at the same minimum level. Its priority follows the highest level in it: `critical` is urgent, `high` is high, `medium` is the default. A tap on it opens the dashboard. On ntfy.sh anybody who knows the topic can read it: pick a long name, or use a self-hosted server with a token. Check the settings with:
+
+```
+api-cli run module/wazuh1/test-ntfy --data '{"url":"https://ntfy.sh","topic":"wazuh-alerts"}'
 ```
 
 ## Host name and certificates

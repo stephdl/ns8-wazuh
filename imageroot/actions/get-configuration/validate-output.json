@@ -48,7 +48,11 @@
         "telegram_enabled",
         "telegram_admin_enabled",
         "telegram_chat_id",
-        "telegram_token_set"
+        "telegram_token_set",
+        "ntfy_enabled",
+        "ntfy_url",
+        "ntfy_topic",
+        "ntfy_token_set"
     ],
     "properties": {
         "host": {
@@ -167,6 +171,23 @@
             "type": "boolean",
             "title": "Smarthost enabled",
             "description": "The cluster smarthost is configured, so emails can be sent."
+        },
+        "ntfy_enabled": {
+            "type": "boolean",
+            "title": "ntfy notifications"
+        },
+        "ntfy_url": {
+            "type": "string",
+            "title": "ntfy server"
+        },
+        "ntfy_topic": {
+            "type": "string",
+            "title": "ntfy topic"
+        },
+        "ntfy_token_set": {
+            "type": "boolean",
+            "title": "ntfy access token set",
+            "description": "True when an access token is stored. The token itself is never returned."
         }
     }
 }
