@@ -409,6 +409,16 @@
                     />
                     <NsButton
                       type="button"
+                      v-if="ntfyTokenSet"
+                      kind="danger--tertiary"
+                      size="field"
+                      :disabled="stillLoading"
+                      @click="isShownRemoveNtfySecretModal = true"
+                      class="mg-bottom"
+                      >{{ $t("settings.ntfy_token_remove") }}</NsButton
+                    >
+                    <NsButton
+                      type="button"
                       kind="secondary"
                       size="field"
                       :loading="loading.testNtfy"
@@ -534,6 +544,29 @@
         $t("settings.telegram_remove_token")
       }}</template>
     </NsModal>
+    <NsModal
+      size="default"
+      kind="danger"
+      :visible="isShownRemoveNtfySecretModal"
+      :primary-button-disabled="loading.configureModule"
+      @modal-hidden="isShownRemoveNtfySecretModal = false"
+      @primary-click="removeNtfySecretConfirmed"
+    >
+      <template slot="title">{{
+        $t("settings.ntfy_token_remove_title")
+      }}</template>
+      <template slot="content">
+        <p>
+          {{ $t("settings.ntfy_token_remove_description") }}
+        </p>
+      </template>
+      <template slot="secondary-button">{{
+        core.$t("common.cancel")
+      }}</template>
+      <template slot="primary-button">{{
+        $t("settings.ntfy_token_remove")
+      }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
@@ -620,6 +653,8 @@ export default {
       ntfyTokenSet: false,
       ntfyTestSent: false,
       isShownRemoveTokenModal: false,
+      isShownRemoveNtfySecretModal: false,
+      removeNtfySecret: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
@@ -959,6 +994,7 @@ export default {
       this.ntfyTopic = config.ntfy_topic;
       this.ntfyTokenSet = config.ntfy_token_set;
       this.ntfyToken = "";
+      this.removeNtfySecret = false;
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -1087,7 +1123,11 @@ export default {
           isValidationOk = false;
         }
       }
-      if (this.ntfyToken && !NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
+      if (
+        this.ntfyEnabled &&
+        this.ntfyToken &&
+        !NTFY_TOKEN_PATTERN.test(this.ntfyToken)
+      ) {
         this.error.ntfy_token = "settings.ntfy_token_invalid";
         if (isValidationOk) {
           this.focusElement("ntfy_token");
@@ -1170,6 +1210,13 @@ export default {
       } else {
         this.error.testNtfy = result.message;
       }
+    },
+    removeNtfySecretConfirmed() {
+      this.isShownRemoveNtfySecretModal = false;
+      // ntfy goes on without a token: a server that lets anybody publish still takes the summaries
+      this.removeNtfySecret = true;
+      this.ntfyToken = "";
+      this.configureModule();
     },
     removeTelegramToken() {
       this.isShownRemoveTokenModal = false;
@@ -1254,8 +1301,10 @@ export default {
         data.export_token = "";
       }
       // Same for the bot token: turning Telegram off keeps it for later
-      if (this.ntfyToken) {
+      if (this.ntfyToken && NTFY_TOKEN_PATTERN.test(this.ntfyToken)) {
         data.ntfy_token = this.ntfyToken;
+      } else if (this.removeNtfySecret) {
+        data.ntfy_token = "";
       }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
