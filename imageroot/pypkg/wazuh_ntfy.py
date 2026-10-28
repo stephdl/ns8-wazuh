@@ -5,8 +5,10 @@
 
 # Messages to an ntfy server, ntfy.sh or a self-hosted one. The optional access token is a secret:
 # it stays in a file and goes only in the Authorization header, so no error raised here carries it.
+# It is stored with the server it was given for and goes to that server only: a changed URL drops it.
 
 import json
+import os
 import urllib.error
 import urllib.request
 
@@ -34,8 +36,26 @@ class NtfyError(Exception):
         return self.status in LASTING
 
 
-def token():
+def base_url(url):
+    return url.strip().rstrip("/")
+
+
+def token(url):
+    """The stored token if it was stored for this server, else empty."""
+    if wazuh_secrets.read(TOKEN_FILE, "NTFY_URL") != base_url(url):
+        return ""
     return wazuh_secrets.read(TOKEN_FILE, "NTFY_TOKEN")
+
+
+def save_token(value, url):
+    """Store a token for a server, or remove it when the value is empty."""
+    if not value:
+        wazuh_secrets.write(TOKEN_FILE, "NTFY_TOKEN", "")
+        return
+    os.makedirs(os.path.dirname(TOKEN_FILE), mode=0o700, exist_ok=True)
+    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(f"NTFY_TOKEN={value}\nNTFY_URL={base_url(url)}\n")
 
 
 def cut(text):

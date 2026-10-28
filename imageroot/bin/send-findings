@@ -318,7 +318,7 @@ def ntfy():
         return None
     # The title names the server, the priority follows the highest level, a tap opens the dashboard
     return lambda topic, subject, lines, level="medium": wazuh_ntfy.send(
-        url, wazuh_ntfy.token(), topic, subject, as_markdown(lines), level, f"https://{host}/")
+        url, wazuh_ntfy.token(url), topic, subject, as_markdown(lines), level, f"https://{host}/")
 
 
 def summary_level(document):
