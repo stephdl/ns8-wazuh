@@ -165,7 +165,7 @@
     "talk_secret_helper": "Gemeinsames Geheimnis des Bots, 40 bis 128 Zeichen. Der Nextcloud-Admin legt den Bot mit occ talk:bot:create an und richtet ihn in der Unterhaltung ein, siehe README.",
     "talk_secret_remove": "Geheimnis entfernen",
     "talk_secret_remove_title": "Geheimnis des Talk-Bots entfernen",
-    "talk_secret_remove_description": "Nextcloud Talk wird ausgeschaltet und das Geheimnis des Bots hier gelöscht. Um den Bot endgültig zu sperren, entfernen Sie ihn in Nextcloud mit occ talk:bot:remove.",
+    "talk_secret_remove_description": "Nextcloud Talk wird ausgeschaltet und das Geheimnis des Bots hier gelöscht. Um den Bot endgültig zu sperren, deinstallieren Sie ihn in Nextcloud mit occ talk:bot:uninstall.",
     "talk_secret_invalid": "Das Geheimnis hat 40 bis 128 druckbare Zeichen ohne Leerzeichen",
     "talk_secret_required": "Geben Sie das Bot-Geheimnis ein",
     "talk_test": "Testnachricht senden",
