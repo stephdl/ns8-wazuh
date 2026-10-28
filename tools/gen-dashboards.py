@@ -159,16 +159,17 @@ def markdown(id, title, text, new_tab=False):
 
 def place_map(id, title, pattern, query):
     """A circle per city with its name and country on hover, a click filters the city.
-    The tile map can only show coordinates. query is DSL: Vega does not read KQL."""
+    The tile map can only show coordinates. query is DSL: Vega does not read KQL.
+    %context_query% refuses a body.query, so the time range goes in as %timefilter%."""
     spec = {
         "$schema": "https://vega.github.io/schema/vega/v5.json",
         "config": {"kibana": {"type": "map", "latitude": 20, "longitude": 0, "zoom": 2}},
         "data": [{
             "name": "places",
-            "url": {"index": pattern, "%context_query%": "@timestamp", "body": {
+            "url": {"index": pattern, "body": {
                 "size": 0,
                 "query": {"bool": {"must": ["%dashboard_context-must_clause%"] + query.get("must", []),
-                                   "filter": query.get("filter", []),
+                                   "filter": [{"range": {"@timestamp": {"%timefilter%": True}}}] + query.get("filter", []),
                                    "must_not": ["%dashboard_context-must_not_clause%"] + query.get("must_not", [])}},
                 "aggs": {"countries": {"terms": {"field": "source.geo.country_name", "size": 50}, "aggs": {
                     "cities": {"terms": {"field": "source.geo.city_name", "size": 100, "missing": "-"}, "aggs": {
