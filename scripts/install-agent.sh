@@ -573,21 +573,24 @@ path = sys.argv[1]
 text = open(path).read()
 match = re.search(r"<localfile>(?:(?!</localfile>).)*?<location>/var/log/audit/audit\.log</location>.*?</localfile>",
                   text, re.S)
+# A Debian node has no auditd, so no audit log to filter
 if not match:
-    sys.exit(print("Warning: no audit log in the agent, nothing to filter", file=sys.stderr))
+    sys.exit(0)
 block = match.group(0)
 units = (r"backup[0-9]+|refresh-(module|volume|container)-metrics|refresh-node-info|dnf-makecache|logrotate"
          r"|password-warning|phonehome|fstrim|man-db-cache-update|systemd-hostnamed"
          r"|user@0|user-runtime-dir@0|fix-xdg-state@0")
-ignore = (r'<ignore type="PCRE2">^type=SERVICE_(START|STOP) msg=audit\([0-9.:]+\): pid=1 .*msg=' + "'"
+# auditd starts each line with node= when name_format is set
+ignore = (r'<ignore type="PCRE2">^(node=\S+ )?type=SERVICE_(START|STOP) msg=audit\([0-9.:]+\): pid=1 .*msg=' + "'"
           + f'unit=({units}) comm="systemd" exe="(/usr)?/lib/systemd/systemd" .*res=success' + "'</ignore>")
-# A new list replaces the one of a previous run
-block = re.sub(r"\s*<ignore type=\"PCRE2\">\^type=SERVICE_\(START\|STOP\).*?</ignore>", "", block)
+# A new list replaces the one of a previous run, an ignore added by hand stays
+block = re.sub(r"\s*<ignore type=\"PCRE2\">[^<]*unit=\(backup\[0-9\]\+\|[^<]*</ignore>", "", block)
 block = block.replace("</localfile>", f"  {ignore}\n  </localfile>")
 open(path, "w").write(text[:match.start()] + block + text[match.end():])
 print("NS8 node: the audit log skips the routine units.", file=sys.stderr)
 AUDIT
-    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the audit log setting, see ${CONFIG}"
+    # wazuh-agentd -t does not read the localfile blocks, a bad ignore would stop every log at the restart
+    "${INSTALL_DIR}/bin/wazuh-logcollector" -t >/dev/null 2>&1 || die "the agent refuses the audit log setting, see ${CONFIG}"
 }
 
 if [ "${UPDATE}" -eq 1 ]; then
