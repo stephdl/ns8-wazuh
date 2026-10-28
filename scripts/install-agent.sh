@@ -562,6 +562,34 @@ ROOTCHECK
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the rootcheck setting, see ${CONFIG}"
 }
 
+# The NS8 timers and root sessions start and stop about 730 units a day per node. Each becomes a Wazuh finding,
+# the native rule cannot be changed. Only a success by systemd is dropped: a failed or unknown unit stays in.
+setup_audit() {
+    is_ns8 || return 0
+    command -v python3 >/dev/null 2>&1 || { say "Warning: no python3, the audit log keeps its defaults"; return 0; }
+    python3 - "${CONFIG}" <<'AUDIT' || die "cannot set the audit log in ${CONFIG}"
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+match = re.search(r"<localfile>(?:(?!</localfile>).)*?<location>/var/log/audit/audit\.log</location>.*?</localfile>",
+                  text, re.S)
+if not match:
+    sys.exit(print("Warning: no audit log in the agent, nothing to filter", file=sys.stderr))
+block = match.group(0)
+units = (r"backup[0-9]+|refresh-(module|volume|container)-metrics|refresh-node-info|dnf-makecache|logrotate"
+         r"|password-warning|phonehome|fstrim|man-db-cache-update|systemd-hostnamed"
+         r"|user@0|user-runtime-dir@0|fix-xdg-state@0")
+ignore = (r'<ignore type="PCRE2">^type=SERVICE_(START|STOP) msg=audit\([0-9.:]+\): pid=1 .*msg=' + "'"
+          + f'unit=({units}) comm="systemd" exe="(/usr)?/lib/systemd/systemd" .*res=success' + "'</ignore>")
+# A new list replaces the one of a previous run
+block = re.sub(r"\s*<ignore type=\"PCRE2\">\^type=SERVICE_\(START\|STOP\).*?</ignore>", "", block)
+block = block.replace("</localfile>", f"  {ignore}\n  </localfile>")
+open(path, "w").write(text[:match.start()] + block + text[match.end():])
+print("NS8 node: the audit log skips the routine units.", file=sys.stderr)
+AUDIT
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the audit log setting, see ${CONFIG}"
+}
+
 if [ "${UPDATE}" -eq 1 ]; then
     [ -s "${INSTALL_DIR}/etc/client.keys" ] || die "the agent is not enrolled: install it with a token first"
     before="$(installed_version)"
@@ -571,6 +599,7 @@ if [ "${UPDATE}" -eq 1 ]; then
     setup_uptime
     setup_syscheck
     setup_rootcheck
+    setup_audit
     # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
     pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
     # The package keeps ossec.conf and the key, a restart loads the new binaries
@@ -641,6 +670,7 @@ setup_ns8_journal
 setup_uptime
 setup_syscheck
 setup_rootcheck
+setup_audit
 
 # Only root reads the token: the agent takes it at its first start and deletes it
 token_file="${INSTALL_DIR}/etc/enrollment_token"
