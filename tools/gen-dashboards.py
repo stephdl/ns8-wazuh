@@ -109,9 +109,9 @@ WORLD_COUNTRIES = {"name": "World Countries", "origin": "elastic_maps_service", 
                               {"type": "name", "name": "name", "description": "Name"}]}
 
 
-def geo_map(colors="Yellow to Red"):
+def geo_map():
     """Countries colored by count: the tooltip gives the country name, a circle map only its coordinates."""
-    params = {"addTooltip": True, "colorSchema": colors, "isDisplayWarning": False, "legendPosition": "bottomright",
+    params = {"addTooltip": True, "colorSchema": "Yellow to Red", "isDisplayWarning": False, "legendPosition": "bottomright",
               "mapZoom": 2, "mapCenter": [20, 0], "outlineWeight": 1, "showAllShapes": True, "emsHotLink": "",
               "layerChosenByUser": "default", "selectedLayer": WORLD_COUNTRIES,
               "selectedJoinField": WORLD_COUNTRIES["fields"][0],
@@ -153,6 +153,49 @@ def markdown(id, title, text, new_tab=False):
     return {"id": id, "type": "visualization",
             "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
                            "visState": json.dumps({"title": title, "type": "markdown", "params": params, "aggs": []}),
+                           "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
+            "references": []}
+
+
+def place_map(id, title, pattern, query):
+    """query is DSL: Vega does not read KQL. %context_query% refuses a body.query, hence %timefilter%."""
+    spec = {
+        "$schema": "https://vega.github.io/schema/vega/v5.json",
+        "config": {"kibana": {"type": "map", "latitude": 20, "longitude": 0, "zoom": 2}},
+        "data": [{
+            "name": "places",
+            "url": {"index": pattern, "body": {
+                "size": 0,
+                "query": {"bool": {"must": ["%dashboard_context-must_clause%"] + query.get("must", []),
+                                   "filter": [{"range": {"@timestamp": {"%timefilter%": True}}}] + query.get("filter", []),
+                                   "must_not": ["%dashboard_context-must_not_clause%"] + query.get("must_not", [])}},
+                "aggs": {"countries": {"terms": {"field": "source.geo.country_name", "size": 200}, "aggs": {
+                    "cities": {"terms": {"field": "source.geo.city_name", "size": 100, "missing": "-"}, "aggs": {
+                        "where": {"geo_centroid": {"field": "source.geo.location"}}}}}}}}},
+            "format": {"property": "aggregations.countries.buckets"},
+            "transform": [
+                {"type": "flatten", "fields": ["cities.buckets"], "as": ["city"]},
+                # geo_centroid has no location when no login of the city has coordinates
+                {"type": "filter", "expr": "datum.city.where.location"},
+                {"type": "geopoint", "projection": "projection",
+                 "fields": ["city.where.location.lon", "city.where.location.lat"]}]}],
+        "scales": [{"name": "size", "type": "sqrt", "domain": {"data": "places", "field": "city.doc_count"},
+                    "range": [60, 1500]}],
+        # A city name exists in several countries. GeoIP gives some addresses a country and no city.
+        "signals": [{"name": "pick", "on": [{"events": "symbol:click", "update":
+            "opensearchDashboardsAddFilter({bool: {filter: [{match_phrase: {'source.geo.country_name': datum.key}},"
+            " datum.city.key == '-' ? {bool: {must_not: {exists: {field: 'source.geo.city_name'}}}}"
+            " : {match_phrase: {'source.geo.city_name': datum.city.key}}]}}, '%s')" % pattern}]}],
+        "marks": [{"type": "symbol", "from": {"data": "places"}, "encode": {"update": {
+            "x": {"field": "x"}, "y": {"field": "y"}, "size": {"scale": "size", "field": "city.doc_count"},
+            "fill": {"value": "#2e9e4f"}, "fillOpacity": {"value": 0.6},
+            "stroke": {"value": "#1b5e30"}, "cursor": {"value": "pointer"},
+            "tooltip": {"signal": "{title: datum.city.key == '-' ? datum.key : datum.city.key + ', ' + datum.key,"
+                                   " 'Logins': datum.city.doc_count}"}}}}]}
+    params = {"spec": json.dumps(spec, indent=2)}
+    return {"id": id, "type": "visualization",
+            "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
+                           "visState": json.dumps({"title": title, "type": "vega", "params": params, "aggs": []}),
                            "kibanaSavedObjectMeta": {"searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""}, "filter": []})}},
             "references": []}
 
@@ -227,14 +270,20 @@ def write(name, objects):
 
 
 # The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
+CRON = ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]
+# The samba service account and the computers log in every few minutes: their failures stay
+MACHINE = ["service-logon", "machine-logon"]
 AUTH = ("event.category:authentication"
-        " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")"
-        # The samba service account and the computers log in every few minutes: their failures stay
-        " and not event.action:(service-logon or machine-logon)"
+        " and not process.executable:(" + " or ".join(f'"{e}"' for e in CRON) + ")"
+        " and not event.action:(" + " or ".join(MACHINE) + ")"
         # Upstream system-auth counts sshd disconnections before login as successes, ns8 reads every real one
         " and not (event.outcome:success and not wazuh.integration.name:ns8)")
 FAIL = f"{AUTH} and event.outcome:failure"
 SUCCESS = f"{AUTH} and event.outcome:success"
+# SUCCESS in DSL, for the Vega map: an ns8 success is always a real login
+SUCCESS_DSL = {"filter": [{"term": {"event.category": "authentication"}}, {"term": {"event.outcome": "success"}},
+                          {"term": {"wazuh.integration.name": "ns8"}}],
+               "must_not": [{"terms": {"process.executable": CRON}}, {"terms": {"event.action": MACHINE}}]}
 # Only the login zone decoder writes a reason that starts so
 OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
@@ -254,7 +303,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 16, 12),
     # Apart from the failures: mixed in, the bots hide where the users log in from
-    (vis("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS, geo_map("Greens")), 24, 14),
+    (place_map("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS_DSL), 24, 14),
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 24, 14),
     (vis("ns8-logins-success-sources", "Successful logins by user and source", EVENTS, SUCCESS,
          table(terms("2", "user.name", "bucket", size=50, label="User"),
