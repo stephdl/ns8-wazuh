@@ -391,6 +391,16 @@
                       class="mg-bottom"
                       ref="mattermost_webhook"
                     />
+                    <NsButton
+                      type="button"
+                      v-if="mattermostWebhookSet"
+                      kind="danger--tertiary"
+                      size="field"
+                      :disabled="stillLoading"
+                      @click="isShownRemoveMattermostSecretModal = true"
+                      class="mg-bottom"
+                      >{{ $t("settings.mattermost_webhook_remove") }}</NsButton
+                    >
                     <NsTextInput
                       v-model.trim="mattermostChannel"
                       :label="$t('settings.mattermost_channel')"
@@ -537,6 +547,29 @@
         $t("settings.telegram_remove_token")
       }}</template>
     </NsModal>
+    <NsModal
+      size="default"
+      kind="danger"
+      :visible="isShownRemoveMattermostSecretModal"
+      :primary-button-disabled="loading.configureModule"
+      @modal-hidden="isShownRemoveMattermostSecretModal = false"
+      @primary-click="removeMattermostSecretConfirmed"
+    >
+      <template slot="title">{{
+        $t("settings.mattermost_webhook_remove_title")
+      }}</template>
+      <template slot="content">
+        <p>
+          {{ $t("settings.mattermost_webhook_remove_description") }}
+        </p>
+      </template>
+      <template slot="secondary-button">{{
+        core.$t("common.cancel")
+      }}</template>
+      <template slot="primary-button">{{
+        $t("settings.mattermost_webhook_remove")
+      }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
@@ -623,6 +656,8 @@ export default {
       mattermostUsername: "",
       mattermostTestSent: false,
       isShownRemoveTokenModal: false,
+      isShownRemoveMattermostSecretModal: false,
+      removeMattermostSecret: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
@@ -960,6 +995,7 @@ export default {
       this.mattermostEnabled = config.mattermost_enabled;
       this.mattermostWebhookSet = config.mattermost_webhook_set;
       this.mattermostWebhook = "";
+      this.removeMattermostSecret = false;
       this.mattermostChannel = config.mattermost_channel;
       this.mattermostUsername = config.mattermost_username;
 
@@ -1193,6 +1229,14 @@ export default {
         this.error.testMattermost = result.message;
       }
     },
+    removeMattermostSecretConfirmed() {
+      this.isShownRemoveMattermostSecretModal = false;
+      // Without it nothing could be sent: the switch goes off with it
+      this.removeMattermostSecret = true;
+      this.mattermostEnabled = false;
+      this.mattermostWebhook = "";
+      this.configureModule();
+    },
     removeTelegramToken() {
       this.isShownRemoveTokenModal = false;
       // Without a token nothing could be sent: the bot switch goes off with it
@@ -1280,8 +1324,13 @@ export default {
         data.export_token = "";
       }
       // Same for the other secrets: turning a channel off keeps them for later
-      if (this.mattermostWebhook) {
+      if (
+        this.mattermostWebhook &&
+        MATTERMOST_WEBHOOK_PATTERN.test(this.mattermostWebhook)
+      ) {
         data.mattermost_webhook = this.mattermostWebhook;
+      } else if (this.removeMattermostSecret) {
+        data.mattermost_webhook = "";
       }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
