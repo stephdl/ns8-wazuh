@@ -120,11 +120,11 @@ def geo_map(colors="Yellow to Red"):
     return "region_map", params, aggs
 
 
-def point_map(colors="Greens", zoom=4, center=(46, 2)):
+def point_map(colors="Greens"):
     """A circle per place: a country shape would also color its overseas territories."""
     params = {"colorSchema": colors, "mapType": "Scaled Circle Markers", "isDesaturated": True,
               "addTooltip": True, "heatClusterSize": 1.5, "legendPosition": "bottomright",
-              "mapZoom": zoom, "mapCenter": list(center),
+              "mapZoom": 2, "mapCenter": [20, 0],
               "wms": {"enabled": False, "options": {"format": "image/png", "transparent": True}}}
     aggs = [count(), {"id": "2", "enabled": True, "type": "geohash_grid", "schema": "segment",
                       "params": {"field": "source.geo.location", "autoPrecision": True, "precision": 4,
