@@ -120,6 +120,18 @@ def geo_map(colors="Yellow to Red"):
     return "region_map", params, aggs
 
 
+def point_map(colors="Greens", zoom=4, center=(46, 2)):
+    """A circle per place: a country shape would also color its overseas territories."""
+    params = {"colorSchema": colors, "mapType": "Scaled Circle Markers", "isDesaturated": True,
+              "addTooltip": True, "heatClusterSize": 1.5, "legendPosition": "bottomright",
+              "mapZoom": zoom, "mapCenter": list(center),
+              "wms": {"enabled": False, "options": {"format": "image/png", "transparent": True}}}
+    aggs = [count(), {"id": "2", "enabled": True, "type": "geohash_grid", "schema": "segment",
+                      "params": {"field": "source.geo.location", "autoPrecision": True, "precision": 4,
+                                 "useGeocentroid": True, "isFilteredByCollar": True}}]
+    return "tile_map", params, aggs
+
+
 def status_classes(id="3"):
     """Status classes named in words: a range aggregation sends its labels to the indexer, which refuses them."""
     classes = [("OK", "< 300"), ("Redirect or cache", ">= 300 and http.response.status_code < 400"),
@@ -140,7 +152,7 @@ def index_ref(pattern):
 
 def vis(id, title, pattern, query, spec):
     kind, params, aggs = spec
-    params = dict(params, type=params.get("type", kind)) if kind not in ("table", "region_map") else params
+    params = dict(params, type=params.get("type", kind)) if kind not in ("table", "region_map", "tile_map") else params
     return {"id": id, "type": "visualization",
             "attributes": {"title": title, "description": "", "version": 1, "uiStateJSON": "{}",
                            "visState": json.dumps({"title": title, "type": kind, "params": params, "aggs": aggs}),
@@ -254,7 +266,7 @@ write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
                terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True))), 16, 12),
     # Apart from the failures: mixed in, the bots hide where the users log in from
-    (vis("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS, geo_map("Greens")), 24, 14),
+    (vis("ns8-logins-success-map", "Successful logins map", EVENTS, SUCCESS, point_map()), 24, 14),
     (vis("ns8-logins-map", "Failed logins map", EVENTS, FAIL, geo_map()), 24, 14),
     (vis("ns8-logins-success-sources", "Successful logins by user and source", EVENTS, SUCCESS,
          table(terms("2", "user.name", "bucket", size=50, label="User"),
