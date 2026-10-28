@@ -137,6 +137,8 @@ Rootcheck skips the container images on an NS8 node: their layers hold world-wri
 
 File integrity skips `/etc/pki/ca-trust/extracted/pem/directory-hash`. A ca-certificates update rewrites every file there. The CA bundles stay watched. `--update` sets it on agents installed before.
 
+The audit log skips the routine starts and stops of an NS8 node: the backup and metrics timers, dnf-makecache, logrotate and the root sessions. They made about 730 findings a day per node. Only a success by systemd is skipped: a failed unit, sshd, firewalld or any other unit stays in. `--update` sets it on agents installed before.
+
 ### Uptime
 
 The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/ossec/bin/ns8-uptime` at start and then every hour. It sends the uptime and the boot time. NS8 - Fleet shows the uptime in days and the last boot of each server. `--update` adds it to agents installed before.
