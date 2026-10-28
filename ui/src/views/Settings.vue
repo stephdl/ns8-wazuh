@@ -409,6 +409,16 @@
                     />
                     <NsButton
                       type="button"
+                      v-if="talkSecretSet"
+                      kind="danger--tertiary"
+                      size="field"
+                      :disabled="stillLoading"
+                      @click="isShownRemoveTalkSecretModal = true"
+                      class="mg-bottom"
+                      >{{ $t("settings.talk_secret_remove") }}</NsButton
+                    >
+                    <NsButton
+                      type="button"
                       kind="secondary"
                       size="field"
                       :loading="loading.testTalk"
@@ -534,6 +544,29 @@
         $t("settings.telegram_remove_token")
       }}</template>
     </NsModal>
+    <NsModal
+      size="default"
+      kind="danger"
+      :visible="isShownRemoveTalkSecretModal"
+      :primary-button-disabled="loading.configureModule"
+      @modal-hidden="isShownRemoveTalkSecretModal = false"
+      @primary-click="removeTalkSecretConfirmed"
+    >
+      <template slot="title">{{
+        $t("settings.talk_secret_remove_title")
+      }}</template>
+      <template slot="content">
+        <p>
+          {{ $t("settings.talk_secret_remove_description") }}
+        </p>
+      </template>
+      <template slot="secondary-button">{{
+        core.$t("common.cancel")
+      }}</template>
+      <template slot="primary-button">{{
+        $t("settings.talk_secret_remove")
+      }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
@@ -620,6 +653,8 @@ export default {
       talkSecretSet: false,
       talkTestSent: false,
       isShownRemoveTokenModal: false,
+      isShownRemoveTalkSecretModal: false,
+      removeTalkSecret: false,
       loading: {
         getConfiguration: false,
         configureModule: false,
@@ -959,6 +994,7 @@ export default {
       this.talkConversation = config.talk_conversation;
       this.talkSecretSet = config.talk_secret_set;
       this.talkSecret = "";
+      this.removeTalkSecret = false;
 
       // Show the advanced options when one of them is in use
       this.isAdvancedOpen =
@@ -1191,6 +1227,14 @@ export default {
         this.error.testTalk = result.message;
       }
     },
+    removeTalkSecretConfirmed() {
+      this.isShownRemoveTalkSecretModal = false;
+      // Without it nothing could be sent: the switch goes off with it
+      this.removeTalkSecret = true;
+      this.talkEnabled = false;
+      this.talkSecret = "";
+      this.configureModule();
+    },
     removeTelegramToken() {
       this.isShownRemoveTokenModal = false;
       // Without a token nothing could be sent: the bot switch goes off with it
@@ -1272,8 +1316,10 @@ export default {
         data.export_token = "";
       }
       // Same for the other secrets: turning a channel off keeps them for later
-      if (this.talkSecret) {
+      if (this.talkSecret && TALK_SECRET_PATTERN.test(this.talkSecret)) {
         data.talk_secret = this.talkSecret;
+      } else if (this.removeTalkSecret) {
+        data.talk_secret = "";
       }
       if (this.telegramToken) {
         data.telegram_token = this.telegramToken;
