@@ -697,14 +697,8 @@ export default {
         this.compareVersions(agent.version, this.managerVersion) < 0
       );
     },
-    // The agent runs the right Wazuh version, but an older install script set it up.
-    // An agent with no marker predates it, or has not reported its configuration yet.
     isSetupOutdated(agent) {
-      return (
-        !!this.expectedSetup &&
-        !!agent.version &&
-        agent.setup !== this.expectedSetup
-      );
+      return !!agent.setup_outdated;
     },
     // Versions look like "v5.0.0": compare them number by number
     compareVersions(a, b) {

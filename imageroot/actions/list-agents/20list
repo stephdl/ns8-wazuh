@@ -13,7 +13,7 @@ import sys
 import agent
 from wazuh_api import api, manager_api
 
-FIELDS = "id,name,ip,registerIP,status,version,os.name,os.version,lastKeepAlive,dateAdd,group"
+FIELDS = "id,name,ip,registerIP,status,version,os.name,os.platform,os.version,lastKeepAlive,dateAdd,group"
 
 PAGE = 500
 
@@ -41,16 +41,34 @@ def expected_setup():
 # Each agent reports its configuration to the indexer at its start and every hour,
 # the install script leaves its AGENT_SETUP there as the alias of a command
 def agent_setups():
-    answer = api("GET", "wazuh-agent-config/_search?size=10000"
-                 "&_source=wazuh.agent.configuration.content.logcollector.localfile.alias")
+    answer = api("GET", "wazuh-agent-config/_search?size=10000&_source=wazuh.agent.id,"
+                 "wazuh.agent.configuration.content.logcollector.localfile.alias")
+    if "error" in answer:
+        # No agent reported its configuration yet on a new server
+        if answer["error"].get("type") == "index_not_found_exception":
+            return {}
+        raise RuntimeError(answer["error"].get("reason") or answer["error"])
     setups = {}
     for hit in answer.get("hits", {}).get("hits", []):
-        content = hit["_source"].get("wazuh", {}).get("agent", {}).get("configuration", {}).get("content", {})
+        wazuh_agent = hit["_source"].get("wazuh", {}).get("agent", {})
+        content = wazuh_agent.get("configuration", {}).get("content", {})
         for localfile in content.get("logcollector", {}).get("localfile", []):
             alias = localfile.get("alias", "")
             if alias.startswith("ns8-setup:"):
-                setups[hit["_id"]] = alias.partition(":")[2]
+                setups[wazuh_agent.get("id") or hit["_id"]] = alias.partition(":")[2]
     return setups
+
+
+def version_tuple(version):
+    return tuple(int(part) for part in re.findall(r"\d+", version))
+
+
+# Only the Linux agents run the install script: Windows and macOS are installed by hand
+def is_setup_outdated(item, setup):
+    platform = (item.get("os") or {}).get("platform", "")
+    if setups is None or not expected or not item.get("version") or platform in ("windows", "darwin"):
+        return False
+    return not setup or version_tuple(setup) < version_tuple(expected)
 
 
 # The image tag names the script of this module, a branch build falls back to main
@@ -59,12 +77,13 @@ def script_ref():
     return tag if re.fullmatch(r"\d+\.\d+\.\d+(-[\w.]+)?", tag) else "main"
 
 
+expected = expected_setup()
 try:
     setups = agent_setups()
 except RuntimeError as error:
-    # The tags of the setup are lost, the list of the agents stays
+    # Unknown is not outdated: no agent gets the tag, the list of the agents stays
     print(agent.SD_WARNING + f"cannot read the agent configurations: {error}", file=sys.stderr)
-    setups = {}
+    setups = None
 
 agents = []
 for item in items:
@@ -80,7 +99,8 @@ for item in items:
         "last_keep_alive": item.get("lastKeepAlive", ""),
         "date_add": item.get("dateAdd", ""),
         "groups": item.get("group") or [],
-        "setup": setups.get(item["id"], ""),
+        "setup": (setups or {}).get(item["id"], ""),
+        "setup_outdated": is_setup_outdated(item, (setups or {}).get(item["id"], "")),
     })
 
 # Older managers listed themselves with the id 000: it is not an agent
@@ -92,6 +112,6 @@ json.dump({
     "manager_version": f"v{api_version}" if api_version else "",
     # The install script takes the tag of the image, the package versions differ (5.0.0-rc1 is 5.0.0-1)
     "package_version": os.environ.get("WAZUH_MANAGER_IMAGE", "").rpartition(":")[2],
-    "setup": expected_setup(),
+    "setup": expected,
     "script_ref": script_ref(),
 }, fp=sys.stdout)

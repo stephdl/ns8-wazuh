@@ -18,7 +18,8 @@
                     "groups": [
                         "default"
                     ],
-                    "setup": "1.2.0"
+                    "setup": "1.2.0",
+                    "setup_outdated": false
                 }
             ],
             "manager_version": "v5.0.0",
@@ -76,6 +77,10 @@
                     "setup": {
                         "type": "string",
                         "description": "AGENT_SETUP of the install script that last ran on the agent, empty when unknown"
+                    },
+                    "setup_outdated": {
+                        "type": "boolean",
+                        "description": "A Linux agent set up by an older install script, or with no setup marker"
                     }
                 }
             }
