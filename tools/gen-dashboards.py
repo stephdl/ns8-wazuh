@@ -110,7 +110,7 @@ WORLD_COUNTRIES = {"name": "World Countries", "origin": "elastic_maps_service", 
 
 
 def geo_map(colors="Yellow to Red"):
-    """Countries colored by count: the tooltip gives the country name, a circle map only its coordinates."""
+    """Countries colored by count, the tooltip gives the country name. A country shape holds its overseas territories."""
     params = {"addTooltip": True, "colorSchema": colors, "isDisplayWarning": False, "legendPosition": "bottomright",
               "mapZoom": 2, "mapCenter": [20, 0], "outlineWeight": 1, "showAllShapes": True, "emsHotLink": "",
               "layerChosenByUser": "default", "selectedLayer": WORLD_COUNTRIES,
@@ -120,10 +120,10 @@ def geo_map(colors="Yellow to Red"):
     return "region_map", params, aggs
 
 
-def point_map(colors="Greens"):
-    """A circle per place: a country shape would also color its overseas territories."""
-    params = {"colorSchema": colors, "mapType": "Scaled Circle Markers", "isDesaturated": True,
-              "addTooltip": True, "heatClusterSize": 1.5, "legendPosition": "bottomright",
+def point_map():
+    """A circle per place, so only the real places show. The tooltip gives coordinates, the tables give the city."""
+    params = {"colorSchema": "Greens", "mapType": "Scaled Circle Markers", "isDesaturated": True,
+              "addTooltip": True, "legendPosition": "bottomright",
               "mapZoom": 2, "mapCenter": [20, 0],
               "wms": {"enabled": False, "options": {"format": "image/png", "transparent": True}}}
     aggs = [count(), {"id": "2", "enabled": True, "type": "geohash_grid", "schema": "segment",

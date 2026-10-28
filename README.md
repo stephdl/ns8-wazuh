@@ -257,7 +257,7 @@ Ten dashboards, under Explore > Dashboards:
 
 Log tables load the 10000 newest lines, 50 per page. Narrow the time range to see older lines. The limit is `discover:sampleSize` in Advanced settings.
 
-Countries and cities come from GeoIP, for public addresses only. The maps need Internet access in the browser. Logins, Web, CrowdSec and Telephony have a Country picker. To hide one country, pick it, click its filter and choose Exclude results.
+Countries and cities come from GeoIP, for public addresses only. The maps need Internet access in the browser. Logins, Web, CrowdSec and Telephony have a Country picker. To hide one country, pick it, click its filter and choose Exclude results. The Successful logins map shows a circle per place: a click on a circle filters an area, not a country.
 
 The dashboards are reloaded at each configuration and update. A change made in the interface is lost: clone a dashboard before you edit it.
 
