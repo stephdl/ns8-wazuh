@@ -10,6 +10,7 @@ import json
 import urllib.error
 import urllib.request
 
+import wazuh_http
 import wazuh_secrets
 
 WEBHOOK_FILE = "secrets/mattermost.env"
@@ -46,7 +47,9 @@ def webhook():
 def cut(text):
     if len(text) <= LIMIT:
         return text
-    return text[:text.rfind("\n", 0, LIMIT)] + "\n\n… more in the dashboard."
+    # At the last line break below the limit, or at the limit when one line is longer
+    end = text.rfind("\n", 0, LIMIT)
+    return text[:end if end > 0 else LIMIT] + "\n\n… more in the dashboard."
 
 
 def send(url, title, text, level="medium", link="", channel="", username="", timeout=30):
@@ -64,8 +67,7 @@ def send(url, title, text, level="medium", link="", channel="", username="", tim
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
                                      headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout):
-            pass
+        wazuh_http.send(request, timeout)
     except urllib.error.HTTPError as error:
         try:
             body = json.load(error)
