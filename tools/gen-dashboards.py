@@ -184,8 +184,8 @@ def place_map(id, title, pattern, query):
         # GeoIP gives some addresses a country and no city: these filter on the country
         "signals": [{"name": "pick", "on": [{"events": "symbol:click", "update":
             "datum.city.key == '-'"
-            " ? kibanaAddFilter({match_phrase: {'source.geo.country_name': datum.key}}, '%s')"
-            " : kibanaAddFilter({match_phrase: {'source.geo.city_name': datum.city.key}}, '%s')" % (pattern, pattern)}]}],
+            " ? opensearchDashboardsAddFilter({match_phrase: {'source.geo.country_name': datum.key}}, '%s')"
+            " : opensearchDashboardsAddFilter({match_phrase: {'source.geo.city_name': datum.city.key}}, '%s')" % (pattern, pattern)}]}],
         "marks": [{"type": "symbol", "from": {"data": "places"}, "encode": {"update": {
             "x": {"field": "x"}, "y": {"field": "y"}, "size": {"scale": "size", "field": "city.doc_count"},
             "fill": {"value": "#2e9e4f"}, "fillOpacity": {"value": 0.6},
