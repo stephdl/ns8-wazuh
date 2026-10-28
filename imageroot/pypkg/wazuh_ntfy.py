@@ -10,10 +10,11 @@ import json
 import urllib.error
 import urllib.request
 
+import wazuh_http
 import wazuh_secrets
 
 TOKEN_FILE = "secrets/ntfy.env"
-# ntfy turns a longer message into an attachment: the text is cut before, the rest is in the dashboard
+# ntfy turns a message over 4096 bytes into an attachment: the text is cut before, the rest is in the dashboard
 LIMIT = 4000
 # The finding levels as ntfy priorities: 5 is the urgent one, 3 the default
 PRIORITIES = {"critical": 5, "high": 4, "medium": 3, "low": 2, "informational": 1}
@@ -38,9 +39,14 @@ def token():
 
 
 def cut(text):
-    if len(text) <= LIMIT:
+    data = text.encode()
+    if len(data) <= LIMIT:
         return text
-    return text[:text.rfind("\n", 0, LIMIT)] + "\n\n… more in the dashboard."
+    # ntfy counts bytes: an umlaut takes two. At the last line break below the limit, or at the limit
+    # when one line is longer, never inside a character
+    head = data[:LIMIT].decode(errors="ignore")
+    end = head.rfind("\n")
+    return head[:end if end > 0 else len(head)] + "\n\n… more in the dashboard."
 
 
 def send(url, access_token, topic, title, text, level="medium", click="", timeout=30):
@@ -55,8 +61,7 @@ def send(url, access_token, topic, title, text, level="medium", click="", timeou
     if access_token:
         request.add_header("Authorization", f"Bearer {access_token}")
     try:
-        with urllib.request.urlopen(request, timeout=timeout):
-            pass
+        wazuh_http.send(request, timeout)
     except urllib.error.HTTPError as error:
         try:
             body = json.load(error)
