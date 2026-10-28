@@ -604,8 +604,10 @@ setup_hardening() {
     # remote_conf is an internal option since 5.0, and this file survives the package updates
     sed -i '/^agent\.remote_conf=/d' "${options}"
     printf 'agent.remote_conf=0\n' >> "${options}"
-    # Older blocks of a previous run or of the package are replaced by the ones of this run
-    sed -i '/<active-response>/,/<\/active-response>/d; /<agent-upgrade>/,/<\/agent-upgrade>/d' "${CONFIG}"
+    # Older blocks of a previous run or of the package are replaced by the ones of this run.
+    # A block on one line goes first: a range would start there and run to the next closing tag.
+    sed -i -e '/<active-response>.*<\/active-response>/d; /<active-response>/,/<\/active-response>/d' \
+        -e '/<agent-upgrade>.*<\/agent-upgrade>/d; /<agent-upgrade>/,/<\/agent-upgrade>/d' "${CONFIG}"
     append_block '  <active-response>\n    <disabled>yes</disabled>\n  </active-response>'
     append_block '  <agent-upgrade>\n    <enabled>no</enabled>\n  </agent-upgrade>'
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the hardening, see ${CONFIG}"
@@ -614,8 +616,9 @@ setup_hardening() {
 # The module reads this alias in the configuration the agent reports, and compares it with its own AGENT_SETUP.
 # true prints nothing, so the command sends no event. Written last, once every setting above is in place.
 setup_marker() {
-    sed -i '/<localfile>/{:a;N;/<\/localfile>/!ba;/<alias>ns8-setup:/d}' "${CONFIG}"
-    append_block "  <localfile>\n    <log_format>command</log_format>\n    <command>/bin/true</command>\n    <alias>ns8-setup:${AGENT_SETUP}</alias>\n    <frequency>86400</frequency>\n  </localfile>"
+    # The comments delimit the block of this script, the other localfile blocks stay untouched
+    sed -i '/<!-- ns8-setup -->/,/<!-- \/ns8-setup -->/d' "${CONFIG}"
+    append_block "  <!-- ns8-setup -->\n  <localfile>\n    <log_format>command</log_format>\n    <command>/bin/true</command>\n    <alias>ns8-setup:${AGENT_SETUP}</alias>\n    <frequency>86400</frequency>\n  </localfile>\n  <!-- /ns8-setup -->"
     "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the setup marker, see ${CONFIG}"
 }
 

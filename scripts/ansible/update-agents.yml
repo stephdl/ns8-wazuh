@@ -32,4 +32,4 @@
 
     - name: Show the result
       ansible.builtin.debug:
-        msg: "{{ update.stderr_lines | last }}"
+        msg: "{{ update.stderr_lines | default([''], true) | last }}"
