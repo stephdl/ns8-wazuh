@@ -17,11 +17,14 @@
                     "date_add": "2026-10-08T15:10:00+00:00",
                     "groups": [
                         "default"
-                    ]
+                    ],
+                    "setup": "1.2.0"
                 }
             ],
             "manager_version": "v5.0.0",
-            "package_version": "5.0.0-rc1"
+            "package_version": "5.0.0-rc1",
+            "setup": "1.2.0",
+            "script_ref": "1.2.0"
         }
     ],
     "type": "object",
@@ -69,6 +72,10 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "setup": {
+                        "type": "string",
+                        "description": "AGENT_SETUP of the install script that last ran on the agent, empty when unknown"
                     }
                 }
             }
@@ -82,6 +89,16 @@
             "type": "string",
             "title": "Package version",
             "description": "Version to pass to the install script to update an agent"
+        },
+        "setup": {
+            "type": "string",
+            "title": "Agent setup",
+            "description": "AGENT_SETUP of the install script shipped with this module"
+        },
+        "script_ref": {
+            "type": "string",
+            "title": "Script reference",
+            "description": "Git tag or branch of the install script to download"
         }
     }
 }

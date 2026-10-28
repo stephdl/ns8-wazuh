@@ -53,6 +53,8 @@ buildah run \
 
 # Add imageroot directory to the container image
 buildah add "${container}" imageroot /imageroot
+# list-agents reads AGENT_SETUP in it, to find the agents set up by an older script
+buildah add "${container}" scripts/install-agent.sh /imageroot/etc/install-agent.sh
 buildah add "${container}" ui/dist /ui
 
 buildah config --entrypoint=/ \

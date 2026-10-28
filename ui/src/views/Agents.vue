@@ -109,6 +109,12 @@
                             kind="warm-gray"
                             size="sm"
                           />
+                          <NsTag
+                            v-else-if="isSetupOutdated(row)"
+                            :label="$t('agents.setup_outdated')"
+                            kind="warm-gray"
+                            size="sm"
+                          />
                         </cv-data-table-cell>
                         <cv-data-table-cell>{{
                           row.os || "-"
@@ -122,7 +128,9 @@
                             class="table-overflow-menu"
                           >
                             <cv-overflow-menu-item
-                              :disabled="!isOutdated(row)"
+                              :disabled="
+                                !isOutdated(row) && !isSetupOutdated(row)
+                              "
                               @click="showUpdateModal(row)"
                             >
                               <NsMenuItem
@@ -314,11 +322,23 @@
       <template slot="title">{{ $t("agents.update_title") }}</template>
       <template slot="content">
         <p class="mg-bottom">
-          {{
+          <template v-if="agentToUpdate && isOutdated(agentToUpdate)">{{
             $t("agents.update_description", {
-              name: agentToUpdate ? agentToUpdate.name : "",
-              from: agentToUpdate ? agentToUpdate.version : "",
+              name: agentToUpdate.name,
+              from: agentToUpdate.version,
               to: managerVersion,
+            })
+          }}</template>
+          <template v-else-if="agentToUpdate">{{
+            $t("agents.update_setup_description", {
+              name: agentToUpdate.name,
+              from: agentToUpdate.setup || $t("agents.setup_unknown"),
+              to: expectedSetup,
+            })
+          }}</template>
+          {{
+            $t("agents.update_run", {
+              name: agentToUpdate ? agentToUpdate.name : "",
             })
           }}
         </p>
@@ -329,8 +349,17 @@
           :moreText="$t('agents.show_more')"
           :lessText="$t('agents.show_less')"
           :wrapText="true"
+          class="mg-bottom"
           >{{ updateCommand }}</NsCodeSnippet
         >
+        <NsInlineNotification
+          kind="info"
+          :title="$t('agents.update_many_title')"
+          :description="$t('agents.update_many')"
+          :actionLabel="$t('agents.update_doc')"
+          @action="openUrl(updateDocUrl)"
+          :showCloseButton="false"
+        />
       </template>
       <template slot="secondary-button">{{ core.$t("common.close") }}</template>
     </NsModal>
@@ -415,9 +444,9 @@ import {
   PageTitleService,
 } from "@nethserver/ns8-ui-lib";
 
-// Public place of the enrollment script of the module
+// Public place of the enrollment script of the module, at a tag or a branch
 const AGENT_SCRIPT_URL =
-  "https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh";
+  "https://raw.githubusercontent.com/stephdl/ns8-wazuh/{ref}/scripts/install-agent.sh";
 
 export default {
   name: "Agents",
@@ -451,6 +480,8 @@ export default {
       maxUses: "1",
       readmeUrl:
         "https://github.com/stephdl/ns8-wazuh/blob/main/README.md#add-an-agent",
+      updateDocUrl:
+        "https://github.com/stephdl/ns8-wazuh/blob/main/README.md#agent-updates",
       wazuhAgentDocUrl:
         "https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html",
       customer: "",
@@ -464,6 +495,9 @@ export default {
       moveModalCount: 0,
       managerVersion: "",
       packageVersion: "",
+      expectedSetup: "",
+      // Same script as the module, a branch build gets main
+      scriptRef: "main",
       // Until the module is configured the manager is down and cannot list agents
       configured: true,
       loading: {
@@ -518,14 +552,17 @@ export default {
         options.push(`--name ${this.result.agentName}`);
       }
       const args = options.length ? ` -s -- ${options.join(" ")}` : "";
-      return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo WAZUH_ENROLLMENT_TOKEN='${this.result.token}' bash${args}`;
+      return `curl -fsSL ${this.scriptUrl} | sudo WAZUH_ENROLLMENT_TOKEN='${this.result.token}' bash${args}`;
     },
     // A name only fits a token for one server: the manager refuses two agents with the same name
     agentNameToSend() {
       return this.maxUses === "1" ? this.agentName : "";
     },
+    scriptUrl() {
+      return AGENT_SCRIPT_URL.replace("{ref}", this.scriptRef);
+    },
     updateCommand() {
-      return `curl -fsSL ${AGENT_SCRIPT_URL} | sudo bash -s -- --update --version ${this.packageVersion}`;
+      return `curl -fsSL ${this.scriptUrl} | sudo bash -s -- --update --version ${this.packageVersion}`;
     },
   },
   created() {
@@ -649,6 +686,8 @@ export default {
       }));
       this.managerVersion = taskResult.output.manager_version || "";
       this.packageVersion = taskResult.output.package_version || "";
+      this.expectedSetup = taskResult.output.setup || "";
+      this.scriptRef = taskResult.output.script_ref || "main";
       this.loading.listAgents = false;
     },
     isOutdated(agent) {
@@ -656,6 +695,15 @@ export default {
         !!this.managerVersion &&
         !!agent.version &&
         this.compareVersions(agent.version, this.managerVersion) < 0
+      );
+    },
+    // The agent runs the right Wazuh version, but an older install script set it up.
+    // An agent with no marker predates it, or has not reported its configuration yet.
+    isSetupOutdated(agent) {
+      return (
+        !!this.expectedSetup &&
+        !!agent.version &&
+        agent.setup !== this.expectedSetup
       );
     },
     // Versions look like "v5.0.0": compare them number by number
