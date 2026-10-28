@@ -109,9 +109,9 @@ WORLD_COUNTRIES = {"name": "World Countries", "origin": "elastic_maps_service", 
                               {"type": "name", "name": "name", "description": "Name"}]}
 
 
-def geo_map(colors="Yellow to Red"):
+def geo_map():
     """Countries colored by count: the tooltip gives the country name, a circle map only its coordinates."""
-    params = {"addTooltip": True, "colorSchema": colors, "isDisplayWarning": False, "legendPosition": "bottomright",
+    params = {"addTooltip": True, "colorSchema": "Yellow to Red", "isDisplayWarning": False, "legendPosition": "bottomright",
               "mapZoom": 2, "mapCenter": [20, 0], "outlineWeight": 1, "showAllShapes": True, "emsHotLink": "",
               "layerChosenByUser": "default", "selectedLayer": WORLD_COUNTRIES,
               "selectedJoinField": WORLD_COUNTRIES["fields"][0],
@@ -158,9 +158,7 @@ def markdown(id, title, text, new_tab=False):
 
 
 def place_map(id, title, pattern, query):
-    """A circle per city with its name and country on hover, a click filters the city.
-    The tile map can only show coordinates. query is DSL: Vega does not read KQL.
-    %context_query% refuses a body.query, so the time range goes in as %timefilter%."""
+    """query is DSL: Vega does not read KQL. %context_query% refuses a body.query, hence %timefilter%."""
     spec = {
         "$schema": "https://vega.github.io/schema/vega/v5.json",
         "config": {"kibana": {"type": "map", "latitude": 20, "longitude": 0, "zoom": 2}},
@@ -171,21 +169,23 @@ def place_map(id, title, pattern, query):
                 "query": {"bool": {"must": ["%dashboard_context-must_clause%"] + query.get("must", []),
                                    "filter": [{"range": {"@timestamp": {"%timefilter%": True}}}] + query.get("filter", []),
                                    "must_not": ["%dashboard_context-must_not_clause%"] + query.get("must_not", [])}},
-                "aggs": {"countries": {"terms": {"field": "source.geo.country_name", "size": 50}, "aggs": {
+                "aggs": {"countries": {"terms": {"field": "source.geo.country_name", "size": 200}, "aggs": {
                     "cities": {"terms": {"field": "source.geo.city_name", "size": 100, "missing": "-"}, "aggs": {
                         "where": {"geo_centroid": {"field": "source.geo.location"}}}}}}}}},
             "format": {"property": "aggregations.countries.buckets"},
             "transform": [
                 {"type": "flatten", "fields": ["cities.buckets"], "as": ["city"]},
+                # geo_centroid has no location when no login of the city has coordinates
+                {"type": "filter", "expr": "datum.city.where.location"},
                 {"type": "geopoint", "projection": "projection",
                  "fields": ["city.where.location.lon", "city.where.location.lat"]}]}],
         "scales": [{"name": "size", "type": "sqrt", "domain": {"data": "places", "field": "city.doc_count"},
                     "range": [60, 1500]}],
-        # GeoIP gives some addresses a country and no city: these filter on the country
+        # A city name exists in several countries. GeoIP gives some addresses a country and no city.
         "signals": [{"name": "pick", "on": [{"events": "symbol:click", "update":
-            "datum.city.key == '-'"
-            " ? opensearchDashboardsAddFilter({match_phrase: {'source.geo.country_name': datum.key}}, '%s')"
-            " : opensearchDashboardsAddFilter({match_phrase: {'source.geo.city_name': datum.city.key}}, '%s')" % (pattern, pattern)}]}],
+            "opensearchDashboardsAddFilter({bool: {filter: [{match_phrase: {'source.geo.country_name': datum.key}},"
+            " datum.city.key == '-' ? {bool: {must_not: {exists: {field: 'source.geo.city_name'}}}}"
+            " : {match_phrase: {'source.geo.city_name': datum.city.key}}]}}, '%s')" % pattern}]}],
         "marks": [{"type": "symbol", "from": {"data": "places"}, "encode": {"update": {
             "x": {"field": "x"}, "y": {"field": "y"}, "size": {"scale": "size", "field": "city.doc_count"},
             "fill": {"value": "#2e9e4f"}, "fillOpacity": {"value": 0.6},
@@ -270,10 +270,12 @@ def write(name, objects):
 
 
 # The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
+CRON = ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]
+# The samba service account and the computers log in every few minutes: their failures stay
+MACHINE = ["service-logon", "machine-logon"]
 AUTH = ("event.category:authentication"
-        " and not process.executable:(\"/usr/bin/crond\" or \"/usr/sbin/cron\" or \"/usr/lib/systemd/systemd\")"
-        # The samba service account and the computers log in every few minutes: their failures stay
-        " and not event.action:(service-logon or machine-logon)"
+        " and not process.executable:(" + " or ".join(f'"{e}"' for e in CRON) + ")"
+        " and not event.action:(" + " or ".join(MACHINE) + ")"
         # Upstream system-auth counts sshd disconnections before login as successes, ns8 reads every real one
         " and not (event.outcome:success and not wazuh.integration.name:ns8)")
 FAIL = f"{AUTH} and event.outcome:failure"
@@ -281,8 +283,7 @@ SUCCESS = f"{AUTH} and event.outcome:success"
 # SUCCESS in DSL, for the Vega map: an ns8 success is always a real login
 SUCCESS_DSL = {"filter": [{"term": {"event.category": "authentication"}}, {"term": {"event.outcome": "success"}},
                           {"term": {"wazuh.integration.name": "ns8"}}],
-               "must_not": [{"terms": {"process.executable": ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]}},
-                            {"terms": {"event.action": ["service-logon", "machine-logon"]}}]}
+               "must_not": [{"terms": {"process.executable": CRON}}, {"terms": {"event.action": MACHINE}}]}
 # Only the login zone decoder writes a reason that starts so
 OUTSIDE = f"{SUCCESS} and event.reason:Login*"
 write("10-logins.ndjson", dashboard("ns8-logins", "NS8 - Logins",
