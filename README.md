@@ -67,7 +67,7 @@ Run `configure-module` with:
 - `ntfy_enabled`: publish the summary of the new findings to an ntfy topic every 5 minutes (true/false). Needs a topic.
 - `ntfy_url`: ntfy server, `https://ntfy.sh` by default, or a self-hosted one.
 - `ntfy_topic`: topic that receives the summary.
-- `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it.
+- `ntfy_token`: optional access token of an ntfy user allowed to publish to the topic. Omit to keep the current one, empty to remove it. The token is stored for the `ntfy_url` it came with: a new URL without a new token drops it, so it never goes to another server.
 
 Example:
 
