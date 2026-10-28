@@ -25,6 +25,9 @@ set -euo pipefail
 VERSION="${WAZUH_AGENT_VERSION:-5.0.0-rc1}"
 PACKAGE_BASE="${WAZUH_PACKAGE_BASE:-https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x}"
 KEY_URL="https://packages.wazuh.com/key/GPG-KEY-WAZUH"
+# Version of the module that last changed what this script sets on the agent. Raise it to that
+# module version with each such change: the module shows the agents with an older one as outdated.
+AGENT_SETUP="1.2.0"
 
 INSTALL_DIR=/var/ossec
 CONFIG="${INSTALL_DIR}/etc/ossec.conf"
@@ -593,6 +596,38 @@ AUDIT
     "${INSTALL_DIR}/bin/wazuh-logcollector" -t >/dev/null 2>&1 || die "the agent refuses the audit log setting, see ${CONFIG}"
 }
 
+# The manager must not change what the agent runs: no shared agent.conf, no active response,
+# no remote upgrade. The agent is updated by this script, run as root on the host.
+setup_hardening() {
+    local options="${INSTALL_DIR}/etc/local_internal_options.conf"
+    touch "${options}"
+    # remote_conf is an internal option since 5.0, and this file survives the package updates
+    sed -i '/^agent\.remote_conf=/d' "${options}"
+    printf 'agent.remote_conf=0\n' >> "${options}"
+    # Older blocks of a previous run or of the package are replaced by the ones of this run
+    sed -i '/<active-response>/,/<\/active-response>/d; /<agent-upgrade>/,/<\/agent-upgrade>/d' "${CONFIG}"
+    append_block '  <active-response>\n    <disabled>yes</disabled>\n  </active-response>'
+    append_block '  <agent-upgrade>\n    <enabled>no</enabled>\n  </agent-upgrade>'
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the hardening, see ${CONFIG}"
+}
+
+# The module reads this alias in the configuration the agent reports, and compares it with its own AGENT_SETUP.
+# true prints nothing, so the command sends no event. Written last, once every setting above is in place.
+setup_marker() {
+    sed -i '/<localfile>/{:a;N;/<\/localfile>/!ba;/<alias>ns8-setup:/d}' "${CONFIG}"
+    append_block "  <localfile>\n    <log_format>command</log_format>\n    <command>/bin/true</command>\n    <alias>ns8-setup:${AGENT_SETUP}</alias>\n    <frequency>86400</frequency>\n  </localfile>"
+    "${INSTALL_DIR}/bin/wazuh-agentd" -t >/dev/null 2>&1 || die "the agent refuses the setup marker, see ${CONFIG}"
+}
+
+# Insert a block before the last </ossec_config>, without python3: a plain host may not have it
+append_block() {
+    local last
+    last="$(grep -n "</ossec_config>" "${CONFIG}" | tail -n 1 | cut -d: -f1)"
+    [ -n "${last}" ] || die "no </ossec_config> in ${CONFIG}"
+    awk -v last="${last}" -v block="$1" 'NR == last { print block } { print }' "${CONFIG}" > "${CONFIG}.new" \
+        && cat "${CONFIG}.new" > "${CONFIG}" && rm -f "${CONFIG}.new" || die "cannot write ${CONFIG}"
+}
+
 if [ "${UPDATE}" -eq 1 ]; then
     [ -s "${INSTALL_DIR}/etc/client.keys" ] || die "the agent is not enrolled: install it with a token first"
     before="$(installed_version)"
@@ -603,6 +638,8 @@ if [ "${UPDATE}" -eq 1 ]; then
     setup_syscheck
     setup_rootcheck
     setup_audit
+    setup_hardening
+    setup_marker
     # The agent restart leaves its commands running, so a run stuck before this fix would stay forever
     pkill -f "${INSTALL_DIR}/bin/ns8-journal" 2>/dev/null || true
     # The package keeps ossec.conf and the key, a restart loads the new binaries
@@ -674,6 +711,8 @@ setup_uptime
 setup_syscheck
 setup_rootcheck
 setup_audit
+setup_hardening
+setup_marker
 
 # Only root reads the token: the agent takes it at its first start and deletes it
 token_file="${INSTALL_DIR}/etc/enrollment_token"
