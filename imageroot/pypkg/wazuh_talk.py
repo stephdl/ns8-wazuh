@@ -14,6 +14,7 @@ import secrets
 import urllib.error
 import urllib.request
 
+import wazuh_http
 import wazuh_secrets
 
 SECRET_FILE = "secrets/talk.env"
@@ -44,7 +45,9 @@ def secret():
 def cut(text):
     if len(text) <= LIMIT:
         return text
-    return text[:text.rfind("\n", 0, LIMIT)] + "\n\n… more in the dashboard."
+    # At the last line break below the limit, or at the limit when one line is longer
+    end = text.rfind("\n", 0, LIMIT)
+    return text[:end if end > 0 else LIMIT] + "\n\n… more in the dashboard."
 
 
 def send(url, conversation, bot_secret, title, text, level="medium", timeout=30):
@@ -62,8 +65,7 @@ def send(url, conversation, bot_secret, title, text, level="medium", timeout=30)
                                               "OCS-APIRequest": "true", "X-Nextcloud-Talk-Bot-Random": random,
                                               "X-Nextcloud-Talk-Bot-Signature": signature})
     try:
-        with urllib.request.urlopen(request, timeout=timeout):
-            pass
+        wazuh_http.send(request, timeout)
     except urllib.error.HTTPError as error:
         try:
             body = json.load(error).get("ocs", {}).get("meta", {}).get("message", "")
