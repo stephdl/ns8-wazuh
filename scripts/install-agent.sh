@@ -25,8 +25,9 @@ set -euo pipefail
 VERSION="${WAZUH_AGENT_VERSION:-5.0.0-rc1}"
 PACKAGE_BASE="${WAZUH_PACKAGE_BASE:-https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x}"
 KEY_URL="https://packages.wazuh.com/key/GPG-KEY-WAZUH"
-# Version of the module that last changed what this script sets on the agent. Raise it to that
-# module version with each such change: the module shows the agents with an older one as outdated.
+# Version of what this script sets on the agent, apart from the module version: a module release
+# alone does not ask to update the agents. Raise it with each change on the agent side, the module
+# shows the agents with an older one as outdated. It must stay above 1.2.0, shipped by module 1.1.3.
 AGENT_SETUP="1.2.1"
 
 INSTALL_DIR=/var/ossec

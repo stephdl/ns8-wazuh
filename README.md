@@ -168,7 +168,7 @@ The Agents page shows two tags:
 
 The script writes its `AGENT_SETUP` in the agent configuration, as the alias `ns8-setup:<version>` of a command that prints nothing. The agent reports its configuration at start and every hour, the module compares it with the `AGENT_SETUP` it ships. An agent installed before this has no marker and shows Setup outdated. After an update, the tag can stay up to an hour.
 
-Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` to the next module version whenever a change touches the agent side.
+Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` whenever a change touches the agent side, and only then. It does not follow the module version, so a module release alone does not ask to update the agents.
 
 The Update command of an agent gives the command to run as root on it. It downloads the script of the module version, not main:
 
