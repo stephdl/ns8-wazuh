@@ -588,8 +588,8 @@ ignore = (r'<ignore type="PCRE2">^(node=\S+ )?type=SERVICE_(START|STOP) msg=audi
           + f'unit=({units}) comm="systemd" exe="(/usr)?/lib/systemd/systemd" .*res=success' + "'</ignore>")
 # The CrowdSec bouncer adds and removes each banned address in its nftables set, about 80 findings a day
 # per node. A change to a rule or a table, even by the bouncer, stays in.
-bouncer = (r'<ignore type="PCRE2">^(node=\S+ )?type=NETFILTER_CFG msg=audit\([0-9.:]+\): table=crowdsec:[0-9]+ '
-           r'family=[0-9]+ entries=[0-9]+ op=nft_(un)?register_setelem pid=[0-9]+ subj=\S+ comm="crowdsec-firewa"</ignore>')
+bouncer = (r'<ignore type="PCRE2">^(node=\S+ )?type=NETFILTER_CFG msg=audit\([0-9.:]+\): table=crowdsec6?:[0-9]+ '
+           r'family=[0-9]+ entries=[0-9]+ op=nft_(un)?register_setelem pid=[0-9]+( subj=\S+)? comm="crowdsec-firewa"</ignore>')
 # A new list replaces the one of a previous run, an ignore added by hand stays
 block = re.sub(r"\s*<ignore type=\"PCRE2\">[^<]*unit=\(backup\[0-9\]\+\|[^<]*</ignore>", "", block)
 block = re.sub(r"\s*<ignore type=\"PCRE2\">[^<]*type=NETFILTER_CFG[^<]*comm=\"crowdsec-firewa\"</ignore>", "", block)
