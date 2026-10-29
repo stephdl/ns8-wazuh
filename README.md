@@ -137,7 +137,7 @@ Rootcheck skips the container images on an NS8 node: their layers hold world-wri
 
 File integrity skips `/etc/pki/ca-trust/extracted/pem/directory-hash`. A ca-certificates update rewrites every file there. The CA bundles stay watched. `--update` sets it on agents installed before.
 
-The audit log skips the routine starts and stops of an NS8 node: the backup and metrics timers, dnf-makecache, logrotate and the root sessions. They made about 730 findings a day per node. Only a success by systemd is skipped: a failed unit, sshd, firewalld or any other unit stays in. `--update` sets it on agents installed before.
+The audit log skips the routine starts and stops of an NS8 node: the backup and metrics timers, dnf-makecache, logrotate and the root sessions. They made about 730 findings a day per node. Only a success by systemd is skipped: a failed unit, sshd, firewalld or any other unit stays in. It also skips the CrowdSec bouncer when it adds or removes a banned address in its nftables set, about 80 findings a day per node. A change to a rule or a table stays in. `--update` sets it on agents installed before.
 
 ### Uptime
 
@@ -168,7 +168,7 @@ The Agents page shows two tags:
 
 The script writes its `AGENT_SETUP` in the agent configuration, as the alias `ns8-setup:<version>` of a command that prints nothing. The agent reports its configuration at start and every hour, the module compares it with the `AGENT_SETUP` it ships. An agent installed before this has no marker and shows Setup outdated. After an update, the tag can stay up to an hour.
 
-Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` to the next module version whenever a change touches the agent side.
+Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` whenever a change touches the agent side, and only then. It does not follow the module version, so a module release alone does not ask to update the agents.
 
 The Update command of an agent gives the command to run as root on it. It downloads the script of the module version, not main:
 
@@ -251,12 +251,13 @@ Wazuh downloads its decoders and rules from the Wazuh CTI service, so the node n
 | NethVoice | failed SIP, CTI and reports logins |
 | Proxmox VE | logins, failures and tasks |
 
-Eleven rules raise findings, the web scan rule is off:
+Twelve rules raise findings, the web scan rule is off:
 
 | Rule | Level |
 |---|---|
 | NS8 authentication failure | low |
-| NS8 CrowdSec scenario triggered | low |
+| NS8 mail authentication failure | informational: mostly password spraying from the Internet |
+| NS8 CrowdSec scenario triggered | informational: the address is already banned |
 | NS8 mail virus found | low |
 | NS8 mail relay denied | low |
 | NS8 domain account locked | medium |
