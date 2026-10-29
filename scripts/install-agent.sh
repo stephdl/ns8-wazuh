@@ -27,7 +27,7 @@ PACKAGE_BASE="${WAZUH_PACKAGE_BASE:-https://packages-staging.xdrsiem.wazuh.info/
 KEY_URL="https://packages.wazuh.com/key/GPG-KEY-WAZUH"
 # Version of the module that last changed what this script sets on the agent. Raise it to that
 # module version with each such change: the module shows the agents with an older one as outdated.
-AGENT_SETUP="1.2.0"
+AGENT_SETUP="1.2.1"
 
 INSTALL_DIR=/var/ossec
 CONFIG="${INSTALL_DIR}/etc/ossec.conf"
@@ -586,11 +586,16 @@ units = (r"backup[0-9]+|refresh-(module|volume|container)-metrics|refresh-node-i
 # auditd starts each line with node= when name_format is set
 ignore = (r'<ignore type="PCRE2">^(node=\S+ )?type=SERVICE_(START|STOP) msg=audit\([0-9.:]+\): pid=1 .*msg=' + "'"
           + f'unit=({units}) comm="systemd" exe="(/usr)?/lib/systemd/systemd" .*res=success' + "'</ignore>")
+# The CrowdSec bouncer adds and removes each banned address in its nftables set, about 80 findings a day
+# per node. A change to a rule or a table, even by the bouncer, stays in.
+bouncer = (r'<ignore type="PCRE2">^(node=\S+ )?type=NETFILTER_CFG msg=audit\([0-9.:]+\): table=crowdsec:[0-9]+ '
+           r'family=[0-9]+ entries=[0-9]+ op=nft_(un)?register_setelem pid=[0-9]+ subj=\S+ comm="crowdsec-firewa"</ignore>')
 # A new list replaces the one of a previous run, an ignore added by hand stays
 block = re.sub(r"\s*<ignore type=\"PCRE2\">[^<]*unit=\(backup\[0-9\]\+\|[^<]*</ignore>", "", block)
-block = block.replace("</localfile>", f"  {ignore}\n  </localfile>")
+block = re.sub(r"\s*<ignore type=\"PCRE2\">[^<]*type=NETFILTER_CFG[^<]*comm=\"crowdsec-firewa\"</ignore>", "", block)
+block = block.replace("</localfile>", f"  {ignore}\n    {bouncer}\n  </localfile>")
 open(path, "w").write(text[:match.start()] + block + text[match.end():])
-print("NS8 node: the audit log skips the routine units.", file=sys.stderr)
+print("NS8 node: the audit log skips the routine units and the CrowdSec bans.", file=sys.stderr)
 AUDIT
     # wazuh-agentd -t does not read the localfile blocks, a bad ignore would stop every log at the restart
     "${INSTALL_DIR}/bin/wazuh-logcollector" -t >/dev/null 2>&1 || die "the agent refuses the audit log setting, see ${CONFIG}"

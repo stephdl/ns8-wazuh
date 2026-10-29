@@ -2,7 +2,7 @@
   "resource": {
     "metadata": {
       "title": "NS8 authentication failure",
-      "description": "A login to an NS8 service failed",
+      "description": "A login to an NS8 service failed. Mail submission failures have their own rule",
       "author": "NethServer",
       "references": [
         "https://github.com/stephdl/ns8-wazuh"
@@ -16,13 +16,18 @@
       "product": "ns8"
     },
     "detection": {
-      "condition": "selection",
+      "condition": "selection and not filter_postfix",
       "selection": {
         "event.outcome": [
           "failure"
         ],
         "event.action": [
           "logon-failed"
+        ]
+      },
+      "filter_postfix": {
+        "service.type": [
+          "postfix"
         ]
       }
     }
