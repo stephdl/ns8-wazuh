@@ -147,17 +147,53 @@ The Wazuh inventory has no uptime. On every Linux host, the agent runs `/var/oss
 
 The script covers Linux only. Install the agent with the [Wazuh documentation](https://documentation.wazuh.com/current/installation-guide/wazuh-agent/index.html), then enroll it with the same token.
 
+### Agent hardening
+
+The server must not change what an agent runs. If someone takes over the server, they must not get root on the agents. The script turns off three Wazuh features on every agent:
+
+- Remote configuration: `agent.remote_conf=0` in `/var/ossec/etc/local_internal_options.conf`. A shared `agent.conf` from the server could make the agent read any file as root and send it.
+- Active response: `<active-response><disabled>yes</disabled>`. The module does not use it, CrowdSec already bans.
+- Remote upgrade: `<agent-upgrade><enabled>no</enabled>`. The agent is updated by the script only.
+
+`--update` sets them on agents installed before.
+
 ### Agent updates
 
 The script does not add the Wazuh repository, so system updates leave the agent alone. This is on purpose: an agent must not be newer than its server.
 
-An older agent keeps working. The Agents page tags it as Outdated and shows the command to run as root:
+The Agents page shows two tags:
+
+- Outdated: the agent runs an older Wazuh version than the server.
+- Setup outdated: the agent runs the right version, but an older script set it up. A new module release can change what the script sets on the agent, like the hardening above.
+
+The script writes its `AGENT_SETUP` in the agent configuration, as the alias `ns8-setup:<version>` of a command that prints nothing. The agent reports its configuration at start and every hour, the module compares it with the `AGENT_SETUP` it ships. An agent installed before this has no marker and shows Setup outdated. After an update, the tag can stay up to an hour.
+
+Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` to the next module version whenever a change touches the agent side.
+
+The Update command of an agent gives the command to run as root on it. It downloads the script of the module version, not main:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/main/scripts/install-agent.sh | sudo bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/<module version>/scripts/install-agent.sh | sudo bash -s -- --update --version 5.0.0-rc1
 ```
 
-`--update` installs `--version`, `5.0.0-rc1` by default. It keeps the key and settings.
+`--update` installs `--version`, applies the settings of the script and restarts the agent. It keeps the key and the enrollment.
+
+#### Many agents: Ansible
+
+The module never runs the update itself. With many agents, run the same command from Ansible, or any tool you already use. The playbook [scripts/ansible/update-agents.yml](scripts/ansible/update-agents.yml) updates 20% of the agents at a time and stops at the first failure.
+
+```
+[wazuh_agents]
+web1.example.com
+mail.example.com
+```
+
+```
+ansible-playbook -i inventory.ini scripts/ansible/update-agents.yml \
+    -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc1
+```
+
+`module_tag` is the module version on the About page. `wazuh_version` is the `--version` of the Update command. When customers run different servers, set both per group in the inventory.
 
 ### Revoke an agent
 

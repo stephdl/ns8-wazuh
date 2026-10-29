@@ -1,0 +1,35 @@
+# Update the Wazuh agents with install-agent.sh, as the Update command of the Agents page does.
+#
+#   ansible-playbook -i inventory.ini scripts/ansible/update-agents.yml \
+#       -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc1
+#
+# module_tag: version of the ns8-wazuh module that runs the server (About page).
+# wazuh_version: package version shown by the Update command (--version).
+# Set both per group in the inventory when the customers run different servers.
+- hosts: wazuh_agents
+  become: true
+  # One batch at a time: a failed batch stops the run before the next one
+  serial: "20%"
+  max_fail_percentage: 0
+  tasks:
+    - name: Check the variables
+      ansible.builtin.assert:
+        that:
+          - module_tag is defined
+          - wazuh_version is defined
+
+    - name: Download install-agent.sh of the module
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/stephdl/ns8-wazuh/{{ module_tag }}/scripts/install-agent.sh"
+        dest: /root/install-agent.sh
+        mode: "0700"
+        force: true
+
+    - name: Update the agent
+      ansible.builtin.command: /root/install-agent.sh --update --version {{ wazuh_version }}
+      register: update
+      changed_when: true
+
+    - name: Show the result
+      ansible.builtin.debug:
+        msg: "{{ update.stderr_lines | default([''], true) | last }}"

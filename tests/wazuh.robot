@@ -78,6 +78,12 @@ Agent status should be
     ${statuses} =    Evaluate    [a['status'] for a in $result['agents'] if a['name'] == '${AGENT_NAME}']
     Should Be Equal    ${statuses}    ${{ ['${expected}'] }}
 
+Agent setup should be current
+    ${result} =    Run action    list-agents
+    Should Not Be Empty    ${result}[setup]
+    ${setups} =    Evaluate    [a['setup'] for a in $result['agents'] if a['name'] == '${AGENT_NAME}']
+    Should Be Equal    ${setups}    ${{ ['${result}[setup]'] }}
+
 Uptime should be indexed
     ${output} =    Execute Command
     ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' 'https://localhost:9200/wazuh-events-v5-applications*/_search' -d '{"size":1,"_source":["host.uptime"],"query":{"bool":{"filter":[{"term":{"event.action":"uptime-reported"}},{"term":{"wazuh.agent.name":"${AGENT_NAME}"}}]}}}'
@@ -238,6 +244,16 @@ Check if the agent update keeps the enrollment
     ...    return_rc=True  return_stderr=True
     Should Be Equal As Integers    ${rc}  0    ${stderr}
     Wait Until Keyword Succeeds    2 min    10 s    Agent status should be    active
+
+Check if the agent is hardened and marked
+    Use the install node
+    ${options} =    Execute Command    cat /var/ossec/etc/local_internal_options.conf
+    Should Contain    ${options}    agent.remote_conf=0
+    ${config} =    Execute Command    cat /var/ossec/etc/ossec.conf
+    Should Match Regexp    ${config}    <active-response>\\s*<disabled>yes</disabled>
+    Should Match Regexp    ${config}    <agent-upgrade>\\s*<enabled>no</enabled>
+    # The agent reports its configuration at its start, after the update above
+    Wait Until Keyword Succeeds    3 min    15 s    Agent setup should be current
 
 Check if the agent reports its uptime
     Use the install node
