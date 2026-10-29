@@ -32,15 +32,15 @@ def log(message):
     print(message, file=sys.stderr)
 
 
-def disabled_titles():
-    # Security Analytics does not carry the enabled flag of the Content Manager: the detector would still run them
-    titles = set()
+def content_titles():
+    """Return the titles of the enabled and of the disabled rules shipped with the module."""
+    enabled, disabled = set(), set()
     for path in glob.glob(os.path.join(CONTENT_DIR, "rules", "*.json")):
         with open(path) as f:
             resource = json.load(f)["resource"]
-        if not resource.get("enabled", True):
-            titles.add(resource["metadata"]["title"])
-    return titles
+        # Security Analytics does not carry the enabled flag of the Content Manager: the detector would still run them
+        (enabled if resource.get("enabled", True) else disabled).add(resource["metadata"]["title"])
+    return enabled, disabled
 
 
 def our_rules(disabled):
@@ -57,7 +57,7 @@ def our_rules(disabled):
             continue
         # The detector wants the id of the document of the Content Manager, not the id in Security Analytics
         unique[source.get("metadata", {}).get("title")] = source["document"]["id"]
-    return sorted(unique.values())
+    return unique
 
 
 def find_detector():
@@ -68,16 +68,21 @@ def find_detector():
     return None
 
 
-# The rules are registered a few seconds after the promotion
-rules = []
-disabled = disabled_titles()
+# The rules are registered a few seconds after the promotion. On an update the old ones are already
+# there: wait for every rule of the module, or a new rule would miss the detector.
+found = {}
+enabled, disabled = content_titles()
 for _ in range(30):
-    rules = our_rules(disabled)
-    if rules:
+    found = our_rules(disabled)
+    if enabled <= found.keys():
         break
     time.sleep(2)
-if not rules:
+if not found:
     sys.exit("no NS8 rule found in Security Analytics")
+missing = enabled - found.keys()
+if missing:
+    log(f"Warning: rules not registered yet, the next configure-module adds them: {', '.join(sorted(missing))}")
+rules = sorted(found.values())
 
 detector = {
     "type": "detector",
