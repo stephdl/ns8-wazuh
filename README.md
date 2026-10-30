@@ -4,7 +4,7 @@ A central [Wazuh](https://wazuh.com) 5 server for [NethServer 8](https://github.
 
 Run it on its own node, outside the clusters it watches. Wazuh agents on your servers send their logs to it. The server decodes them, raises alerts and keeps everything searchable.
 
-The module is not ready for production. It runs Wazuh `5.0.0-rc1`. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
+For now the module runs Wazuh `5.0.0-rc1`, a release candidate. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
 ## How it works
 
