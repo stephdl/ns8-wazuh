@@ -4,7 +4,7 @@
     "enabled": true,
     "metadata": {
       "title": "NS8 root decoder",
-      "description": "Reads the journal lines sent by the Wazuh agent, as syslog text or as JSON from the ns8-journal command",
+      "description": "Reads the journal lines sent by the Wazuh agent, as syslog text or as JSON from the ns8-journal command. The events of the agent modules, such as the inventory, are left to their standard copy",
       "author": "NethServer",
       "module": "ns8",
       "compatibility": "NS8",
@@ -15,6 +15,7 @@
         "NS8 3.*"
       ]
     },
+    "check": "NOT regex_match($wazuh.protocol.location, '^(syscollector|vulnerability-scanner|syscheck|rootcheck|wazuh-agent|logcollector|wazuh-modulesd:.*)$')",
     "normalize": [
       {
         "map": [
