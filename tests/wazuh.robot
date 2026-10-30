@@ -93,6 +93,7 @@ Count agent events
     [Arguments]    ${space}    ${location}
     ${output} =    Execute Command
     ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' 'https://localhost:9200/wazuh-events-v5-*/_count' -d '{"query":{"bool":{"filter":[{"term":{"wazuh.agent.name":"${AGENT_NAME}"}},{"term":{"wazuh.space.name":"${space}"}},{"term":{"wazuh.protocol.location":"${location}"}}]}}}'
+    Should Contain    ${output}    "count"
     ${count} =    Evaluate    json.loads($output)['count']    modules=json
     [Return]    ${count}
 
@@ -279,8 +280,12 @@ Check if the inventory is indexed once
     # Both copies of the journal lines are needed: only the custom one carries the application
     Wait Until Keyword Succeeds    3 min    15 s    Agent events should be indexed    custom    ns8-journal
     Wait Until Keyword Succeeds    3 min    15 s    Agent events should be indexed    standard    syscollector
-    ${count} =    Count agent events    custom    syscollector
-    Should Be Equal As Integers    ${count}    0
+    # Both copies are written together, the wait gives a late custom copy the time to show up
+    Sleep    30 s
+    FOR    ${location}    IN    syscollector    syscheck    rootcheck    wazuh-agent
+        ${count} =    Count agent events    custom    ${location}
+        Should Be Equal As Integers    ${count}    0
+    END
 
 Check if ns8-journal ends when its output is cut
     Use the install node
