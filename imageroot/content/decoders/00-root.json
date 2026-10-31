@@ -100,14 +100,14 @@
         "parse|event.original": [
           "<~> <~> <~> <~> <process.name>[<~>]: <message>",
           "<~> <~> <~> <~> <process.name>: <message>",
-          "<~>"
+          "<message>"
         ]
       },
       {
-        "check": "NOT exists($_nj.ns8_journal) AND NOT exists($message)",
+        "check": "NOT exists($_nj.ns8_journal) AND NOT exists($process.name) AND starts_with($wazuh.protocol.location, '/')",
         "map": [
           {
-            "message": "$event.original"
+            "process.name": "$wazuh.protocol.location"
           }
         ]
       },

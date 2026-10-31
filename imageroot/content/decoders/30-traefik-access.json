@@ -29,10 +29,7 @@
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\" <~> \"<service.name>@<~>\" <~>",
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\" <~>",
           "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\"",
-          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>",
-          "<source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\" <~>",
-          "<source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~> \"<~>\" \"<_ua>\"",
-          "<source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
+          "<~>: <source.ip> - <~>\"<http.request.method> <url.path> <~>\" <http.response.status_code> <~>"
         ]
       },
       {
@@ -79,14 +76,6 @@
         "map": [
           {
             "service.target.name": "$_vhost"
-          }
-        ]
-      },
-      {
-        "check": "NOT exists($service.target.name) AND starts_with($wazuh.protocol.location, '/')",
-        "map": [
-          {
-            "service.target.name": "$wazuh.agent.name"
           }
         ]
       },

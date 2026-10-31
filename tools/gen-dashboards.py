@@ -580,6 +580,7 @@ write("97-proxmox.ndjson", dashboard("ns8-proxmox", "NS8 - Proxmox",
 # One list of raw lines, like journalctl: pick the customer and the server, then read
 write("05-journal.ndjson", dashboard("ns8-journal", "NS8 - Journal",
     "Every log line, like journalctl. Pick a server, an application and a program, or search a word", [
-    (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "",
+    # The standard decoders index each line a second time, without the fields of these columns
+    (search("ns8-journal-lines", "NS8 - Journal lines", EVENTS, "wazuh.integration.name:ns8",
             ["wazuh.agent.name", "orchestrator.namespace", "process.name", "message"]), 48, 80),
 ], apps=True, program=True))
