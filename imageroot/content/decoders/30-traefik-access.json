@@ -21,6 +21,9 @@
     "check": [
       {
         "_line": "contains(\" - - [\")"
+      },
+      {
+        "wazuh.protocol.location": "regex_match('^[^/]')"
       }
     ],
     "normalize": [
