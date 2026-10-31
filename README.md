@@ -269,7 +269,7 @@ Twelve rules raise findings, the web scan rule is off:
 | NS8 Proxmox backup failed | medium |
 | NS8 login from outside the allowed zones | medium |
 
-Every journal line is kept, even with no detailed decoder. The NS8 - Journal dashboard lists it.
+Every journal line is kept, even with no detailed decoder. So is every line of a log file the agent reads, with the file path as program. The NS8 - Journal dashboard lists them.
 
 The module loads this content at each configuration and update. To add your own:
 

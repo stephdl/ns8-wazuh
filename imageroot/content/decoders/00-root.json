@@ -96,11 +96,22 @@
         ]
       },
       {
-        "check": "NOT exists($_nj.ns8_journal) AND NOT starts_with($event.original, 'type=')",
+        "check": "NOT exists($_nj.ns8_journal) AND NOT starts_with($event.original, 'type=') AND NOT starts_with($wazuh.protocol.location, '/')",
         "parse|event.original": [
           "<~> <~> <~> <~> <process.name>[<~>]: <message>",
           "<~> <~> <~> <~> <process.name>: <message>",
-          "<~>"
+          "<message>"
+        ]
+      },
+      {
+        "check": "NOT exists($_nj.ns8_journal) AND NOT starts_with($event.original, 'type=') AND starts_with($wazuh.protocol.location, '/')",
+        "map": [
+          {
+            "process.name": "$wazuh.protocol.location"
+          },
+          {
+            "message": "$event.original"
+          }
         ]
       },
       {
