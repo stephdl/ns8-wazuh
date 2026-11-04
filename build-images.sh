@@ -14,9 +14,9 @@ images=()
 repobase="${REPOBASE:-ghcr.io/nethserver}"
 # Configure the image name
 reponame="wazuh"
-wazuh_manager_image="docker.io/wazuh/wazuh-manager:5.0.0-rc1"
-wazuh_indexer_image="docker.io/wazuh/wazuh-indexer:5.0.0-rc1"
-wazuh_dashboard_image="docker.io/wazuh/wazuh-dashboard:5.0.0-rc1"
+wazuh_manager_image="docker.io/wazuh/wazuh-manager:5.0.0-rc2"
+wazuh_indexer_image="docker.io/wazuh/wazuh-indexer:5.0.0-rc2"
+wazuh_dashboard_image="docker.io/wazuh/wazuh-dashboard:5.0.0-rc2"
 
 # Extract the upstream version from the image tag, to set it in the metadata
 wazuh_upstream_version="${wazuh_manager_image##*:}"
