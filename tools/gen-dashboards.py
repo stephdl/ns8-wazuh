@@ -271,7 +271,7 @@ def write(name, objects):
 
 # The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
 CRON = ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]
-# The samba service account and the computers log in every few minutes: their failures stay
+# The samba service account, the computers and the apps of the node itself log in every few minutes: their failures stay
 MACHINE = ["service-logon", "machine-logon"]
 AUTH = ("event.category:authentication"
         " and not process.executable:(" + " or ".join(f'"{e}"' for e in CRON) + ")"
