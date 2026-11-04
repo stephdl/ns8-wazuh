@@ -284,7 +284,7 @@ Ten dashboards, under Explore > Dashboards:
 | NS8 - Journal | every log line, like `journalctl` |
 | NS8 - Logins | logins and failures on every service, with maps |
 | NS8 - Web | status codes, errors, scans, with a map |
-| NS8 - CrowdSec | attacks and bans, with maps |
+| NS8 - CrowdSec | attacks and bans: counters, maps and a table by address under each map |
 | NS8 - Fleet | alerts by level, rule and MITRE tactic, last report and uptime per server |
 | NS8 - System changes | accounts, groups, services and firewall changes |
 | NS8 - Mail | sent and rejected mail, spam, viruses, source countries |
