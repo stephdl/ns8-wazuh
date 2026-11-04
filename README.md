@@ -232,9 +232,7 @@ A customer without zones is not watched. LAN and VPN logins have no country and 
 | Dovecot, SMTP, SSH, NS8 admin, Proxmox, SOGo | login name | nothing |
 | Roundcube | email | its `log_logins` option, set since NethServer/ns8-roundcubemail#143 |
 | Nextcloud | email | a log level of 1 or lower |
-| WebTop | none | |
-
-WebTop logs no client address, so its logins come from the Traefik log, without a user.
+| WebTop | login name | WebTop 5.27.5 or later, which writes a `webtop-auth` log line |
 
 ## Detection content
 
