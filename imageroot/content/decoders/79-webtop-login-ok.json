@@ -3,11 +3,11 @@
     "name": "decoder/ns8-webtop-login-ok/0",
     "enabled": true,
     "parents": [
-      "decoder/ns8-traefik-access/0"
+      "decoder/ns8-root/0"
     ],
     "metadata": {
       "title": "WebTop successful login",
-      "description": "Logins accepted on WebTop, seen in the reverse proxy log: WebTop logs no client IP",
+      "description": "Logins accepted on WebTop, from its webtop-auth log line",
       "author": "NethServer",
       "module": "webtop",
       "compatibility": "NS8",
@@ -18,8 +18,21 @@
         "NS8 3.*"
       ]
     },
-    "check": "exists($service.name) AND starts_with($service.target.name, 'webtop') AND string_equal($http.request.method, 'POST') AND string_equal($url.path, '/webtop/login') AND int_equal($http.response.status_code, 302)",
+    "check": [
+      {
+        "_line": "contains(\"webtop-auth: \")"
+      },
+      {
+        "_line": "contains(\" action=LOGIN_SUCCESS\")"
+      }
+    ],
     "normalize": [
+      {
+        "parse|_line": [
+          "<~>client=<source.ip> profile=<user.name>@<~>",
+          "<~>client=<source.ip> profile=<user.name> <~>"
+        ]
+      },
       {
         "map": [
           {

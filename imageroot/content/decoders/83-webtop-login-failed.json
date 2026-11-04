@@ -1,0 +1,61 @@
+{
+  "resource": {
+    "name": "decoder/ns8-webtop-login-failed/0",
+    "enabled": true,
+    "parents": [
+      "decoder/ns8-root/0"
+    ],
+    "metadata": {
+      "title": "WebTop failed login",
+      "description": "Wrong passwords and wrong OTP codes on WebTop, from its webtop-auth log line",
+      "author": "NethServer",
+      "module": "webtop",
+      "compatibility": "NS8",
+      "references": [
+        "https://github.com/stephdl/ns8-wazuh"
+      ],
+      "versions": [
+        "NS8 3.*"
+      ]
+    },
+    "check": [
+      {
+        "_line": "contains(\"webtop-auth: \")"
+      },
+      {
+        "_line": "contains(\"_FAILURE\")"
+      }
+    ],
+    "normalize": [
+      {
+        "parse|_line": [
+          "<~>client=<source.ip> profile=<user.name>@<~>",
+          "<~>client=<source.ip> profile=<user.name> <~>"
+        ]
+      },
+      {
+        "map": [
+          {
+            "event.category": [
+              "authentication"
+            ]
+          },
+          {
+            "event.type": [
+              "denied"
+            ]
+          },
+          {
+            "event.action": "logon-failed"
+          },
+          {
+            "event.outcome": "failure"
+          },
+          {
+            "service.type": "webtop"
+          }
+        ]
+      }
+    ]
+  }
+}
