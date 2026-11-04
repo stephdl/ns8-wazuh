@@ -18,14 +18,7 @@
         "NS8 3.*"
       ]
     },
-    "check": [
-      {
-        "_line": "contains(\"webtop-auth: \")"
-      },
-      {
-        "_line": "contains(\"_FAILURE\")"
-      }
-    ],
+    "check": "regex_match($_line, '^[^ ]+: webtop-auth: .* action=(LOGIN|OTP)_FAILURE$')",
     "normalize": [
       {
         "parse|_line": [

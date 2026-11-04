@@ -18,14 +18,7 @@
         "NS8 3.*"
       ]
     },
-    "check": [
-      {
-        "_line": "contains(\"webtop-auth: \")"
-      },
-      {
-        "_line": "contains(\" action=LOGIN_SUCCESS\")"
-      }
-    ],
+    "check": "regex_match($_line, '^[^ ]+: webtop-auth: .* action=LOGIN_SUCCESS$')",
     "normalize": [
       {
         "parse|_line": [
