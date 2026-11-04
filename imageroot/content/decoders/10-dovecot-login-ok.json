@@ -26,6 +26,7 @@
     "normalize": [
       {
         "parse|_line": [
+          "<~>Login: user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<_lip>, <~>",
           "<~>Login: user=\\<<user.name>>, method=<~>, rip=<source.ip>, lip=<~>"
         ]
       },
@@ -49,6 +50,14 @@
           },
           {
             "service.type": "dovecot"
+          }
+        ]
+      },
+      {
+        "check": "exists($_lip) AND string_equal($source.ip, $_lip)",
+        "map": [
+          {
+            "event.action": "internal-logon"
           }
         ]
       }

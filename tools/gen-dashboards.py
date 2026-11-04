@@ -271,8 +271,8 @@ def write(name, objects):
 
 # The audit marks cron jobs and the systemd user sessions as failed logins, but nobody logs in
 CRON = ["/usr/bin/crond", "/usr/sbin/cron", "/usr/lib/systemd/systemd"]
-# The samba service account and the computers log in every few minutes: their failures stay
-MACHINE = ["service-logon", "machine-logon"]
+# The samba service account and the computers log in every few minutes, the apps of the node relay each user login to IMAP and LDAP: their failures stay
+MACHINE = ["service-logon", "machine-logon", "internal-logon"]
 AUTH = ("event.category:authentication"
         " and not process.executable:(" + " or ".join(f'"{e}"' for e in CRON) + ")"
         " and not event.action:(" + " or ".join(MACHINE) + ")"
@@ -500,7 +500,7 @@ write("60-mail.ndjson", dashboard("ns8-mail", "NS8 - Mail",
 ]))
 
 SAMBA_AUTH = ("service.type:samba and event.category:authentication"
-              " and not event.action:(service-logon or machine-logon)")
+              " and not event.action:(" + " or ".join(MACHINE) + ")")
 SAMBA_FAIL = "service.type:samba and event.category:authentication and event.outcome:failure"
 # Replication between domain controllers and logon counters change the directory every few minutes
 SAMBA_IAM = ("service.type:samba and event.category:iam"
