@@ -384,11 +384,13 @@ write("20-web.ndjson", dashboard("ns8-web", "NS8 - Web",
 
 CROWDSEC = "event.action:crowdsec-alert"
 CROWDSEC_BAN = "event.action:crowdsec-ban"
-def ip_table(reason_label):
+
+
+def ip_table():
     return table(terms("2", "source.ip", "bucket", size=50, label="Source IP"),
                  terms("3", "source.geo.country_name", "bucket", size=1, label="Country", missing=True),
                  terms("5", "source.geo.city_name", "bucket", size=1, label="City", missing=True),
-                 terms("4", "event.reason", "bucket", size=3, label=reason_label))
+                 terms("4", "event.reason", "bucket", size=3, label="Scenario"))
 
 
 def ip_counter():
@@ -409,8 +411,8 @@ write("30-crowdsec.ndjson", dashboard("ns8-crowdsec", "NS8 - CrowdSec",
          pie(terms("2", "event.reason", "segment", size=15))), 16, 14),
     (vis("ns8-crowdsec-map", "Attacks map", APPS, CROWDSEC, geo_map()), 24, 14),
     (vis("ns8-crowdsec-ban-map", "Bans map", APPS, CROWDSEC_BAN, geo_map()), 24, 14),
-    (vis("ns8-crowdsec-sources", "Attacks by IP", APPS, CROWDSEC, ip_table("Scenario")), 24, 14),
-    (vis("ns8-crowdsec-ban-sources", "Bans by IP", APPS, CROWDSEC_BAN, ip_table("Ban reason")), 24, 14),
+    (vis("ns8-crowdsec-sources", "Attacks by IP", APPS, CROWDSEC, ip_table()), 24, 14),
+    (vis("ns8-crowdsec-ban-sources", "Bans by IP", APPS, CROWDSEC_BAN, ip_table()), 24, 14),
 ], country=True))
 
 NOT_INFO = "not wazuh.rule.level:informational"
