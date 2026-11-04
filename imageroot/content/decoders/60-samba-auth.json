@@ -135,7 +135,7 @@
         "check": "string_equal($_samba.Authentication.status, 'NT_STATUS_OK') AND exists($_local_ip) AND string_equal($source.ip, $_local_ip)",
         "map": [
           {
-            "event.action": "service-logon"
+            "event.action": "internal-logon"
           }
         ]
       },

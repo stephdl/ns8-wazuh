@@ -57,7 +57,7 @@
         "check": "exists($_lip) AND string_equal($source.ip, $_lip)",
         "map": [
           {
-            "event.action": "service-logon"
+            "event.action": "internal-logon"
           }
         ]
       }
