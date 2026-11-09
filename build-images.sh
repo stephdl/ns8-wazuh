@@ -14,6 +14,9 @@ images=()
 repobase="${REPOBASE:-ghcr.io/nethserver}"
 # Configure the image name
 reponame="wazuh"
+# Node.js 25+ no longer ships Corepack, install it from npm
+# renovate: datasource=npm packageName=corepack
+corepack_version=0.36.0
 wazuh_manager_image="docker.io/wazuh/wazuh-manager:5.0.0-rc1"
 wazuh_indexer_image="docker.io/wazuh/wazuh-indexer:5.0.0-rc1"
 wazuh_dashboard_image="docker.io/wazuh/wazuh-dashboard:5.0.0-rc1"
@@ -41,7 +44,8 @@ container=$(buildah from scratch)
 # Reuse existing nodebuilder-wazuh container, to speed up builds
 if ! buildah containers --format "{{.ContainerName}}" | grep -q nodebuilder-wazuh; then
     echo "Pulling NodeJS runtime..."
-    buildah from --name nodebuilder-wazuh -v "${PWD}:/usr/src:Z" docker.io/library/node:24
+    buildah from --name nodebuilder-wazuh -v "${PWD}:/usr/src:Z" docker.io/library/node:26.13.0-slim
+    buildah run nodebuilder-wazuh sh -c "npm install -g corepack@${corepack_version} && corepack enable"
 fi
 
 echo "Build static UI files with node..."
@@ -49,7 +53,7 @@ buildah run \
     --workingdir=/usr/src/ui \
     --env="NODE_OPTIONS=--openssl-legacy-provider" \
     nodebuilder-wazuh \
-    sh -c "corepack enable && yarn install && yarn build"
+    sh -c "yarn install && yarn build"
 
 # Add imageroot directory to the container image
 buildah add "${container}" imageroot /imageroot
