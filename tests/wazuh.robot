@@ -11,7 +11,8 @@ ${AGENT_SCRIPT}      ${CURDIR}/../scripts/install-agent.sh
 ${CLUSTER_USER}      admin
 ${CLUSTER_PASSWORD}  Nethesis,1234
 ${SCREENSHOTS}       ${OUTPUT DIR}/browser/screenshot
-# install tests the image on a clean node. update starts from the release of the stephdl forge, then upgrades it below.
+# install tests the image on a clean node. update starts from the last release of the stephdl forge,
+# the version the deployed servers run, then upgrades it below.
 ${SCENARIO}          install
 
 *** Keywords ***
@@ -466,6 +467,10 @@ Check if wazuh is removed correctly
     ${rc} =    Execute Command    firewall-cmd --list-services | grep -q ${module_id}
     ...    return_rc=True  return_stdout=False
     Should Not Be Equal As Integers    ${rc}  0
+    IF    '${SCENARIO}' == 'update'
+        Use the leader
+        Execute Command    api-cli run remove-repository --data '{"name":"stephdl"}'
+    END
 
 Remove the agent from the node
     Use the install node
