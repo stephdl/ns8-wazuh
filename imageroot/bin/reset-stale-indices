@@ -13,6 +13,8 @@
 # changed in place: that index is created again, and the agents report its states at their next sync.
 
 import sys
+import time
+from datetime import datetime, timezone
 
 import wazuh_api
 from wazuh_api import api, wait_indexer
@@ -65,7 +67,25 @@ def recreate(index):
         sys.exit(f"cannot create {index} again: {answer['error']}")
 
 
+def wait_setup():
+    """The indexer is healthy before its setup plugin writes the templates of its version: until then
+    an old index still matches the old template, and nothing looks stale."""
+    for _ in range(60):
+        stats = api("GET", "_nodes/_local/stats/jvm?filter_path=nodes.*.jvm")
+        jvm = next(iter(stats.get("nodes", {}).values()), {}).get("jvm", {})
+        started = (jvm.get("timestamp", 0) - jvm.get("uptime_in_millis", 0)) / 1000
+        status = api("GET", ".wazuh-setup-status/_doc/setup-status", **CERT).get("_source", {})
+        # The plugin writes the document again at each start, so a ready status of the previous run does not count
+        stamp = status.get("timestamp", "")[:19]
+        if status.get("status") == "ready" and stamp and started and \
+                datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc).timestamp() >= started:
+            return
+        time.sleep(10)
+    sys.exit("the setup plugin of the indexer did not finish")
+
+
 wait_indexer()
+wait_setup()
 indices = api("GET", f"_cat/indices/{PATTERNS}?format=json&h=index&expand_wildcards=open")
 if isinstance(indices, dict) and "error" in indices:
     sys.exit(f"cannot list the indices: {indices['error']}")
