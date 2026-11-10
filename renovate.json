@@ -18,5 +18,17 @@
       "versioning": "semver",
       "automerge": false
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The default agent version of the install script follows the manager image, in the wazuh group",
+      "fileMatch": ["^scripts/install-agent\\.sh$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) packageName=(?<packageName>\\S+)\\s*\\nVERSION=\"\\$\\{WAZUH_AGENT_VERSION:-(?<currentValue>[^}]+)\\}\""
+      ],
+      "depNameTemplate": "{{{packageName}}}",
+      "versioningTemplate": "semver"
+    }
   ]
 }

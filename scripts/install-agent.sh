@@ -21,8 +21,9 @@
 
 set -euo pipefail
 
-# Version and download place of the agent package
-VERSION="${WAZUH_AGENT_VERSION:-5.0.0-rc1}"
+# Version and download place of the agent package. Renovate moves it with the manager image tag.
+# renovate: datasource=docker packageName=docker.io/wazuh/wazuh-manager
+VERSION="${WAZUH_AGENT_VERSION:-5.0.0-rc2}"
 PACKAGE_BASE="${WAZUH_PACKAGE_BASE:-https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x}"
 KEY_URL="https://packages.wazuh.com/key/GPG-KEY-WAZUH"
 # Version of what this script sets on the agent, apart from the module version: a module release
@@ -46,7 +47,7 @@ say() { printf '%s\n' "$*" >&2; }
 die() { say "install-agent: $*"; exit 1; }
 
 usage() {
-    cat >&2 <<'EOF'
+    cat >&2 <<EOF
 Usage: install-agent.sh [options]
 
 The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
@@ -55,7 +56,7 @@ The enrollment token is read from WAZUH_ENROLLMENT_TOKEN, or from --token-file.
   --token-file FILE    Read the enrollment token from FILE
   --name NAME          Agent name (default: the FQDN, else the host name)
   --group GROUP        Agent group, the customer of this host (default: default)
-  --version VERSION    Agent version to install (default: 5.0.0-rc1)
+  --version VERSION    Agent version to install (default: ${VERSION})
   --package-url URL    Download this package instead of the default one
   --sha256 HASH        Expected SHA-256 of the package, needed to check a deb
   --no-start           Configure the agent but do not start it

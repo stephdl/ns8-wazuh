@@ -4,7 +4,7 @@ A central [Wazuh](https://wazuh.com) 5 server for [NethServer 8](https://github.
 
 Run it on its own node, outside the clusters it watches. Wazuh agents on your servers send their logs to it. The server decodes them, raises alerts and keeps everything searchable.
 
-For now the module runs Wazuh `5.0.0-rc1`, a release candidate. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
+For now the module runs Wazuh `5.0.0-rc2`, a release candidate. The plan and the open points are in [docs/PLAN.md](docs/PLAN.md).
 
 ## How it works
 
@@ -173,7 +173,7 @@ Contributors: raise `AGENT_SETUP` in `scripts/install-agent.sh` whenever a chang
 The Update command of an agent gives the command to run as root on it. It downloads the script of the module version, not main:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/<module version>/scripts/install-agent.sh | sudo bash -s -- --update --version 5.0.0-rc1
+curl -fsSL https://raw.githubusercontent.com/stephdl/ns8-wazuh/<module version>/scripts/install-agent.sh | sudo bash -s -- --update --version 5.0.0-rc2
 ```
 
 `--update` installs `--version`, applies the settings of the script and restarts the agent. It keeps the key and the enrollment.
@@ -190,7 +190,7 @@ mail.example.com
 
 ```
 ansible-playbook -i inventory.ini scripts/ansible/update-agents.yml \
-    -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc1
+    -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc2
 ```
 
 `module_tag` is the module version on the About page. `wazuh_version` is the `--version` of the Update command. When customers run different servers, set both per group in the inventory.

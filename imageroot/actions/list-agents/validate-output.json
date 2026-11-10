@@ -23,7 +23,7 @@
                 }
             ],
             "manager_version": "v5.0.0",
-            "package_version": "5.0.0-rc1",
+            "package_version": "5.0.0-rc2",
             "setup": "1.2.0",
             "script_ref": "1.2.0"
         }
