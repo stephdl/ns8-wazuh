@@ -27,7 +27,7 @@
         "^scripts/install-agent\\.sh$"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?) packageName=(?<packageName>\\S+)\\s*\\nVERSION=\"\\$\\{WAZUH_AGENT_VERSION:-(?<currentValue>[^}]+)\\}\""
+        "# renovate: datasource=(?<datasource>[a-z-]+?) packageName=(?<packageName>\\S+)\\s*\\nDEFAULT_VERSION=\"(?<currentValue>[^\"]+)\""
       ],
       "depNameTemplate": "{{{packageName}}}",
       "versioningTemplate": "semver"
