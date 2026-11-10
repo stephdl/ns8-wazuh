@@ -17,6 +17,8 @@ TimeoutStartSec=300
 TimeoutStopSec=90
 Type=forking
 ExecStartPre=/bin/rm -f %t/wazuh-manager.pid %t/wazuh-manager.ctr-id
+# The manager refuses certificates that are not root:wazuh-manager 0640 in a 0750 certs/ directory.
+# A bind mount keeps the owner and mode of state/, so they are copied in before the entrypoint runs.
 ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-manager.pid \
     --cidfile %t/wazuh-manager.ctr-id --cgroups=no-conmon \
     --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-manager \
@@ -26,22 +28,32 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-manager.pid \
     --env WAZUH_CLUSTER_NODES=wazuh.manager \
     --env WAZUH_CLUSTER_BIND_ADDR=wazuh.manager \
     --volume wazuh-api-configuration:/var/wazuh-manager/api/configuration:Z \
-    --volume wazuh-etc:/var/wazuh-manager/etc:Z \
+    --volume wazuh-etc:/etc/wazuh-manager:Z \
     --volume wazuh-logs:/var/wazuh-manager/logs:Z \
     --volume wazuh-queue:/var/wazuh-manager/queue:Z \
     --volume wazuh-multigroups:/var/wazuh-manager/var/multigroups:Z \
     --volume wazuh-data:/var/wazuh-manager/data:Z \
     --volume ./secrets/manager.env:/run/secrets/wazuh-credentials:ro,Z \
-    --volume ./ca/root-ca.pem:/var/wazuh-manager/etc/certs/root-ca.pem:ro,z \
-    --volume ./certs/connector.pem:/var/wazuh-manager/etc/certs/indexer-connector.pem:ro,Z \
-    --volume ./certs/connector-key.pem:/var/wazuh-manager/etc/certs/indexer-connector-key.pem:ro,Z \
-    --volume ./certs/remoted.pem:/var/wazuh-manager/etc/certs/remoted.pem:ro,Z \
-    --volume ./certs/remoted-key.pem:/var/wazuh-manager/etc/certs/remoted-key.pem:ro,Z \
+    --volume ./ca/root-ca.pem:/run/ns8-certs/root-ca.pem:ro,z \
+    --volume ./certs/connector.pem:/run/ns8-certs/indexer-connector.pem:ro,Z \
+    --volume ./certs/connector-key.pem:/run/ns8-certs/indexer-connector-key.pem:ro,Z \
+    --volume ./certs/remoted.pem:/run/ns8-certs/remoted.pem:ro,Z \
+    --volume ./certs/remoted-key.pem:/run/ns8-certs/remoted-key.pem:ro,Z \
+    --volume ./certs/apid.pem:/run/ns8-certs/apid.pem:ro,Z \
+    --volume ./certs/apid-key.pem:/run/ns8-certs/apid-key.pem:ro,Z \
     --health-cmd='["/var/wazuh-manager/bin/wazuh-manager-control","status"]' \
     --health-interval=30s \
     --health-timeout=10s \
     --health-start-period=60s \
-    ${WAZUH_MANAGER_IMAGE}
+    --entrypoint /bin/bash \
+    ${WAZUH_MANAGER_IMAGE} -c "\
+        cd /etc/wazuh-manager && \
+        install -d -o root -g wazuh-manager -m 0750 certs && \
+        install -d -m 0700 ca && \
+        install -m 0644 /run/ns8-certs/root-ca.pem ca/root-ca.pem && \
+        install -o root -g wazuh-manager -m 0640 /run/ns8-certs/root-ca.pem certs/indexer-ca.pem && \
+        install -o root -g wazuh-manager -m 0640 /run/ns8-certs/*.pem certs/ && \
+        exec /usr/local/bin/tini -- /entrypoint.sh"
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/wazuh-manager.ctr-id -t 60
 ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/wazuh-manager.ctr-id
 PIDFile=%t/wazuh-manager.pid

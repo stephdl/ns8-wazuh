@@ -48,6 +48,9 @@ issue() {
 issue indexer "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.indexer" "DNS:wazuh.indexer,DNS:localhost,IP:127.0.0.1"
 issue admin "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=admin" "DNS:admin"
 issue connector "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.manager" "DNS:wazuh.manager,DNS:localhost,IP:127.0.0.1"
+issue apid "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.manager" "DNS:wazuh.manager,DNS:localhost,IP:127.0.0.1"
+# The dashboard serves plain HTTP behind Traefik, but its image does not start without a pair
+issue dashboard "/C=US/L=California/O=Wazuh/OU=Wazuh/CN=wazuh.dashboard" "DNS:wazuh.dashboard,DNS:localhost"
 
 # The agent listener needs the public host name, known after the first configure-module
 if [[ -n "${host}" ]]; then
