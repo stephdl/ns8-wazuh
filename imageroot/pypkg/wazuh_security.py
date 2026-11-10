@@ -10,9 +10,6 @@ import copy
 # The rootless pod reaches the host loopback, where the LDAP proxy listens, at this address
 LDAP_HOST_FROM_POD = "10.0.2.2"
 
-# Service accounts must keep using the internal database only
-INTERNAL_USERS = ["admin", "kibanaserver", "wazuh-manager", "wazuh-wui"]
-
 # Read access to the data and to the dashboard. Not kibana_read_only: the dashboard puts that
 # role in read-only mode, which keeps only its own Dashboards app and hides the Wazuh app.
 # The Wazuh API readonly role blocks the changes to agents and rules.
