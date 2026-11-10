@@ -37,7 +37,7 @@ Run action
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0    ${action} failed: ${output}
     ${result} =    Evaluate    json.loads('''${output}''') if '''${output}'''.strip() else {}    modules=json
-    [Return]    ${result}
+    RETURN    ${result}
 
 Run action that fails
     [Arguments]    ${action}    ${data}
@@ -46,7 +46,7 @@ Run action that fails
     ...    api-cli run module/${module_id}/${action} --data '${data}'
     ...    return_rc=True
     Should Not Be Equal As Integers    ${rc}  0    ${action} did not fail: ${output}
-    [Return]    ${output}
+    RETURN    ${output}
 
 Customer of the agent should be
     [Arguments]    ${expected}
@@ -104,7 +104,7 @@ Count agent events
     ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' 'https://localhost:9200/wazuh-events-v5-*/_count' -d '{"query":{"bool":{"filter":[{"term":{"wazuh.agent.name":"${AGENT_NAME}"}},{"term":{"wazuh.space.name":"${space}"}},{"term":{"wazuh.protocol.location":"${location}"}}]}}}'
     Should Contain    ${output}    "count"
     ${count} =    Evaluate    json.loads($output)['count']    modules=json
-    [Return]    ${count}
+    RETURN    ${count}
 
 Agent events should be indexed
     [Arguments]    ${space}    ${location}
