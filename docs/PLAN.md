@@ -1,4 +1,4 @@
-# ns8-wazuh implementation plan (Wazuh 5.0.0-rc1)
+# ns8-wazuh implementation plan (Wazuh 5.0.0-rc2)
 
 This module installs a central Wazuh 5 server on a dedicated NS8 node. The node sits outside the clusters it watches. Wazuh agents on NS8 nodes, other Linux hosts and Windows hosts send their logs to it. The server decodes them, raises alerts, keeps everything searchable and sends alerts to the customer.
 
@@ -36,9 +36,9 @@ Before each phase, read the `nethserver-ns8-module` skill and the matching pages
 
 ## 3. What Wazuh 5 requires
 
-Checked against the 5.0.0 documentation and wazuh-docker `v5.0.0-rc1`.
+Checked against the 5.0.0 documentation and wazuh-docker `v5.0.0-rc1`. Section 11 lists what changed in rc2.
 
-- Images `wazuh/wazuh-{manager,indexer,dashboard}:5.0.0-rc1`. The tags exist on Docker Hub. There is no external SQL database: the indexer (OpenSearch) stores the data and the manager has an internal SQLite.
+- Images `wazuh/wazuh-{manager,indexer,dashboard}:5.0.0-rc2`. The tags exist on Docker Hub. There is no external SQL database: the indexer (OpenSearch) stores the data and the manager has an internal SQLite.
 - Certificates and passwords are needed before the first start. There are no default passwords and the character rules are strict. The `remoted` certificate (agent port 1517) is mandatory and its SAN holds the public FQDN.
 - `alerts.json`, `archives.json`, `<syslog_output>`, `logall` and Filebeat no longer exist. The manager writes directly to the indexer.
 - Decoded events go to `wazuh-events-v5-<category>-*`, alerts to `wazuh-findings-v5-*`, state to `wazuh-states-*`. Events without a decoder are dropped unless `index_unclassified_events` is true.
@@ -145,7 +145,7 @@ Known gaps:
 - Remote agent update with a WPK package, once 5.0.0 is out (see below).
 - Slack, Microsoft Teams, Mattermost and Telegram channels (see below).
 - Generic NS8 dashboards shipped with the module, then one family of NS8 modules at a time (see below).
-- Move from `5.0.0-rc1` to `5.0.0` through the Renovate pull request. Check the agent package name and the staging repository of the install script then: the final packages will likely move to the stable Wazuh repository.
+- Move from `5.0.0-rc2` to `5.0.0` through the Renovate pull request (see section 11 for what Renovate bumps). Check the agent package name and the staging repository of the install script then: the final packages will likely move to the stable Wazuh repository.
 
 **Generic NS8 dashboards.** The dashboard imports saved objects (ndjson) through `POST /api/saved_objects/_import?overwrite=true`. The module ships them in `imageroot/content/dashboards/` and loads them at each configuration and update, like the decoders and rules. Useful to any NS8 customer:
 - Logins: Dovecot and api-server successes and failures, by user, source IP and country, with a map.
@@ -372,3 +372,64 @@ Restore a backup, then configure: check the dashboards are there.
 ### Later
 
 The restart path (64 s in 80start_services, 26 s in 85setup_ldap waiting for the Wazuh API) is not covered here.
+
+## 11. Move to 5.0.0-rc2
+
+The Renovate pull request that bumped the three images to rc2 failed the CI. The indexer started, but the manager and the dashboard refused to start and took the pod down with them. Every test after the install failed, the first one in `configure-module` at `85setup_ldap`.
+
+### What rc2 changed
+
+- The manager keeps its configuration in `/etc/wazuh-manager`. `/var/wazuh-manager/etc` is gone.
+- The manager needs a Server API certificate, `certs/apid.pem` and `certs/apid-key.pem`, and its own copy of the indexer CA, `certs/indexer-ca.pem`. The CA is also expected in `ca/root-ca.pem`.
+- The manager accepts a certificate only when it is owned by `root:wazuh-manager` with mode 0640, in a `certs/` directory with mode 0750. Its paths must be absolute and inside `/etc/wazuh-manager/certs`.
+- The dashboard runs `bin/resolve-credentials.js` before it starts. It wants `certs/dashboard.pem` and `certs/dashboard-key.pem` even with `SERVER_SSL_ENABLED=false`, and one CA per peer: `indexer-ca.pem` and `manager-ca.pem`. It trusts only files owned by root.
+- The API user of the dashboard is now `wazuh-internal-client`. It was `wazuh-wui`. The password still comes from `WAZUH_MANAGER_WUI_PASSWORD`.
+- The images never rewrite an existing volume. A new volume gets the rc2 files, an old one keeps the rc1 files.
+
+### Fresh install
+
+- `wazuh-manager.service` mounts `wazuh-etc` on `/etc/wazuh-manager`. A bind mount keeps the owner and mode of `state/`, and `state/` must stay owned by the module (see `bin/fix-perms`). So the certificates are mounted in `/run/ns8-certs`, and a bash wrapper copies them with `install` to the owner and mode rc2 wants, then runs `tini -- /entrypoint.sh`.
+- The Server API reuses the `connector` pair. Both present the `wazuh.manager` identity.
+- `wazuh-dashboard.service` mounts the root CA as `indexer-ca.pem` and `manager-ca.pem`, and a new `dashboard` pair. The `SERVER_SSL_*` workaround of rc1 is gone.
+- `bin/renew-certs` issues the `dashboard` pair.
+
+### Upgrade of an rc1 module
+
+`imageroot/update-module.d/10migrate_rc2` runs before `20restart`. Each step does nothing on a fresh install and can run twice.
+
+1. Run `renew-certs` to issue the `dashboard` pair.
+2. In `wazuh-etc`, turn the relative `etc/certs/...` paths of `wazuh-manager.conf` into absolute ones, point the indexer CA to `indexer-ca.pem`, and copy the rc2 `wazuh-manager.schema.json`. The result equals the rc2 default, apart from the cluster key. The other files of the directory are the same in rc1 and rc2.
+3. In `rbac.db`, rename `wazuh-wui` to `wazuh-internal-client`. The update fails when that user is still missing, so a broken dashboard login does not go unnoticed.
+4. In `wazuh-dashboard-config`, give the files to `root:wazuh-dashboard`, remove the empty `certs/root-ca.pem` left by the rc1 bind mount, and add the `ca:` line of the Server API host.
+
+The hook runs one-shot containers of the rc2 images on the volumes, with `--security-opt label=disable`, so the rc1 containers keep their SELinux access until the restart.
+
+A backup is always restored with the module version that made it, so a restore needs no migration.
+
+### Agent
+
+`scripts/install-agent.sh` installs `5.0.0-rc2` by default. The package is on the same staging repository, as `wazuh-agent_5.0.0-rc2_amd64.deb` and `wazuh-agent-5.0.0-rc2.x86_64.rpm`. Its version reads `5.0.0-1`.
+
+### Renovate
+
+The staging packages have no datasource Renovate can read. So every Wazuh version in the repository follows the tag of `docker.io/wazuh/wazuh-manager`, and they all sit in the `wazuh` group, with automerge off.
+
+- The three images in `build-images.sh` come from the regex manager of the shared NS8 preset.
+- The default agent version in `scripts/install-agent.sh` has a `# renovate: datasource=docker packageName=docker.io/wazuh/wazuh-manager` comment, read by the first custom manager of `renovate.json`.
+- The versions in `README.md`, `scripts/ansible/update-agents.yml` and the example of `list-agents/validate-output.json` are read by the second custom manager.
+
+A bump therefore opens one pull request that moves the images, the agent and the docs together. It still needs a human: a breaking change like rc2 needs an update hook.
+
+### CI
+
+The QEMU workflow runs two scenarios, `install` and `update`, one per distribution and rotating with the run number. With `SCENARIO=update` the suite installs the last GitHub release of the module, configures it, runs `update-module` to the image under test, then runs the same checks as a fresh install. A Renovate bump that breaks the upgrade path fails there. Check that the agent package exists under the new tag before merging. For 5.0.0 the packages will likely move to the stable repository, which changes `PACKAGE_BASE` too.
+
+### Checks done
+
+- On a workstation, with volumes created by the rc1 images: the hook ran twice without error, then the rc2 manager started all its daemons and the rc2 dashboard passed its credential checks.
+- On rocky9-pve.org: `wazuh1` installed from `main` (rc1) and configured, then `update-module ghcr.io/stephdl/wazuh:fix-wazuh-rc2 wazuh1`. After it the three containers run rc2 and are healthy, `/app/login` answers 200, `rbac.db` holds `wazuh-internal-client`, and the API accepts the dashboard password.
+- An rc2 agent enrolled on debian13-pve2.org. Web traffic to a WordPress site (200, 403, 404), mail accepted and rejected, and failed SMTP logins were decoded. The 10 NS8 dashboards load, all their references resolve, and the 33 fields they use exist in the rc2 templates. rc2 maps a field only when the first document holding it arrives, so an empty install can show "field not found" in a visualization.
+
+### Not done
+
+- Failed sshd logins, such as `Invalid user`, have no decoder. This was already the case in rc1.
