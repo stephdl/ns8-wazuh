@@ -25,6 +25,8 @@ if podman volume exists wazuh-etc; then
     run_on_volume --user 0 --volume wazuh-etc:/etc/wazuh-manager --entrypoint /bin/bash "${WAZUH_MANAGER_IMAGE}" -c '
         set -e
         cd /etc/wazuh-manager
+        # Only an rc1 configuration holds relative certificate paths: later updates skip this step
+        grep -q ">etc/certs/" wazuh-manager.conf || exit 0
         sed -i -e "s|<ca>etc/certs/root-ca.pem</ca>|<ca>/etc/wazuh-manager/certs/indexer-ca.pem</ca>|" \
             -e "s|>etc/certs/|>/etc/wazuh-manager/certs/|g" wazuh-manager.conf
         cp -a /var/wazuh-manager/data_tmp/permanent/etc/wazuh-manager/wazuh-manager.schema.json .
@@ -40,7 +42,9 @@ import os, sqlite3, sys
 path = "/var/wazuh-manager/api/configuration/security/rbac.db"
 if os.path.exists(path):
     with sqlite3.connect(path, timeout=30) as db:
-        db.execute("UPDATE users SET username = ? WHERE username = ?", ("wazuh-internal-client", "wazuh-wui"))
+        # A database that already holds both names keeps them: renaming would break the unique name
+        if not db.execute("SELECT 1 FROM users WHERE username = ?", ("wazuh-internal-client",)).fetchone():
+            db.execute("UPDATE users SET username = ? WHERE username = ?", ("wazuh-internal-client", "wazuh-wui"))
         if not db.execute("SELECT 1 FROM users WHERE username = ?", ("wazuh-internal-client",)).fetchone():
             sys.exit("rbac.db has no wazuh-internal-client user: the dashboard cannot log in to the Server API")
 '
@@ -52,6 +56,8 @@ if podman volume exists wazuh-dashboard-config; then
     run_on_volume --user 0 --volume wazuh-dashboard-config:/usr/share/wazuh-dashboard/config --entrypoint /bin/bash "${WAZUH_DASHBOARD_IMAGE}" -c '
         set -e
         cd /usr/share/wazuh-dashboard/config
+        # Only an rc1 volume belongs to the service user: later updates skip this step
+        [ "$(stat -c %U .)" = root ] && exit 0
         # Left empty by the rc1 bind mount of the CA, nothing reads it now
         rm -f certs/root-ca.pem
         chown -R root:wazuh-dashboard .
