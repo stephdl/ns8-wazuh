@@ -1,0 +1,61 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Bring the volumes of a 5.0.0-rc1 module to the layout of 5.0.0-rc2.
+# A new volume gets its files from the image, so each step only changes the old content and can run again.
+
+set -e
+exec 1>&2
+
+# rc2 also needs a certificate for the Server API and one for the dashboard
+runagent renew-certs
+
+# The containers of the previous version still run on these volumes: no relabel, so they keep their access
+run_on_volume() {
+    podman run --rm --network none --security-opt label=disable "$@"
+}
+
+# rc1 resolved the certificates against /var/wazuh-manager/etc, gone in rc2,
+# and checked the indexer with the root CA, now read from its own file
+if podman volume exists wazuh-etc; then
+    run_on_volume --user 0 --volume wazuh-etc:/etc/wazuh-manager --entrypoint /bin/bash "${WAZUH_MANAGER_IMAGE}" -c '
+        set -e
+        cd /etc/wazuh-manager
+        sed -i -e "s|<ca>etc/certs/root-ca.pem</ca>|<ca>/etc/wazuh-manager/certs/indexer-ca.pem</ca>|" \
+            -e "s|>etc/certs/|>/etc/wazuh-manager/certs/|g" wazuh-manager.conf
+        cp -a /var/wazuh-manager/data_tmp/permanent/etc/wazuh-manager/wazuh-manager.schema.json .
+    '
+fi
+
+# The dashboard logs in to the Server API as wazuh-internal-client, named wazuh-wui in rc1.
+# The database is seeded once and never migrated by the image.
+if podman volume exists wazuh-api-configuration; then
+    run_on_volume --user 0 --volume wazuh-api-configuration:/var/wazuh-manager/api/configuration \
+        --entrypoint /var/wazuh-manager/framework/python/bin/python3 "${WAZUH_MANAGER_IMAGE}" -I -c '
+import os, sqlite3
+path = "/var/wazuh-manager/api/configuration/security/rbac.db"
+if os.path.exists(path):
+    with sqlite3.connect(path, timeout=30) as db:
+        db.execute("UPDATE users SET username = ? WHERE id = 2 AND username = ?", ("wazuh-internal-client", "wazuh-wui"))
+'
+fi
+
+# rc2 trusts only a configuration owned by root, that its service can read but not change, as in the image.
+# It verifies the Server API with a CA of its own, set at each start only when the line is there.
+if podman volume exists wazuh-dashboard-config; then
+    run_on_volume --user 0 --volume wazuh-dashboard-config:/usr/share/wazuh-dashboard/config --entrypoint /bin/bash "${WAZUH_DASHBOARD_IMAGE}" -c '
+        set -e
+        cd /usr/share/wazuh-dashboard/config
+        chown -R root:wazuh-dashboard .
+        chmod -R g-w,o-rwx .
+        for dir in . */; do chmod g+rx "${dir}"; done
+        conf=opensearch_dashboards.yml
+        [ -f "${conf}" ] || exit 0
+        sed -n "/^wazuh_core.hosts:/,/^[^ ]/p" "${conf}" | grep -q "^ *ca:" && exit 0
+        sed -i "/^wazuh_core.hosts:/,/^[^ ]/ s|^\( *\)run_as:.*|&\n\1ca: /usr/share/wazuh-dashboard/config/certs/manager-ca.pem|" "${conf}"
+    '
+fi
