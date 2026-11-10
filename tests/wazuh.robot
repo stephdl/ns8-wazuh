@@ -11,6 +11,10 @@ ${AGENT_SCRIPT}      ${CURDIR}/../scripts/install-agent.sh
 ${CLUSTER_USER}      admin
 ${CLUSTER_PASSWORD}  Nethesis,1234
 ${SCREENSHOTS}       ${OUTPUT DIR}/browser/screenshot
+# install tests the image on a clean node. update starts from the last release, then upgrades it below.
+${SCENARIO}          install
+# Empty: the last GitHub release of the module, as the deployed servers run it
+${UPDATE_FROM}       ${EMPTY}
 
 *** Keywords ***
 Use the install node
@@ -105,7 +109,17 @@ Agent events should be indexed
 *** Test Cases ***
 Check if wazuh is installed correctly
     Use the leader
-    ${output}  ${rc} =    Execute Command    add-module ${IMAGE_URL} ${INSTALL_NODE}
+    ${image} =    Set Variable    ${IMAGE_URL}
+    IF    '${SCENARIO}' == 'update' and '${UPDATE_FROM}' == ''
+        ${tag} =    Execute Command
+        ...    curl -fsS https://api.github.com/repos/stephdl/ns8-wazuh/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])'
+        Should Not Be Empty    ${tag}
+        ${image} =    Set Variable    ghcr.io/stephdl/wazuh:${tag}
+    ELSE IF    '${SCENARIO}' == 'update'
+        ${image} =    Set Variable    ${UPDATE_FROM}
+    END
+    Log    Installing ${image}    console=True
+    ${output}  ${rc} =    Execute Command    add-module ${image} ${INSTALL_NODE}
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
     &{output} =    Evaluate    ${output}
@@ -122,6 +136,16 @@ Check if the secrets are not readable by other users
 Check if wazuh can be configured
     Run action    configure-module
     ...    {"host":"${TEST_HOST}","admin_password":"${ADMIN_PASSWORD}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false}
+
+Check if wazuh updates to the image under test
+    Skip If    '${SCENARIO}' != 'update'    scenario is ${SCENARIO}, nothing to update
+    Use the leader
+    ${output}  ${rc} =    Execute Command    update-module ${IMAGE_URL} ${module_id}
+    ...    return_rc=True  return_stderr=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0    update-module failed: ${output}
+    Use the install node
+    ${env} =    Execute Command    runagent -m ${module_id} printenv IMAGE_URL
+    Should Be Equal    ${env}    ${IMAGE_URL}
 
 Check if wazuh configuration reads back
     ${config} =    Run action    get-configuration
