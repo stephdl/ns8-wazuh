@@ -11,12 +11,17 @@ ${AGENT_SCRIPT}      ${CURDIR}/../scripts/install-agent.sh
 ${CLUSTER_USER}      admin
 ${CLUSTER_PASSWORD}  Nethesis,1234
 ${SCREENSHOTS}       ${OUTPUT DIR}/browser/screenshot
-# install tests the image on a clean node. update starts from the last release, then upgrades it below.
+# install tests the image on a clean node. update starts from the release of the stephdl forge, then upgrades it below.
 ${SCENARIO}          install
-# Empty: the last GitHub release of the module, as the deployed servers run it
-${UPDATE_FROM}       ${EMPTY}
 
 *** Keywords ***
+Enable the stephdl forge
+    # The module is published there, not in the default NS8 repositories
+    ${rc} =    Execute Command
+    ...    api-cli run add-repository --data '{"name":"stephdl","url":"https://forge.de-labrusse.fr/ns8/updates/","status":true}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+
 Use the install node
     # Commands on the node of the module: runagent, ss, the agent. The leader runs the cluster actions.
     Switch Connection    install
@@ -109,16 +114,12 @@ Agent events should be indexed
 *** Test Cases ***
 Check if wazuh is installed correctly
     Use the leader
-    ${image} =    Set Variable    ${IMAGE_URL}
-    IF    '${SCENARIO}' == 'update' and '${UPDATE_FROM}' == ''
-        ${tag} =    Execute Command
-        ...    curl -fsS https://api.github.com/repos/stephdl/ns8-wazuh/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])'
-        Should Not Be Empty    ${tag}
-        ${image} =    Set Variable    ghcr.io/stephdl/wazuh:${tag}
-    ELSE IF    '${SCENARIO}' == 'update'
-        ${image} =    Set Variable    ${UPDATE_FROM}
+    IF    '${SCENARIO}' == 'update'
+        Enable the stephdl forge
+        ${image} =    Set Variable    wazuh
+    ELSE
+        ${image} =    Set Variable    ${IMAGE_URL}
     END
-    Log    Installing ${image}    console=True
     ${output}  ${rc} =    Execute Command    add-module ${image} ${INSTALL_NODE}
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
@@ -140,9 +141,10 @@ Check if wazuh can be configured
 Check if wazuh updates to the image under test
     Skip If    '${SCENARIO}' != 'update'    scenario is ${SCENARIO}, nothing to update
     Use the leader
-    ${output}  ${rc} =    Execute Command    update-module ${IMAGE_URL} ${module_id}
-    ...    return_rc=True  return_stderr=True  return_stdout=False
-    Should Be Equal As Integers    ${rc}  0    update-module failed: ${output}
+    ${rc} =    Execute Command
+    ...    api-cli run update-module --data '{"force":true,"module_url":"${IMAGE_URL}","instances":["${module_id}"]}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
     Use the install node
     ${env} =    Execute Command    runagent -m ${module_id} printenv IMAGE_URL
     Should Be Equal    ${env}    ${IMAGE_URL}

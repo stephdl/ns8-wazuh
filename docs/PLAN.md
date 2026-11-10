@@ -422,7 +422,7 @@ A bump therefore opens one pull request that moves the images, the agent and the
 
 ### CI
 
-The QEMU workflow runs two scenarios, `install` and `update`, one per distribution and rotating with the run number. With `SCENARIO=update` the suite installs the last GitHub release of the module, configures it, runs `update-module` to the image under test, then runs the same checks as a fresh install. A Renovate bump that breaks the upgrade path fails there. Check that the agent package exists under the new tag before merging. For 5.0.0 the packages will likely move to the stable repository, which changes `PACKAGE_BASE` too.
+The QEMU workflow runs two scenarios, `install` and `update`, one per distribution and rotating with the run number. With `SCENARIO=update` the suite adds the stephdl forge (`forge.de-labrusse.fr/ns8/updates`), installs the `wazuh` release it publishes, configures it, runs `update-module` to the image under test, then runs the same checks as a fresh install. A Renovate bump that breaks the upgrade path fails there. Check that the agent package exists under the new tag before merging. For 5.0.0 the packages will likely move to the stable repository, which changes `PACKAGE_BASE` too.
 
 ### Checks done
 
