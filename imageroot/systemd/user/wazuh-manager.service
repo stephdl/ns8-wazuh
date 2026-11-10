@@ -19,6 +19,7 @@ Type=forking
 ExecStartPre=/bin/rm -f %t/wazuh-manager.pid %t/wazuh-manager.ctr-id
 # The manager refuses certificates that are not root:wazuh-manager 0640 in a 0750 certs/ directory.
 # A bind mount keeps the owner and mode of state/, so they are copied in before the entrypoint runs.
+# The Server API presents the same wazuh.manager identity as the indexer connector, so it reuses that pair.
 ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-manager.pid \
     --cidfile %t/wazuh-manager.ctr-id --cgroups=no-conmon \
     --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-manager \
@@ -39,8 +40,8 @@ ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-manager.pid \
     --volume ./certs/connector-key.pem:/run/ns8-certs/indexer-connector-key.pem:ro,Z \
     --volume ./certs/remoted.pem:/run/ns8-certs/remoted.pem:ro,Z \
     --volume ./certs/remoted-key.pem:/run/ns8-certs/remoted-key.pem:ro,Z \
-    --volume ./certs/apid.pem:/run/ns8-certs/apid.pem:ro,Z \
-    --volume ./certs/apid-key.pem:/run/ns8-certs/apid-key.pem:ro,Z \
+    --volume ./certs/connector.pem:/run/ns8-certs/apid.pem:ro,Z \
+    --volume ./certs/connector-key.pem:/run/ns8-certs/apid-key.pem:ro,Z \
     --health-cmd='["/var/wazuh-manager/bin/wazuh-manager-control","status"]' \
     --health-interval=30s \
     --health-timeout=10s \
