@@ -20,6 +20,8 @@ from wazuh_api import api, wait_indexer
 wazuh_api.MEMORY_RETRY_SECONDS = 120
 
 PATTERNS = "wazuh-states-*,wazuh-agent-*"
+# These indices are protected: only the admin certificate may change them, as in restore-snapshot
+CERT = {"admin_cert": True}
 
 
 def flatten(properties, prefix=""):
@@ -53,12 +55,13 @@ def compare(index):
 
 
 def recreate(index):
-    answer = api("DELETE", index)
+    answer = api("DELETE", index, **CERT)
     if "error" in answer:
         sys.exit(f"cannot delete {index}: {answer['error']}")
-    # The manager may not create an index, the indexer does it only at its start: create it now from the template
-    answer = api("PUT", index)
-    if "error" in answer:
+    # The manager may not create an index, the indexer does it only at its start: create it now from the template.
+    # The manager writes all the time, so the index may already be back from the template: that is fine.
+    answer = api("PUT", index, **CERT)
+    if "error" in answer and answer["error"].get("type") != "resource_already_exists_exception":
         sys.exit(f"cannot create {index} again: {answer['error']}")
 
 
@@ -72,7 +75,7 @@ for index in sorted(item["index"] for item in indices):
         print(f"{index}: field types changed, created again: {', '.join(changed[:5])}", file=sys.stderr)
         recreate(index)
     elif missing:
-        answer = api("PUT", f"{index}/_mapping", {"properties": properties})
+        answer = api("PUT", f"{index}/_mapping", {"properties": properties}, **CERT)
         if "error" in answer:
             print(f"{index}: new fields refused ({answer['error'].get('reason')}), created again", file=sys.stderr)
             recreate(index)
