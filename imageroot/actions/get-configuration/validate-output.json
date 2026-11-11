@@ -48,7 +48,11 @@
         "telegram_enabled",
         "telegram_admin_enabled",
         "telegram_chat_id",
-        "telegram_token_set"
+        "telegram_token_set",
+        "talk_enabled",
+        "talk_url",
+        "talk_conversation",
+        "talk_secret_set"
     ],
     "properties": {
         "host": {
@@ -167,6 +171,23 @@
             "type": "boolean",
             "title": "Smarthost enabled",
             "description": "The cluster smarthost is configured, so emails can be sent."
+        },
+        "talk_enabled": {
+            "type": "boolean",
+            "title": "Nextcloud Talk notifications"
+        },
+        "talk_url": {
+            "type": "string",
+            "title": "Nextcloud server"
+        },
+        "talk_conversation": {
+            "type": "string",
+            "title": "Talk conversation token"
+        },
+        "talk_secret_set": {
+            "type": "boolean",
+            "title": "Talk bot secret set",
+            "description": "True when the bot secret is stored. The secret itself is never returned."
         }
     }
 }

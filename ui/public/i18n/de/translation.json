@@ -152,7 +152,27 @@
     "retention_days_minimum": "Geben Sie eine Anzahl von Tagen zwischen 30 und 3650 ein",
     "retention_days_maximum": "Geben Sie eine Anzahl von Tagen zwischen 30 und 3650 ein",
     "notify_recipients_format": "Jede Zeile muss eine gültige E-Mail-Adresse sein",
-    "notify_min_level_enum": "Wählen Sie eine Stufe aus der Liste"
+    "notify_min_level_enum": "Wählen Sie eine Stufe aus der Liste",
+    "talk_title": "Nextcloud-Talk-Benachrichtigungen",
+    "talk_enabled": "Zusammenfassung an Nextcloud Talk senden",
+    "talk_url": "Nextcloud-Server",
+    "talk_url_invalid": "Geben Sie eine HTTPS-Adresse ein, etwa https://cloud.example.com",
+    "talk_conversation": "Token der Unterhaltung",
+    "talk_conversation_helper": "Der letzte Teil des Links der Unterhaltung, etwa a1b2c3d4 in https://cloud.example.com/call/a1b2c3d4. Der Bot muss darin eingerichtet sein.",
+    "talk_conversation_invalid": "Nur Kleinbuchstaben und Ziffern, 4 bis 32",
+    "talk_secret": "Bot-Geheimnis",
+    "talk_secret_set": "Geheimnis gespeichert, zum Ersetzen ein neues eingeben",
+    "talk_secret_helper": "Gemeinsames Geheimnis des Bots, 40 bis 128 Zeichen. Der Nextcloud-Admin legt den Bot mit occ talk:bot:create an und richtet ihn in der Unterhaltung ein, siehe README.",
+    "talk_secret_remove": "Geheimnis entfernen",
+    "talk_secret_remove_title": "Geheimnis des Talk-Bots entfernen",
+    "talk_secret_remove_description": "Nextcloud Talk wird ausgeschaltet und das Geheimnis des Bots hier gelöscht. Um den Bot endgültig zu sperren, deinstallieren Sie ihn in Nextcloud mit occ talk:bot:uninstall.",
+    "talk_secret_invalid": "Das Geheimnis hat 40 bis 128 druckbare Zeichen ohne Leerzeichen",
+    "talk_secret_required": "Geben Sie das Bot-Geheimnis ein",
+    "talk_test": "Testnachricht senden",
+    "talk_test_sent": "Testnachricht gesendet. Sehen Sie in der Unterhaltung nach.",
+    "talk_bot_unverified": "Nextcloud Talk lehnt den Bot ab: Das Geheimnis ist falsch, der Bot ist in dieser Unterhaltung nicht eingerichtet, oder die Unterhaltung existiert nicht",
+    "talk_rate_limited": "Nextcloud Talk sperrt den Bot nach zu vielen Ablehnungen, versuchen Sie es später noch einmal",
+    "talk_unreachable": "Der Nextcloud-Server ist nicht erreichbar"
   },
   "about": {
     "title": "Über"
@@ -179,7 +199,8 @@
     "test-telegram": "Telegram testen",
     "list-telegram-chats": "Telegram-Chats suchen",
     "set-agent-customer": "Kunden eines Agents ändern",
-    "remove-customer": "Kunden entfernen"
+    "remove-customer": "Kunden entfernen",
+    "test-talk": "Nextcloud Talk testen"
   },
   "error": {
     "error": "Fehler",

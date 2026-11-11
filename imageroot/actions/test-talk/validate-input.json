@@ -1,0 +1,33 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Test Nextcloud Talk",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/test-talk",
+    "description": "Post a test message to a Nextcloud Talk conversation through the bot, to check the server, the conversation and the secret",
+    "examples": [
+        {
+            "url": "https://cloud.example.com",
+            "conversation": "a1b2c3d4"
+        }
+    ],
+    "type": "object",
+    "required": ["url", "conversation"],
+    "properties": {
+        "url": {
+            "type": "string",
+            "title": "Nextcloud server",
+            "description": "Base URL of the Nextcloud server, like https://cloud.example.com",
+            "pattern": "^https://[^/?#]+(/[^?#]*)?$"
+        },
+        "conversation": {
+            "type": "string",
+            "title": "Talk conversation token",
+            "pattern": "^[a-z0-9]{4,32}$"
+        },
+        "secret": {
+            "type": "string",
+            "title": "Talk bot secret",
+            "description": "Secret to test before it is saved. Omit to use the saved one.",
+            "pattern": "^([\\x21-\\x7e]{40,128})?$"
+        }
+    }
+}
