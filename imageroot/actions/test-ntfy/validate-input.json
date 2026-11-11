@@ -1,0 +1,38 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Test ntfy",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/test-ntfy",
+    "description": "Publish a test message to an ntfy topic, to check the server, the topic and the access token",
+    "examples": [
+        {
+            "url": "https://ntfy.sh",
+            "topic": "wazuh-alerts"
+        },
+        {
+            "url": "https://ntfy.example.org",
+            "topic": "wazuh-alerts",
+            "token": "tk_example"
+        }
+    ],
+    "type": "object",
+    "required": ["url", "topic"],
+    "properties": {
+        "url": {
+            "type": "string",
+            "title": "ntfy server",
+            "description": "Base URL of the ntfy server, like https://ntfy.sh",
+            "pattern": "^https://[^/?#]+(/[^?#]*)?$"
+        },
+        "topic": {
+            "type": "string",
+            "title": "ntfy topic",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "token": {
+            "type": "string",
+            "title": "ntfy access token",
+            "description": "Token to test before it is saved. Omit to use the saved one.",
+            "pattern": "^(tk_[A-Za-z0-9]+)?$"
+        }
+    }
+}
