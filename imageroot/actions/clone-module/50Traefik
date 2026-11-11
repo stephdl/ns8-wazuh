@@ -24,6 +24,9 @@ configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='conf
     "telegram_enabled": os.environ.get("TELEGRAM_ENABLED") == "True",
     "telegram_admin_enabled": os.environ.get("TELEGRAM_ADMIN_ENABLED") == "True",
     "telegram_chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
+    "mattermost_enabled": os.environ.get("MATTERMOST_ENABLED") == "True",
+    "mattermost_channel": os.environ.get("MATTERMOST_CHANNEL", ""),
+    "mattermost_username": os.environ.get("MATTERMOST_USERNAME", ""),
     "retention_days": int(os.environ.get("LOG_RETENTION_DAYS", "365")),
 })
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

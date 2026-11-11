@@ -1,0 +1,33 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Test Mattermost",
+    "$id": "http://nethserver.org/json-schema/task/input/wazuh/test-mattermost",
+    "description": "Post a test message to a Mattermost incoming webhook, to check the webhook and the channel",
+    "examples": [
+        {},
+        {
+            "webhook": "https://chat.example.org/hooks/xxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "channel": "security",
+            "username": "Wazuh"
+        }
+    ],
+    "type": "object",
+    "properties": {
+        "webhook": {
+            "type": "string",
+            "title": "Mattermost incoming webhook",
+            "description": "Webhook to test before it is saved. Omit to use the saved one.",
+            "pattern": "^(https://[^/?#]+(/[^?#]*)?/hooks/[A-Za-z0-9]+)?$"
+        },
+        "channel": {
+            "type": "string",
+            "title": "Mattermost channel",
+            "pattern": "^(@?[a-z0-9._-]{1,64})?$"
+        },
+        "username": {
+            "type": "string",
+            "title": "Mattermost sender name",
+            "pattern": "^[A-Za-z0-9 ._()-]{0,64}$"
+        }
+    }
+}
