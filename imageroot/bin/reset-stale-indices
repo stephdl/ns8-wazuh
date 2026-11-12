@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Bring the state indices to the mapping of the template of this Wazuh version.
+# A template applies only when an index is created, so after an image update an old index keeps
+# the old mapping. Its mapping is strict: the manager then fails to index the new fields, and an
+# agent whose inventory cannot be stored stops all its synchronization.
+# New fields are added in place and the documents stay. A field that changed its type cannot be
+# changed in place: that index is created again, and the agents report its states at their next sync.
+
+import sys
+import time
+from datetime import datetime, timezone
+
+import wazuh_api
+from wazuh_api import api, wait_indexer
+
+wazuh_api.MEMORY_RETRY_SECONDS = 120
+
+PATTERNS = "wazuh-states-*,wazuh-agent-*"
+# These indices are protected: only the admin certificate may change them, as in restore-snapshot
+CERT = {"admin_cert": True}
+
+
+def flatten(properties, prefix=""):
+    fields = {}
+    for name, spec in properties.items():
+        path = prefix + name
+        if "properties" in spec:
+            fields[path] = "object"
+            fields.update(flatten(spec["properties"], path + "."))
+        else:
+            fields[path] = spec.get("type", "object")
+    return fields
+
+
+def compare(index):
+    """Return the template properties, the missing fields and the fields of another type."""
+    live = api("GET", f"{index}/_mapping")
+    if "error" in live:
+        raise RuntimeError(live["error"].get("reason") or live["error"])
+    live = flatten(live[index]["mappings"].get("properties", {}))
+    template = api("POST", f"_index_template/_simulate_index/{index}")
+    if "error" in template or "template" not in template:
+        # No template of this version matches the index: nothing to compare with
+        return {}, [], []
+    properties = template["template"]["mappings"].get("properties", {})
+    wanted = flatten(properties)
+    missing = [path for path in wanted if path not in live]
+    changed = [f"{path} ({live[path]} instead of {kind})"
+               for path, kind in wanted.items() if path in live and live[path] != kind]
+    return properties, missing, changed
+
+
+def recreate(index):
+    answer = api("DELETE", index, **CERT)
+    if "error" in answer:
+        sys.exit(f"cannot delete {index}: {answer['error']}")
+    # The manager may not create an index, the indexer does it only at its start: create it now from the template.
+    # The manager writes all the time, so the index may already be back from the template: that is fine.
+    answer = api("PUT", index, **CERT)
+    if "error" in answer and answer["error"].get("type") != "resource_already_exists_exception":
+        sys.exit(f"cannot create {index} again: {answer['error']}")
+
+
+def wait_setup():
+    """The indexer is healthy before its setup plugin writes the templates of its version: until then
+    an old index still matches the old template, and nothing looks stale."""
+    for _ in range(60):
+        stats = api("GET", "_nodes/_local/stats/jvm?filter_path=nodes.*.jvm")
+        jvm = next(iter(stats.get("nodes", {}).values()), {}).get("jvm", {})
+        started = (jvm.get("timestamp", 0) - jvm.get("uptime_in_millis", 0)) / 1000
+        status = api("GET", ".wazuh-setup-status/_doc/setup-status", **CERT).get("_source", {})
+        # The plugin writes the document again at each start, so a ready status of the previous run does not count
+        stamp = status.get("timestamp", "")[:19]
+        if status.get("status") == "ready" and stamp and started and \
+                datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc).timestamp() >= started:
+            return
+        time.sleep(10)
+    sys.exit("the setup plugin of the indexer did not finish")
+
+
+wait_indexer()
+wait_setup()
+indices = api("GET", f"_cat/indices/{PATTERNS}?format=json&h=index&expand_wildcards=open")
+if isinstance(indices, dict) and "error" in indices:
+    sys.exit(f"cannot list the indices: {indices['error']}")
+for index in sorted(item["index"] for item in indices):
+    properties, missing, changed = compare(index)
+    if changed:
+        print(f"{index}: field types changed, created again: {', '.join(changed[:5])}", file=sys.stderr)
+        recreate(index)
+    elif missing:
+        answer = api("PUT", f"{index}/_mapping", {"properties": properties}, **CERT)
+        if "error" in answer:
+            print(f"{index}: new fields refused ({answer['error'].get('reason')}), created again", file=sys.stderr)
+            recreate(index)
+        else:
+            print(f"{index}: new fields added: {', '.join(missing[:5])}", file=sys.stderr)

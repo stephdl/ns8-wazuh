@@ -18,24 +18,23 @@ TimeoutStopSec=70
 Type=forking
 ExecStartPre=/bin/rm -f %t/wazuh-dashboard.pid %t/wazuh-dashboard.ctr-id
 # Traefik terminates TLS, so the dashboard speaks plain HTTP on localhost.
-# SERVER_SSL_KEY and SERVER_SSL_CERTIFICATE still have to point to existing files
-# in the rc1 image, even if SERVER_SSL_ENABLED is false: it fails to start otherwise.
+# The image still refuses to start without dashboard.pem and dashboard-key.pem, even if SERVER_SSL_ENABLED is false.
 # The pickers read 100000 lines per shard at most by default, and miss the quiet modules of a busy node.
 ExecStart=/usr/bin/podman run --conmon-pidfile %t/wazuh-dashboard.pid \
     --cidfile %t/wazuh-dashboard.ctr-id --cgroups=no-conmon \
     --pod-id-file %t/wazuh.pod-id --replace -d --name wazuh-dashboard \
     --env SERVER_SSL_ENABLED=false \
-    --env SERVER_SSL_KEY=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
-    --env SERVER_SSL_CERTIFICATE=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
     --env SERVER_PORT=5601 \
     --env SERVER_HOST=0.0.0.0 \
     --env OPENSEARCH_HOSTS=https://wazuh.indexer:9200 \
-    --env OPENSEARCH_SSL_CERTIFICATE_AUTHORITIES=/usr/share/wazuh-dashboard/config/certs/root-ca.pem \
     --env WAZUH_API_URL=https://wazuh.manager \
     --volume wazuh-dashboard-config:/usr/share/wazuh-dashboard/config:Z \
     --volume wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom:Z \
     --volume ./secrets/dashboard.env:/run/secrets/wazuh-credentials:ro,Z \
-    --volume ./ca/root-ca.pem:/usr/share/wazuh-dashboard/config/certs/root-ca.pem:ro,z \
+    --volume ./ca/root-ca.pem:/usr/share/wazuh-dashboard/config/certs/indexer-ca.pem:ro,z \
+    --volume ./ca/root-ca.pem:/usr/share/wazuh-dashboard/config/certs/manager-ca.pem:ro,z \
+    --volume ./certs/dashboard.pem:/usr/share/wazuh-dashboard/config/certs/dashboard.pem:ro,Z \
+    --volume ./certs/dashboard-key.pem:/usr/share/wazuh-dashboard/config/certs/dashboard-key.pem:ro,Z \
     --health-cmd='["curl","-f","-s","-o","/dev/null","http://localhost:5601/app/login"]' \
     --health-interval=30s \
     --health-timeout=10s \

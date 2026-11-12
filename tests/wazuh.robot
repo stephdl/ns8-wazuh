@@ -11,8 +11,18 @@ ${AGENT_SCRIPT}      ${CURDIR}/../scripts/install-agent.sh
 ${CLUSTER_USER}      admin
 ${CLUSTER_PASSWORD}  Nethesis,1234
 ${SCREENSHOTS}       ${OUTPUT DIR}/browser/screenshot
+# install tests the image on a clean node. update starts from the last release of the stephdl forge,
+# the version the deployed servers run, then upgrades it below.
+${SCENARIO}          install
 
 *** Keywords ***
+Enable the stephdl forge
+    # The module is published there, not in the default NS8 repositories
+    ${rc} =    Execute Command
+    ...    api-cli run add-repository --data '{"name":"stephdl","url":"https://forge.de-labrusse.fr/ns8/updates/","status":true}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+
 Use the install node
     # Commands on the node of the module: runagent, ss, the agent. The leader runs the cluster actions.
     Switch Connection    install
@@ -28,7 +38,7 @@ Run action
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0    ${action} failed: ${output}
     ${result} =    Evaluate    json.loads('''${output}''') if '''${output}'''.strip() else {}    modules=json
-    [Return]    ${result}
+    RETURN    ${result}
 
 Run action that fails
     [Arguments]    ${action}    ${data}
@@ -37,7 +47,7 @@ Run action that fails
     ...    api-cli run module/${module_id}/${action} --data '${data}'
     ...    return_rc=True
     Should Not Be Equal As Integers    ${rc}  0    ${action} did not fail: ${output}
-    [Return]    ${output}
+    RETURN    ${output}
 
 Customer of the agent should be
     [Arguments]    ${expected}
@@ -95,7 +105,7 @@ Count agent events
     ...    runagent -m ${module_id} podman exec wazuh-indexer curl -sk -u 'admin:${ADMIN_PASSWORD}' -H 'Content-Type: application/json' 'https://localhost:9200/wazuh-events-v5-*/_count' -d '{"query":{"bool":{"filter":[{"term":{"wazuh.agent.name":"${AGENT_NAME}"}},{"term":{"wazuh.space.name":"${space}"}},{"term":{"wazuh.protocol.location":"${location}"}}]}}}'
     Should Contain    ${output}    "count"
     ${count} =    Evaluate    json.loads($output)['count']    modules=json
-    [Return]    ${count}
+    RETURN    ${count}
 
 Agent events should be indexed
     [Arguments]    ${space}    ${location}
@@ -105,7 +115,13 @@ Agent events should be indexed
 *** Test Cases ***
 Check if wazuh is installed correctly
     Use the leader
-    ${output}  ${rc} =    Execute Command    add-module ${IMAGE_URL} ${INSTALL_NODE}
+    IF    '${SCENARIO}' == 'update'
+        Enable the stephdl forge
+        ${image} =    Set Variable    wazuh
+    ELSE
+        ${image} =    Set Variable    ${IMAGE_URL}
+    END
+    ${output}  ${rc} =    Execute Command    add-module ${image} ${INSTALL_NODE}
     ...    return_rc=True
     Should Be Equal As Integers    ${rc}  0
     &{output} =    Evaluate    ${output}
@@ -122,6 +138,17 @@ Check if the secrets are not readable by other users
 Check if wazuh can be configured
     Run action    configure-module
     ...    {"host":"${TEST_HOST}","admin_password":"${ADMIN_PASSWORD}","lets_encrypt":false,"ldap_domain":"","ldap_admin_group":"","index_unclassified_events":false,"export_url":"","notify_enabled":false}
+
+Check if wazuh updates to the image under test
+    Skip If    '${SCENARIO}' != 'update'    scenario is ${SCENARIO}, nothing to update
+    Use the leader
+    ${rc} =    Execute Command
+    ...    api-cli run update-module --data '{"force":true,"module_url":"${IMAGE_URL}","instances":["${module_id}"]}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+    Use the install node
+    ${env} =    Execute Command    runagent -m ${module_id} printenv IMAGE_URL
+    Should Be Equal    ${env}    ${IMAGE_URL}
 
 Check if wazuh configuration reads back
     ${config} =    Run action    get-configuration
@@ -442,6 +469,10 @@ Check if wazuh is removed correctly
     ${rc} =    Execute Command    firewall-cmd --list-services | grep -q ${module_id}
     ...    return_rc=True  return_stdout=False
     Should Not Be Equal As Integers    ${rc}  0
+    IF    '${SCENARIO}' == 'update'
+        Use the leader
+        Execute Command    api-cli run remove-repository --data '{"name":"stephdl"}'
+    END
 
 Remove the agent from the node
     Use the install node

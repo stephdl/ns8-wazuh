@@ -18,5 +18,37 @@
       "versioning": "semver",
       "automerge": false
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The default agent version of the install script follows the manager image, in the wazuh group",
+      "fileMatch": [
+        "^scripts/install-agent\\.sh$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) packageName=(?<packageName>\\S+)\\s*\\nDEFAULT_VERSION=\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "{{{packageName}}}",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "The Wazuh version written in the docs and examples follows the manager image, in the wazuh group",
+      "fileMatch": [
+        "^README\\.md$",
+        "^scripts/ansible/update-agents\\.yml$",
+        "^imageroot/actions/list-agents/validate-output\\.json$"
+      ],
+      "matchStrings": [
+        "runs Wazuh `(?<currentValue>\\d+\\.\\d+\\.\\d+[^`]*)`",
+        "--update --version (?<currentValue>\\d+\\.\\d+\\.\\d+\\S*)",
+        "wazuh_version=(?<currentValue>\\d+\\.\\d+\\.\\d+\\S*)",
+        "\"package_version\": \"(?<currentValue>\\d+\\.\\d+\\.\\d+[^\"]*)\""
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "docker.io/wazuh/wazuh-manager",
+      "versioningTemplate": "semver"
+    }
   ]
 }

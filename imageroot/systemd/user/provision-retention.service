@@ -15,3 +15,5 @@ EnvironmentFile=%E/state/environment
 WorkingDirectory=%E/state
 SyslogIdentifier=%N
 ExecStart=runagent provision-retention
+# The update hook may run before the indexer writes the templates of the new version: catch up here
+ExecStart=runagent reset-stale-indices

@@ -14,7 +14,8 @@ set -e
 exec 1>&2
 
 cd "${AGENT_STATE_DIR}"
-chmod 0644 certs/*.pem
+# The images refuse a certificate writable by its group, and the umask of the module is 002 on Debian
+chmod 0644 certs/*.pem ca/root-ca.pem
 
 # Rocky keeps vm.max_map_count at 65530 and a rootless module cannot raise it.
 # Below the 262144 the indexer expects, stop it from mapping the index files in memory.

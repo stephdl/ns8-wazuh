@@ -1,7 +1,7 @@
 # Update the Wazuh agents with install-agent.sh, as the Update command of the Agents page does.
 #
 #   ansible-playbook -i inventory.ini scripts/ansible/update-agents.yml \
-#       -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc1
+#       -e module_tag=1.2.0 -e wazuh_version=5.0.0-rc2
 #
 # module_tag: version of the ns8-wazuh module that runs the server (About page).
 # wazuh_version: package version shown by the Update command (--version).
